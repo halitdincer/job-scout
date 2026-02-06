@@ -1,0 +1,15 @@
+{
+  "name": "Microsoft Toronto",
+  "url": "https://apply.careers.microsoft.com/careers?start=0&location=Toronto%2C++ON%2C++Canada&pid=1970393556649678&sort_by=distance&filter_distance=160&filter_include_remote=1&filter_career_discipline=Software+Engineering&filter_seniority=Entry%2CMid-Level",
+  "selectors": {
+    "jobCard": "div[role=\"listitem\"]",
+    "title": "h3",
+    "location": "div[class*=\"location\"]",
+    "link": "a",
+    "company": null,
+    "postedDate": "",
+    "nextPage": "a[aria-label=\"Next\"]"
+  },
+  "pagination": { "type": "click", "maxPages": 5, "delayMs": 1000 },
+  "waitForSelector": "div[role=\"listitem\"]"
+}
