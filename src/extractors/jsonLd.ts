@@ -23,7 +23,7 @@ export async function extractJobsFromJsonLd(page: Page, config: BoardConfig): Pr
   const ldScripts = await page.$$eval('script[type="application/ld+json"]', (scripts) =>
     scripts.map((s) => {
       try {
-        return JSON.parse(s.innerText);
+        return JSON.parse((s as HTMLElement).innerText || s.textContent || '');
       } catch (_e) {
         return null;
       }
