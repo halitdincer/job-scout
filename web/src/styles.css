@@ -1,0 +1,148 @@
+:root {
+  color-scheme: light;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  background: #f3f0ea;
+  color: #1f1d1a;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #fff8eb, #f3f0ea 60%, #ece8df);
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #d9d4cb;
+}
+
+.subtitle {
+  margin-top: 6px;
+  color: #6a6258;
+}
+
+.nav {
+  display: flex;
+  gap: 12px;
+}
+
+.nav a {
+  text-decoration: none;
+  color: #1f1d1a;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: #f5efe5;
+}
+
+.nav a.active {
+  border-color: #b98b2f;
+  background: #ffedc3;
+}
+
+.content {
+  padding-top: 24px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 12px 30px rgba(24, 20, 14, 0.08);
+}
+
+.hero {
+  background: linear-gradient(135deg, #fff0cc, #fff9f0);
+}
+
+.stat {
+  font-size: 2rem;
+  font-weight: 600;
+  margin: 10px 0 0;
+}
+
+.muted {
+  color: #6a6258;
+  font-size: 0.95rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.input,
+.select {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #d9d4cb;
+  font-size: 1rem;
+}
+
+.job-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.job-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.button {
+  background: #1f1d1a;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.tag {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f5efe5;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 720px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}

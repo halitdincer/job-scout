@@ -17,5 +17,9 @@ jobs:
           cache: "npm"
       - name: Install dependencies
         run: npm ci
+      - name: Install web dependencies
+        run: npm --prefix web install
       - name: Run unit tests
         run: npm test
+      - name: Build web app
+        run: npm run web:build

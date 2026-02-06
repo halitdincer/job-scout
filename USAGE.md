@@ -42,6 +42,40 @@ Remove a board:
 npx ts-node src/index.ts --db data/jobscout.sqlite --remove-board "Microsoft Toronto"
 ```
 
+## Static Web App (GitHub Pages)
+
+The static site lives in `web/` and is built with Vite + React. It reads data from:
+
+- `web/public/data/jobs.json`
+- `web/public/data/boards.json`
+
+Generate the static JSON (runs the scraper):
+
+```bash
+npm run data:build
+```
+
+Build the site:
+
+```bash
+npm run web:build
+```
+
+Preview locally:
+
+```bash
+npm run web:dev
+```
+
+### GitHub Pages Automation
+
+The workflow `.github/workflows/pages.yml` runs on a schedule, regenerates `web/public/data/*.json`, builds the site, and deploys to Pages.
+
+Before the first scheduled run:
+
+1. Add at least one board via `--add-board`.
+2. Commit `data/jobscout.sqlite` so the Action has state to read.
+
 Example SQL:
 
 ```sql

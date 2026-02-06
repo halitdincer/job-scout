@@ -36,6 +36,16 @@ To unlink:
 npm unlink -g job-scout
 ```
 
+## Web App (GitHub Pages)
+
+Build and preview locally:
+
+```bash
+npm run data:build
+npm run web:build
+npm run web:dev
+```
+
 ## Option B: Homebrew (shareable)
 
 1) Create a separate tap repo, e.g. `github.com/your-org/homebrew-jobscout`.

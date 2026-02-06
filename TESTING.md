@@ -36,6 +36,12 @@ npx playwright install
 npm run test:browser
 ```
 
+### 3) Build the web app
+
+```bash
+npm run web:build
+```
+
 ## How AIs Should Validate Changes
 
 When making changes, use this checklist:

@@ -1,6 +1,5 @@
 node_modules/
 dist/
-data/jobscout.sqlite
 *.log
 debug.html
 debug.js

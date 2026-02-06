@@ -10,6 +10,9 @@
     "build": "tsc",
     "prepare": "npm run build",
     "scout": "node dist/index.js --db data/jobscout.sqlite",
+    "data:build": "ts-node scripts/generate-site-data.ts",
+    "web:build": "npm --prefix web run build",
+    "web:dev": "npm --prefix web run dev",
     "test": "node --test --require ts-node/register test/**/*.test.ts",
     "test:browser": "RUN_BROWSER_TESTS=1 node --test --require ts-node/register test/**/*.test.ts"
   },
