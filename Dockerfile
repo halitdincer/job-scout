@@ -10,7 +10,7 @@ RUN npm --prefix web install
 COPY web/ web/
 
 # Build the React web app
-RUN npm run web:build
+RUN npm --prefix web run build
 
 # Serve with nginx
 FROM nginx:alpine
