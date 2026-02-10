@@ -6,9 +6,8 @@ WORKDIR /app
 COPY web/package*.json web/
 RUN npm --prefix web install
 
-# Copy web source and any pre-built data
+# Copy web source (including pre-built data in web/public/data/)
 COPY web/ web/
-COPY web/public/data/ web/public/data/ 2>/dev/null || true
 
 # Build the React web app
 RUN npm run web:build
