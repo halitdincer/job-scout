@@ -526,55 +526,66 @@ button { font-family: inherit; }
   color: var(--c-muted);
 }
 
-.selector-field { margin-bottom: 12px; }
-
-.selector-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.selector-input-row .input { flex: 1; min-width: 0; }
+.selector-field { margin-bottom: 10px; }
 
 .required-star { color: var(--c-danger); }
 
-/* AI chip */
-.ai-chip {
-  flex-shrink: 0;
-  max-width: 220px;
+/* AI suggestions panel */
+.ai-suggestions-panel {
+  border: 1.5px solid #C8DAF0;
+  border-radius: var(--r-md);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 5px 10px;
-  border-radius: 20px;
-  border: 1px solid #C8DAF0;
-  background: #EEF3FB;
-  color: var(--c-primary);
-  font-size: 12px;
-  font-family: 'IBM Plex Mono', monospace;
-  cursor: pointer;
-  transition: background 0.12s;
 }
 
-.ai-chip:hover { background: #D8E8F8; }
-
-/* AI ready banner */
-.ai-banner {
+.ai-suggestions-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   background: #EEF3FB;
-  border: 1px solid #C8DAF0;
-  border-radius: var(--r-md);
   padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-primary);
+  border-bottom: 1px solid #C8DAF0;
 }
 
-.ai-banner-label {
-  font-size: 13px;
-  color: var(--c-primary);
+.ai-suggestions-body {
+  background: var(--c-surface);
+}
+
+.ai-suggestion-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.ai-suggestion-row:last-child {
+  border-bottom: none;
+}
+
+.ai-suggestion-label {
+  font-size: 12px;
   font-weight: 500;
+  color: var(--c-muted);
+  white-space: nowrap;
+}
+
+.ai-suggestion-value {
+  font-family: 'IBM Plex Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--c-text);
+  background: #F8F9FA;
+  padding: 3px 7px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 /* Preview section */

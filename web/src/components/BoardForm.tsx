@@ -65,7 +65,7 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
 
   function setSelector(key: SKey, val: string) {
     setSelectors((prev) => ({ ...prev, [key]: val }));
-    setPreviewResult(null); // invalidate preview when selectors change
+    setPreviewResult(null);
   }
 
   async function runAi() {
@@ -89,7 +89,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         return;
       }
       setAiSuggestions(body as AnalyzeResult);
-      // Auto-fill name if empty
       if (!name && body.name) setName(body.name);
     } catch (err: any) {
       setAiError(err.message ?? 'Network error');
@@ -98,19 +97,24 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
     }
   }
 
-  function applyAiField(key: SKey) {
+  function applyOne(key: SKey) {
     const val = aiSuggestions?.selectors?.[key];
-    if (val) setSelector(key, val);
+    if (val) {
+      setSelectors((prev) => ({ ...prev, [key]: val }));
+      setPreviewResult(null);
+    }
   }
 
-  function applyAllAi() {
+  function applyAll() {
     if (!aiSuggestions?.selectors) return;
-    const next = { ...selectors };
-    for (const f of SELECTOR_FIELDS) {
-      const v = aiSuggestions.selectors[f.key];
-      if (v) next[f.key] = v;
-    }
-    setSelectors(next);
+    setSelectors((prev) => {
+      const next = { ...prev };
+      for (const f of SELECTOR_FIELDS) {
+        const v = aiSuggestions.selectors[f.key];
+        if (v) next[f.key] = v;
+      }
+      return next;
+    });
     if (aiSuggestions.waitForSelector) setWaitForSelector(aiSuggestions.waitForSelector);
     setPreviewResult(null);
   }
@@ -161,12 +165,10 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-
     if (!selectors.jobCard.trim() || !selectors.title.trim() || !selectors.link.trim()) {
       setError('Job Card, Title, and Link selectors are required');
       return;
     }
-
     let pagination: Record<string, unknown> | undefined;
     if (paginationText.trim()) {
       try {
@@ -176,7 +178,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         return;
       }
     }
-
     setSubmitting(true);
     try {
       await onSubmit({
@@ -193,9 +194,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
     }
   }
 
-  const hasAiSuggestion = (key: SKey) =>
-    !!(aiSuggestions?.selectors?.[key] && aiSuggestions.selectors[key] !== selectors[key]);
-
   return (
     <form className="board-form" onSubmit={handleSubmit}>
       {error && <p className="error">{error}</p>}
@@ -210,7 +208,8 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         />
       </label>
 
-      <div className="selector-url-row">
+      {/* URL + Run AI */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
         <label className="form-label" style={{ flex: 1 }}>
           URL
           <input
@@ -225,85 +224,91 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
             required
           />
         </label>
-        <div className="selector-url-actions">
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={runAi}
-            disabled={aiLoading || !url.trim()}
-            title="Ask AI to suggest selectors for this URL"
-          >
-            {aiLoading ? 'Analyzing…' : 'Run AI'}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="button button-secondary"
+          style={{ flexShrink: 0, marginBottom: 1 }}
+          onClick={runAi}
+          disabled={aiLoading || !url.trim()}
+          title="Ask AI to suggest CSS selectors for this URL"
+        >
+          {aiLoading ? 'Analyzing…' : 'Run AI'}
+        </button>
       </div>
 
       {aiError && <p className="error">{aiError}</p>}
 
+      {/* AI suggestions panel */}
       {aiSuggestions && (
-        <div className="ai-banner">
-          <span className="ai-banner-label">AI suggestions ready</span>
-          <button type="button" className="button button-small" onClick={applyAllAi}>
-            Apply All
-          </button>
+        <div className="ai-suggestions-panel">
+          <div className="ai-suggestions-header">
+            <span>AI Suggestions</span>
+            <button type="button" className="button button-small" onClick={applyAll}>
+              Apply All
+            </button>
+          </div>
+          <div className="ai-suggestions-body">
+            {SELECTOR_FIELDS.map((f) => {
+              const val = aiSuggestions.selectors[f.key];
+              if (!val) return null;
+              return (
+                <div key={f.key} className="ai-suggestion-row">
+                  <span className="ai-suggestion-label">{f.label}</span>
+                  <code className="ai-suggestion-value">{val}</code>
+                  <button
+                    type="button"
+                    className="button button-secondary button-small"
+                    onClick={() => applyOne(f.key)}
+                  >
+                    Apply
+                  </button>
+                </div>
+              );
+            })}
+            {aiSuggestions.waitForSelector && (
+              <div className="ai-suggestion-row">
+                <span className="ai-suggestion-label">Wait-for selector</span>
+                <code className="ai-suggestion-value">{aiSuggestions.waitForSelector}</code>
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={() => setWaitForSelector(aiSuggestions.waitForSelector!)}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
+      {/* Selector inputs */}
       <fieldset className="selectors-fieldset">
         <legend>Selectors</legend>
-
-        {SELECTOR_FIELDS.map((field) => {
-          const suggestion = aiSuggestions?.selectors?.[field.key];
-          return (
-            <div key={field.key} className="selector-field">
-              <label className="form-label">
-                {field.label}
-                {field.required && <span className="required-star"> *</span>}
-              </label>
-              <div className="selector-input-row">
-                <input
-                  className="input"
-                  value={selectors[field.key]}
-                  onChange={(e) => setSelector(field.key, e.target.value)}
-                  placeholder={field.placeholder}
-                />
-                {suggestion && hasAiSuggestion(field.key) && (
-                  <button
-                    type="button"
-                    className="ai-chip"
-                    onClick={() => applyAiField(field.key)}
-                    title={`Apply AI suggestion: ${suggestion}`}
-                  >
-                    ← {suggestion}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {SELECTOR_FIELDS.map((field) => (
+          <div key={field.key} className="selector-field">
+            <label className="form-label">
+              {field.label}
+              {field.required && <span className="required-star"> *</span>}
+              <input
+                className="input"
+                value={selectors[field.key]}
+                onChange={(e) => setSelector(field.key, e.target.value)}
+                placeholder={field.placeholder}
+              />
+            </label>
+          </div>
+        ))}
       </fieldset>
 
       <label className="form-label">
         Wait-for selector (optional)
-        <div className="selector-input-row">
-          <input
-            className="input"
-            value={waitForSelector}
-            onChange={(e) => setWaitForSelector(e.target.value)}
-            placeholder=".jobs-container"
-          />
-          {aiSuggestions?.waitForSelector &&
-            aiSuggestions.waitForSelector !== waitForSelector && (
-              <button
-                type="button"
-                className="ai-chip"
-                onClick={() => setWaitForSelector(aiSuggestions.waitForSelector!)}
-                title={`Apply AI suggestion: ${aiSuggestions.waitForSelector}`}
-              >
-                ← {aiSuggestions.waitForSelector}
-              </button>
-            )}
-        </div>
+        <input
+          className="input"
+          value={waitForSelector}
+          onChange={(e) => setWaitForSelector(e.target.value)}
+          placeholder=".jobs-container"
+        />
       </label>
 
       <label className="form-label">
@@ -316,6 +321,7 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         />
       </label>
 
+      {/* Preview */}
       <div className="preview-section">
         <div className="row-between">
           <span className="form-section-title">Test selectors</span>
