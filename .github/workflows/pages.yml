@@ -29,6 +29,9 @@ jobs:
       - name: Install web dependencies
         run: npm --prefix web install
 
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
       - name: Generate static data
         run: npm run data:build
 
