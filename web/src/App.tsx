@@ -1,4 +1,4 @@
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { Link, NavLink, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
@@ -13,27 +13,31 @@ function NavBar() {
 
   return (
     <header className="header">
-      <div>
-        <h1>JobScout</h1>
-        <p className="subtitle">Your personal job feed</p>
+      <div className="header-inner">
+        <Link to="/" className="logo">
+          <span className="logo-mark">JS</span>
+          JobScout
+        </Link>
+        <nav className="nav">
+          {user && (
+            <>
+              <NavLink to="/" end>Home</NavLink>
+              <NavLink to="/jobs">Jobs</NavLink>
+              <NavLink to="/boards">Boards</NavLink>
+              <NavLink to="/runs">Runs</NavLink>
+              <button className="button button-secondary button-small" onClick={logout}>
+                Sign out
+              </button>
+            </>
+          )}
+          {!user && (
+            <>
+              <NavLink to="/login">Sign in</NavLink>
+              <NavLink to="/register">Register</NavLink>
+            </>
+          )}
+        </nav>
       </div>
-      <nav className="nav">
-        {user && (
-          <>
-            <NavLink to="/" end>Home</NavLink>
-            <NavLink to="/boards">Boards</NavLink>
-            <NavLink to="/jobs">Jobs</NavLink>
-            <NavLink to="/runs">Runs</NavLink>
-            <button className="button button-small" onClick={logout}>Sign out</button>
-          </>
-        )}
-        {!user && (
-          <>
-            <NavLink to="/login">Sign in</NavLink>
-            <NavLink to="/register">Register</NavLink>
-          </>
-        )}
-      </nav>
     </header>
   );
 }
