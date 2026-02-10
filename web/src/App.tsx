@@ -6,6 +6,7 @@ import BoardsPage from './pages/BoardsPage';
 import JobsPage from './pages/JobsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import RunsPage from './pages/RunsPage';
 
 function NavBar() {
   const { user, logout } = useAuth();
@@ -22,6 +23,7 @@ function NavBar() {
             <NavLink to="/" end>Home</NavLink>
             <NavLink to="/boards">Boards</NavLink>
             <NavLink to="/jobs">Jobs</NavLink>
+            <NavLink to="/runs">Runs</NavLink>
             <button className="button button-small" onClick={logout}>Sign out</button>
           </>
         )}
@@ -66,6 +68,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <JobsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/runs"
+              element={
+                <ProtectedRoute>
+                  <RunsPage />
                 </ProtectedRoute>
               }
             />

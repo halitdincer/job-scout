@@ -4,6 +4,8 @@ import { Database } from 'sqlite';
 import { makeAuthRouter } from './routes/authRouter';
 import { makeBoardsRouter } from './routes/boardsRouter';
 import { makeJobsRouter } from './routes/jobsRouter';
+import { makeRunsRouter } from './routes/runsRouter';
+import { makeSetupRouter } from './routes/setupRouter';
 import { serveStatic } from './static';
 
 export function createApp(db: Database): express.Express {
@@ -21,6 +23,8 @@ export function createApp(db: Database): express.Express {
   app.use('/api/auth', makeAuthRouter(db));
   app.use('/api/boards', makeBoardsRouter(db));
   app.use('/api/jobs', makeJobsRouter(db));
+  app.use('/api/runs', makeRunsRouter(db));
+  app.use('/api/setup', makeSetupRouter());
 
   // Serve React SPA + static assets
   serveStatic(app);

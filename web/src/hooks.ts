@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ApiBoard, JobsResponse } from './types';
+import { ApiBoard, JobsResponse, Run } from './types';
 
 interface JobsParams {
   q?: string;
@@ -73,4 +73,30 @@ export function useBoardsData() {
   }
 
   return { data, error, loading, refresh };
+}
+
+export function useRunsData(boardId?: string) {
+  const [data, setData] = useState<Run[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const query = new URLSearchParams();
+    if (boardId) query.set('boardId', boardId);
+
+    fetch(`/api/runs?${query}`, { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<Run[]>;
+      })
+      .then((payload) => {
+        setData(payload);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [boardId]);
+
+  return { data, error, loading };
 }

@@ -25,6 +25,7 @@
     "node": ">=20 <23"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.8",
     "@types/express": "^5.0.0",

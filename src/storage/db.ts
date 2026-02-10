@@ -8,6 +8,18 @@ export interface DbOptions {
   dbPath: string;
 }
 
+export interface RunRow {
+  id: string;
+  boardId: string;
+  userId: string;
+  startedAt: string;
+  finishedAt: string | null;
+  jobsFound: number;
+  jobsNew: number;
+  status: 'running' | 'success' | 'error';
+  errorMsg: string | null;
+}
+
 export async function openDb({ dbPath }: DbOptions): Promise<Database> {
   await fs.ensureDir(path.dirname(dbPath));
 
@@ -88,6 +100,37 @@ export async function openDb({ dbPath }: DbOptions): Promise<Database> {
     }
   }
 
+  if (currentVersion < 2) {
+    await db.exec('BEGIN');
+    try {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS runs (
+          id TEXT PRIMARY KEY,
+          board_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          started_at TEXT NOT NULL,
+          finished_at TEXT,
+          jobs_found INTEGER NOT NULL DEFAULT 0,
+          jobs_new INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'running',
+          error_msg TEXT
+        );
+      `);
+
+      const jobCols2 = await db.all<{ name: string }[]>('PRAGMA table_info(jobs)');
+      const jobColNames2 = jobCols2.map((c) => c.name);
+      if (!jobColNames2.includes('found_in_run_id')) {
+        await db.exec(`ALTER TABLE jobs ADD COLUMN found_in_run_id TEXT`);
+      }
+
+      await db.exec(`INSERT OR IGNORE INTO schema_version (version) VALUES (2)`);
+      await db.exec('COMMIT');
+    } catch (err) {
+      await db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
   return db;
 }
 
@@ -97,6 +140,86 @@ function chunkArray<T>(items: T[], size: number) {
     chunks.push(items.slice(i, i + size));
   }
   return chunks;
+}
+
+export async function createRun(db: Database, boardId: string, userId: string): Promise<string> {
+  const id = generateUuid();
+  const now = new Date().toISOString();
+  await db.run(
+    `INSERT INTO runs (id, board_id, user_id, started_at, jobs_found, jobs_new, status)
+     VALUES (?, ?, ?, ?, 0, 0, 'running')`,
+    id,
+    boardId,
+    userId,
+    now
+  );
+  return id;
+}
+
+export async function finishRun(
+  db: Database,
+  runId: string,
+  jobsFound: number,
+  jobsNew: number,
+  status: 'success' | 'error',
+  errorMsg?: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db.run(
+    `UPDATE runs SET finished_at = ?, jobs_found = ?, jobs_new = ?, status = ?, error_msg = ?
+     WHERE id = ?`,
+    now,
+    jobsFound,
+    jobsNew,
+    status,
+    errorMsg ?? null,
+    runId
+  );
+}
+
+export async function listRunsForUser(
+  db: Database,
+  userId: string,
+  boardId?: string
+): Promise<RunRow[]> {
+  const conditions = ['user_id = ?'];
+  const params: unknown[] = [userId];
+
+  if (boardId) {
+    conditions.push('board_id = ?');
+    params.push(boardId);
+  }
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const rows = await db.all<{
+    id: string;
+    board_id: string;
+    user_id: string;
+    started_at: string;
+    finished_at: string | null;
+    jobs_found: number;
+    jobs_new: number;
+    status: string;
+    error_msg: string | null;
+  }[]>(
+    `SELECT id, board_id, user_id, started_at, finished_at, jobs_found, jobs_new, status, error_msg
+     FROM runs ${where}
+     ORDER BY started_at DESC
+     LIMIT 100`,
+    params
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    boardId: r.board_id,
+    userId: r.user_id,
+    startedAt: r.started_at,
+    finishedAt: r.finished_at,
+    jobsFound: r.jobs_found,
+    jobsNew: r.jobs_new,
+    status: r.status as RunRow['status'],
+    errorMsg: r.error_msg,
+  }));
 }
 
 export async function upsertJobs(db: Database, jobs: Job[], board: string): Promise<Job[]> {
@@ -177,7 +300,8 @@ export async function upsertJobsForUser(
   db: Database,
   jobs: Job[],
   board: string,
-  userId: string
+  userId: string,
+  runId?: string
 ): Promise<Job[]> {
   if (jobs.length === 0) return [];
 
@@ -203,8 +327,8 @@ export async function upsertJobsForUser(
   try {
     const insertStmt = await db.prepare(`
       INSERT INTO jobs (
-        id, title, company, location, url, posted_date, board, first_seen_at, last_seen_at, user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, title, company, location, url, posted_date, board, first_seen_at, last_seen_at, user_id, found_in_run_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const updateStmt = await db.prepare(`
@@ -225,7 +349,8 @@ export async function upsertJobsForUser(
           board,
           now,
           now,
-          userId
+          userId,
+          runId ?? null
         );
         newJobs.push(job);
       } else {

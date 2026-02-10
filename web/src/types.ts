@@ -31,3 +31,22 @@ export type User = {
   id: string;
   email: string;
 };
+
+export type Run = {
+  id: string;
+  boardId: string;
+  userId: string;
+  startedAt: string;
+  finishedAt: string | null;
+  jobsFound: number;
+  jobsNew: number;
+  status: 'running' | 'success' | 'error';
+  errorMsg: string | null;
+};
+
+export type AnalyzeResult = {
+  url: string;
+  name: string;
+  selectors: Record<string, string | null>;
+  waitForSelector?: string;
+};
