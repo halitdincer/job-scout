@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import { Database } from 'sqlite';
 import { makeAuthRouter } from './routes/authRouter';
@@ -11,6 +11,11 @@ export function createApp(db: Database): express.Express {
 
   app.use(express.json());
   app.use(cookieParser());
+
+  // Health check — always 200, used by K8s probes
+  app.get('/api/health', (_req: Request, res: Response) => {
+    res.json({ status: 'ok' });
+  });
 
   // API routes
   app.use('/api/auth', makeAuthRouter(db));

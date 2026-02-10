@@ -2,7 +2,7 @@ import path from 'path';
 import express, { Express } from 'express';
 
 export function serveStatic(app: Express): void {
-  const distDir = path.join(__dirname, '..', 'web', 'dist');
+  const distDir = path.join(__dirname, '..', '..', 'web', 'dist');
 
   app.use(express.static(distDir));
 
