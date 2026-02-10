@@ -16,7 +16,7 @@ COPY server/ server/
 RUN npm run server:build
 
 # Stage 3: Playwright runtime
-FROM mcr.microsoft.com/playwright:v1.50.0-noble
+FROM mcr.microsoft.com/playwright:v1.58.1-noble
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
