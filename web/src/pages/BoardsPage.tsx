@@ -1,16 +1,14 @@
 import { useState } from 'react';
 import { useBoardsData, useJobsData } from '../hooks';
 import BoardForm from '../components/BoardForm';
-import AnalyzeStep from '../components/AnalyzeStep';
-import { AnalyzeResult, ApiBoard } from '../types';
+import { ApiBoard } from '../types';
 
-type View = 'list' | 'analyze' | 'add' | { type: 'edit'; board: ApiBoard };
+type View = 'list' | 'add' | { type: 'edit'; board: ApiBoard };
 
 export default function BoardsPage() {
   const boards = useBoardsData();
   const jobs = useJobsData();
   const [view, setView] = useState<View>('list');
-  const [analyzeResult, setAnalyzeResult] = useState<AnalyzeResult | null>(null);
   const [actionError, setActionError] = useState('');
 
   if (boards.error) {
@@ -34,7 +32,6 @@ export default function BoardsPage() {
       throw new Error(body.error ?? 'Failed to add board');
     }
     boards.refresh();
-    setAnalyzeResult(null);
     setView('list');
   }
 
@@ -68,34 +65,11 @@ export default function BoardsPage() {
     boards.refresh();
   }
 
-  if (view === 'analyze') {
-    return (
-      <div className="stack">
-        <h2>Add Board</h2>
-        <AnalyzeStep
-          onAnalyzed={(result) => {
-            setAnalyzeResult(result);
-            setView('add');
-          }}
-          onSkip={() => {
-            setAnalyzeResult(null);
-            setView('add');
-          }}
-          onCancel={() => setView('list')}
-        />
-      </div>
-    );
-  }
-
   if (view === 'add') {
     return (
       <div className="stack">
         <h2>Add Board</h2>
-        <BoardForm
-          initial={analyzeResult ?? undefined}
-          onSubmit={handleAdd}
-          onCancel={() => setView('list')}
-        />
+        <BoardForm onSubmit={handleAdd} onCancel={() => setView('list')} />
       </div>
     );
   }
@@ -117,7 +91,7 @@ export default function BoardsPage() {
     <div className="stack">
       <div className="row-between">
         <h2>Boards</h2>
-        <button className="button" onClick={() => setView('analyze')}>
+        <button className="button" onClick={() => setView('add')}>
           + Add Board
         </button>
       </div>

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { chromium } from 'playwright';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../auth/middleware';
+import { scrapeBoard } from '../../src/scraper';
 
 function cleanHtml(raw: string): string {
   return raw
@@ -108,6 +109,33 @@ ${html}`,
       selectors: parsed.selectors ?? {},
       waitForSelector: parsed.waitForSelector ?? undefined,
     });
+  });
+
+  router.post('/preview', async (req: Request, res: Response) => {
+    const { url, selectors, waitForSelector, pagination } = req.body ?? {};
+    if (!url || typeof url !== 'string') {
+      res.status(400).json({ error: 'url is required' });
+      return;
+    }
+    if (!selectors || typeof selectors !== 'object') {
+      res.status(400).json({ error: 'selectors is required' });
+      return;
+    }
+
+    const boardConfig: any = {
+      name: '__preview__',
+      url,
+      selectors,
+      ...(waitForSelector ? { waitForSelector } : {}),
+      ...(pagination ? { pagination } : {}),
+    };
+
+    try {
+      const result = await scrapeBoard(boardConfig);
+      res.json({ jobs: result.jobs.slice(0, 10), total: result.jobs.length });
+    } catch (err) {
+      res.status(422).json({ error: `Preview scrape failed: ${String(err)}` });
+    }
   });
 
   return router;

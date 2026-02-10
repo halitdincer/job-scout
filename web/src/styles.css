@@ -308,6 +308,124 @@ body {
   appearance: auto;
 }
 
+/* Board form — selector fields */
+.selector-url-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.selector-url-actions {
+  flex-shrink: 0;
+  padding-bottom: 1px;
+}
+
+.selectors-fieldset {
+  border: 1px solid #d9d4cb;
+  border-radius: 12px;
+  padding: 16px 18px 8px;
+}
+
+.selectors-fieldset legend {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0 6px;
+  color: #4a4540;
+}
+
+.selector-field {
+  margin-bottom: 12px;
+}
+
+.selector-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.selector-input-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.required-star {
+  color: #b91c1c;
+}
+
+/* AI suggestion chip */
+.ai-chip {
+  flex-shrink: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #b98b2f;
+  background: #fef9ec;
+  color: #7a5c18;
+  font-size: 0.8rem;
+  font-family: "IBM Plex Mono", monospace;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ai-chip:hover {
+  background: #ffedc3;
+}
+
+/* AI ready banner */
+.ai-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fef9ec;
+  border: 1px solid #f0d070;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.ai-banner-label {
+  font-size: 0.9rem;
+  color: #7a5c18;
+}
+
+/* Preview section */
+.preview-section {
+  border: 1px solid #d9d4cb;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-section-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #4a4540;
+}
+
+.preview-count {
+  font-size: 0.9rem;
+  color: #4a4540;
+  margin: 0;
+}
+
+.preview-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.table-compact th,
+.table-compact td {
+  padding: 7px 10px;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 720px) {
   .header {
     flex-direction: column;

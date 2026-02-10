@@ -50,3 +50,17 @@ export type AnalyzeResult = {
   selectors: Record<string, string | null>;
   waitForSelector?: string;
 };
+
+export type PreviewJob = {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  postedDate?: string;
+};
+
+export type PreviewResult = {
+  jobs: PreviewJob[];
+  total: number;
+};
