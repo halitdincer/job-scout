@@ -10,7 +10,7 @@ RUN VITE_BASE_PATH=/ npm --prefix web run build
 FROM node:22-alpine AS server-builder
 WORKDIR /app
 COPY package*.json tsconfig.json tsconfig.server.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY src/ src/
 COPY server/ server/
 RUN npm run server:build
