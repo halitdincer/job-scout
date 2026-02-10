@@ -14,6 +14,8 @@
     "web:dev": "npm --prefix web run dev",
     "server:build": "tsc -p tsconfig.server.json",
     "server:start": "node dist-server/server/index.js",
+    "dev:server": "nodemon --watch server --watch src --ext ts,js --exec 'ts-node server/index.ts'",
+    "dev": "concurrently -n server,web -c cyan,yellow \"npm run dev:server\" \"npm run web:dev\"",
     "test": "node --test --require ts-node/register test/**/*.test.ts",
     "test:browser": "RUN_BROWSER_TESTS=1 node --test --require ts-node/register test/**/*.test.ts"
   },
@@ -48,6 +50,8 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/node-cron": "^3.0.11"
+    "@types/node-cron": "^3.0.11",
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.11"
   }
 }

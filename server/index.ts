@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { openDb } from '../src/storage/db';
 import { createApp } from './app';
 import { startScheduler } from './cron/scheduler';

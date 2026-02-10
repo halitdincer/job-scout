@@ -1,0 +1,26 @@
+{
+  "name": "Job Scout",
+  "image": "mcr.microsoft.com/playwright:v1.58.1-noble",
+  "postCreateCommand": "npm install && npm --prefix web install && mkdir -p data",
+  "forwardPorts": [3000, 5173],
+  "portsAttributes": {
+    "3000": { "label": "API Server", "onAutoForward": "silent" },
+    "5173": { "label": "Dev UI", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss"
+      ],
+      "settings": {
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  },
+  "remoteEnv": {
+    "DB_PATH": "/workspaces/job-scout/data/jobscout.sqlite"
+  }
+}

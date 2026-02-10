@@ -1,6 +1,9 @@
 node_modules/
 dist/
+dist-server/
 *.log
 debug.html
 debug.js
 .DS_Store
+.env
+data/
