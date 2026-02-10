@@ -9,8 +9,8 @@ RUN npm --prefix web install
 # Copy web source (including pre-built data in web/public/data/)
 COPY web/ web/
 
-# Build the React web app
-RUN npm --prefix web run build
+# Build the React web app (base path set to / for direct domain deployment)
+RUN VITE_BASE_PATH=/ npm --prefix web run build
 
 # Serve with nginx
 FROM nginx:alpine
