@@ -4,12 +4,14 @@ export type Job = {
   company: string;
   location: string;
   url: string;
-  foundAt: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
   postedDate?: string;
   board: string;
 };
 
-export type BoardConfig = {
+export type ApiBoard = {
+  id: string;
   name: string;
   url: string;
   selectors: Record<string, string | null>;
@@ -17,12 +19,15 @@ export type BoardConfig = {
   waitForSelector?: string;
 };
 
-export type SiteData = {
-  generatedAt: string;
+export type JobsResponse = {
   jobs: Job[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
 };
 
-export type BoardsData = {
-  generatedAt: string;
-  boards: BoardConfig[];
+export type User = {
+  id: string;
+  email: string;
 };

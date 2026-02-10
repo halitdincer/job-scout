@@ -13,6 +13,8 @@
     "data:build": "ts-node scripts/generate-site-data.ts",
     "web:build": "npm --prefix web run build",
     "web:dev": "npm --prefix web run dev",
+    "server:build": "tsc -p tsconfig.server.json",
+    "server:start": "node dist-server/server/index.js",
     "test": "node --test --require ts-node/register test/**/*.test.ts",
     "test:browser": "RUN_BROWSER_TESTS=1 node --test --require ts-node/register test/**/*.test.ts"
   },
@@ -24,14 +26,28 @@
     "node": ">=20 <23"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^5.0.0",
     "@types/fs-extra": "^11.0.4",
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^25.2.0",
+    "@types/uuid": "^10.0.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
+    "express": "^4.21.2",
     "fs-extra": "^11.3.3",
+    "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3",
     "playwright": "^1.58.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11"
   }
 }

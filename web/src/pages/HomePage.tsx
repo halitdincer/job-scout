@@ -1,4 +1,5 @@
 import { useBoardsData, useJobsData } from '../hooks';
+import { useAuth } from '../context/AuthContext';
 
 function formatDate(value?: string) {
   if (!value) return 'Unknown';
@@ -7,24 +8,28 @@ function formatDate(value?: string) {
 }
 
 export default function HomePage() {
-  const jobs = useJobsData();
+  const jobs = useJobsData({ limit: 1 });
   const boards = useBoardsData();
+  const { user } = useAuth();
 
   if (jobs.error || boards.error) {
     return <div className="card">Failed to load data.</div>;
   }
 
-  const jobCount = jobs.data?.jobs.length ?? 0;
-  const boardCount = boards.data?.boards.length ?? 0;
+  const jobCount = jobs.data?.total ?? 0;
+  const boardCount = (boards.data ?? []).length;
+  const latestJob = jobs.data?.jobs[0];
 
   return (
     <div className="stack">
       <section className="card hero">
-        <h2>Latest scrape</h2>
+        <h2>Welcome, {user?.email}</h2>
         <p>
-          {jobCount} jobs across {boardCount} boards.
+          {jobCount} job{jobCount !== 1 ? 's' : ''} across {boardCount} board{boardCount !== 1 ? 's' : ''}.
         </p>
-        <p className="muted">Last generated: {formatDate(jobs.data?.generatedAt)}</p>
+        <p className="muted">
+          Last activity: {formatDate(latestJob?.lastSeenAt)}
+        </p>
       </section>
 
       <section className="grid">
@@ -37,9 +42,9 @@ export default function HomePage() {
           <p className="stat">{jobCount}</p>
         </div>
         <div className="card">
-          <h3>Newest job</h3>
+          <h3>Latest job</h3>
           <p className="muted">
-            {jobs.data?.jobs[0]?.title ? jobs.data.jobs[0].title : 'No jobs yet'}
+            {latestJob?.title ?? 'No jobs yet'}
           </p>
         </div>
       </section>

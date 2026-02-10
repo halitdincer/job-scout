@@ -23,3 +23,5 @@ jobs:
         run: npm test
       - name: Build web app
         run: npm run web:build
+      - name: Build server
+        run: npm run server:build

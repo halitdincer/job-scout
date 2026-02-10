@@ -135,6 +135,105 @@ body {
   font-size: 0.85rem;
 }
 
+/* Auth pages */
+.auth-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 40px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Forms */
+.form-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.textarea {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.board-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Button variants */
+.button {
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.button-secondary {
+  background: #f5efe5;
+  color: #1f1d1a;
+  border: 1px solid #d9d4cb;
+}
+
+.button-small {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+}
+
+.button-danger {
+  background: #b91c1c;
+}
+
+/* Card actions */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Row layout */
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Error message */
+.error {
+  color: #b91c1c;
+  font-size: 0.95rem;
+}
+
+/* Nav button */
+.nav .button {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 8px 14px;
+}
+
 @media (max-width: 720px) {
   .header {
     flex-direction: column;

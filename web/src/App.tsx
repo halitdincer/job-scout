@@ -1,32 +1,77 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import BoardsPage from './pages/BoardsPage';
 import JobsPage from './pages/JobsPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+
+function NavBar() {
+  const { user, logout } = useAuth();
+
+  return (
+    <header className="header">
+      <div>
+        <h1>JobScout</h1>
+        <p className="subtitle">Your personal job feed</p>
+      </div>
+      <nav className="nav">
+        {user && (
+          <>
+            <NavLink to="/" end>Home</NavLink>
+            <NavLink to="/boards">Boards</NavLink>
+            <NavLink to="/jobs">Jobs</NavLink>
+            <button className="button button-small" onClick={logout}>Sign out</button>
+          </>
+        )}
+        {!user && (
+          <>
+            <NavLink to="/login">Sign in</NavLink>
+            <NavLink to="/register">Register</NavLink>
+          </>
+        )}
+      </nav>
+    </header>
+  );
+}
 
 export default function App() {
   return (
-    <div className="app">
-      <header className="header">
-        <div>
-          <h1>JobScout</h1>
-          <p className="subtitle">Static job tracker powered by scheduled scrapes</p>
-        </div>
-        <nav className="nav">
-          <NavLink to="/" end>
-            Home
-          </NavLink>
-          <NavLink to="/boards">Boards</NavLink>
-          <NavLink to="/jobs">Jobs</NavLink>
-        </nav>
-      </header>
-
-      <main className="content">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/boards" element={<BoardsPage />} />
-          <Route path="/jobs" element={<JobsPage />} />
-        </Routes>
-      </main>
-    </div>
+    <AuthProvider>
+      <div className="app">
+        <NavBar />
+        <main className="content">
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/boards"
+              element={
+                <ProtectedRoute>
+                  <BoardsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/jobs"
+              element={
+                <ProtectedRoute>
+                  <JobsPage />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </main>
+      </div>
+    </AuthProvider>
   );
 }

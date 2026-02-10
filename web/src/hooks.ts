@@ -1,30 +1,76 @@
 import { useEffect, useState } from 'react';
-import { BoardsData, SiteData } from './types';
+import { ApiBoard, JobsResponse } from './types';
 
-export function useJobsData() {
-  const [data, setData] = useState<SiteData | null>(null);
+interface JobsParams {
+  q?: string;
+  board?: string;
+  page?: number;
+  limit?: number;
+}
+
+export function useJobsData(params: JobsParams = {}) {
+  const { q = '', board = '', page = 1, limit = 25 } = params;
+  const [data, setData] = useState<JobsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('./data/jobs.json')
-      .then((res) => res.json())
-      .then((payload) => setData(payload))
-      .catch((err) => setError(err.message));
-  }, []);
+    setLoading(true);
+    const query = new URLSearchParams();
+    if (q) query.set('q', q);
+    if (board) query.set('board', board);
+    query.set('page', String(page));
+    query.set('limit', String(limit));
 
-  return { data, error };
+    fetch(`/api/jobs?${query}`, { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<JobsResponse>;
+      })
+      .then((payload) => {
+        setData(payload);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [q, board, page, limit]);
+
+  return { data, error, loading };
 }
 
 export function useBoardsData() {
-  const [data, setData] = useState<BoardsData | null>(null);
+  const [data, setData] = useState<ApiBoard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('./data/boards.json')
-      .then((res) => res.json())
-      .then((payload) => setData(payload))
-      .catch((err) => setError(err.message));
+    fetch('/api/boards', { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<ApiBoard[]>;
+      })
+      .then((payload) => {
+        setData(payload);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
   }, []);
 
-  return { data, error };
+  function refresh() {
+    setLoading(true);
+    fetch('/api/boards', { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<ApiBoard[]>;
+      })
+      .then((payload) => {
+        setData(payload);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  return { data, error, loading, refresh };
 }

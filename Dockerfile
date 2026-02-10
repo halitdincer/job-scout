@@ -1,32 +1,28 @@
-FROM node:22-alpine AS builder
-
+# Stage 1: Build React SPA
+FROM node:22-alpine AS web-builder
 WORKDIR /app
-
-# Install web dependencies
 COPY web/package*.json web/
 RUN npm --prefix web install
-
-# Copy web source (including pre-built data in web/public/data/)
 COPY web/ web/
-
-# Build the React web app (base path set to / for direct domain deployment)
 RUN VITE_BASE_PATH=/ npm --prefix web run build
 
-# Serve with nginx
-FROM nginx:alpine
+# Stage 2: Compile TypeScript server
+FROM node:22-alpine AS server-builder
+WORKDIR /app
+COPY package*.json tsconfig.json tsconfig.server.json ./
+RUN npm ci
+COPY src/ src/
+COPY server/ server/
+RUN npm run server:build
 
-COPY --from=builder /app/web/dist /usr/share/nginx/html
-
-# Config for single-page app routing
-RUN printf 'server {\n\
-    listen 80;\n\
-    root /usr/share/nginx/html;\n\
-    index index.html;\n\
-    location / {\n\
-        try_files $uri $uri/ /index.html;\n\
-    }\n\
-}\n' > /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Stage 3: Playwright runtime
+FROM mcr.microsoft.com/playwright:v1.50.0-noble
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY --from=server-builder /app/dist-server/ dist-server/
+COPY --from=web-builder /app/web/dist/ web/dist/
+ENV DB_PATH=/data/jobscout.sqlite
+ENV PORT=3000
+EXPOSE 3000
+CMD ["node", "dist-server/server/index.js"]
