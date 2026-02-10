@@ -1,0 +1,17 @@
+node_modules
+dist
+*.log
+.git
+data
+brew
+bin
+src
+scripts
+test
+boards.example.json
+debug.html
+debug.js
+tsconfig.json
+package-lock.json
+web/node_modules
+web/dist
