@@ -8,7 +8,6 @@
   },
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
     "scout": "node dist/index.js --db data/jobscout.sqlite",
     "data:build": "ts-node scripts/generate-site-data.ts",
     "web:build": "npm --prefix web run build",
