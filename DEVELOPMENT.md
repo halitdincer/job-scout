@@ -65,25 +65,36 @@ Copy `.env.example` to `.env` and fill in your values. The `.env` file is git-ig
 
 ## Deploying
 
-Push to `main` — GitHub Actions builds the Docker image, pushes to GHCR, then the self-hosted runner on the K3s VM runs `kubectl rollout restart`.
+**Just push to `main`.** The full pipeline is automatic:
 
-### One-time runner setup (already done on K3s VM)
-The runner binary is at `/opt/actions-runner/` on the K3s VM (`192.168.2.216`).
-
-To register or re-register the runner:
-1. Go to https://github.com/halitdincer/job-scout/settings/actions/runners/new
-2. Copy the registration token
-3. SSH to K3s VM and run:
-   ```bash
-   ssh root@192.168.2.216
-   /opt/actions-runner/register.sh <YOUR_TOKEN>
-   ```
-The runner installs itself as a systemd service and starts automatically on boot.
-
-To check runner status:
-```bash
-ssh root@192.168.2.216 "cd /opt/actions-runner && ./svc.sh status"
 ```
+git push origin main
+   ↓ (~2 min)
+GitHub Actions: builds Docker image → pushes ghcr.io/halitdincer/job-scout:latest + :sha-<sha>
+   ↓ (~2 min poll)
+ArgoCD Image Updater: detects new digest on :latest
+   ↓
+ArgoCD: syncs job-scout Application → K3s deploys new pod
+   ↓
+https://jobs.halitdincer.com serves the new version
+```
+
+**Do not** manually run `kubectl apply`, `kubectl rollout restart`, or push Docker images by hand. The pipeline handles everything.
+
+### Pipeline components (all on K3s VM, 192.168.2.216)
+
+| Component | What it does |
+|---|---|
+| GitHub Actions (`.github/workflows/docker.yml`) | Builds + pushes to GHCR on every push to `main` |
+| ArgoCD Image Updater | Polls GHCR every 2 min, triggers deploy on new digest |
+| ArgoCD (`job-scout` Application) | Syncs `homeserver-iac/k3s-manifests/job-scout/` kustomize manifests |
+| K3s | Runs the pod, serves traffic via nginx ingress |
+
+### Kubernetes manifests
+
+Live in `homeserver-iac` repo at `k3s-manifests/job-scout/` (kustomize).
+Changes to those manifests (resource limits, env vars, etc.) deploy automatically via ArgoCD.
+**Do not** edit the K3s resources directly with `kubectl edit` — ArgoCD's `selfHeal` will revert them.
 
 ---
 
