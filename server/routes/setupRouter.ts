@@ -4,15 +4,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../auth/middleware';
 import { scrapeBoard } from '../../src/scraper';
 
-function cleanHtml(raw: string): string {
-  return raw
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .slice(0, 15000);
-}
-
 export function makeSetupRouter(): Router {
   const router = Router();
 
@@ -31,12 +22,80 @@ export function makeSetupRouter(): Router {
     }
 
     let browser;
-    let rawHtml = '';
+    let simplifiedHtml = '';
     try {
       browser = await chromium.launch();
       const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-      rawHtml = await page.content();
+
+      // domcontentloaded is fast; networkidle gives SPAs extra time but won't fail if they never idle
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+      // Run DOM simplification inside the browser so we can use computed styles and real DOM APIs
+      simplifiedHtml = await page.evaluate(() => {
+        const SKIP_TAGS = new Set(['script', 'style', 'svg', 'noscript', 'iframe', 'canvas']);
+
+        // Skip root-level chrome elements
+        const ROOT_SKIP_TAGS = new Set(['nav', 'header', 'footer']);
+
+        function isVisible(el: Element): boolean {
+          const cs = window.getComputedStyle(el);
+          if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0')
+            return false;
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 && rect.height === 0) return false;
+          return true;
+        }
+
+        function simplifyNode(node: Node, depth: number): string {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = (node.textContent ?? '').trim().slice(0, 120);
+            return text ? text + ' ' : '';
+          }
+          if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+          const el = node as Element;
+          const tag = el.tagName.toLowerCase();
+
+          if (SKIP_TAGS.has(tag)) return '';
+          if (depth <= 2 && ROOT_SKIP_TAGS.has(tag)) return '';
+          if (!isVisible(el)) return '';
+
+          // Keep only stable, meaningful attributes
+          const keepAttrs: string[] = [];
+          for (const attr of ['id', 'class', 'href', 'role', 'data-job-id', 'data-testid', 'aria-label']) {
+            const val = el.getAttribute(attr);
+            if (val) {
+              // Strip hashed CSS-module class names; keep semantic ones
+              if (attr === 'class') {
+                const cleanClasses = val
+                  .split(/\s+/)
+                  .filter((c) => !/^(sc-|css-|[a-z]+-[A-Za-z0-9]{6,}$)/.test(c))
+                  .join(' ')
+                  .trim();
+                if (cleanClasses) keepAttrs.push(`class="${cleanClasses}"`);
+              } else {
+                keepAttrs.push(`${attr}="${val.slice(0, 200)}"`);
+              }
+            }
+          }
+
+          const attrStr = keepAttrs.length ? ' ' + keepAttrs.join(' ') : '';
+          const children = Array.from(el.childNodes)
+            .map((n) => simplifyNode(n, depth + 1))
+            .join('')
+            .trim();
+
+          if (!children && !el.hasAttribute('href')) return '';
+          return `<${tag}${attrStr}>${children}</${tag}>`;
+        }
+
+        // Prefer main content area; fall back to body
+        const root: Element =
+          document.querySelector('main, [role="main"]') ?? document.body;
+
+        return simplifyNode(root, 0).slice(0, 40000);
+      });
     } catch (err) {
       res.status(422).json({ error: `Failed to load page: ${String(err)}` });
       return;
@@ -44,70 +103,88 @@ export function makeSetupRouter(): Router {
       if (browser) await browser.close();
     }
 
-    const html = cleanHtml(rawHtml);
-
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    let analysisText = '';
+    const tool: Anthropic.Tool = {
+      name: 'report_selectors',
+      description: 'Report the CSS selectors needed to scrape job listings from this page.',
+      input_schema: {
+        type: 'object' as const,
+        required: ['name', 'selectors'],
+        properties: {
+          name: { type: 'string', description: 'Short human-readable name for this job board' },
+          selectors: {
+            type: 'object' as const,
+            required: ['jobCard', 'title', 'link'],
+            properties: {
+              jobCard:    { type: 'string', description: 'Selector for each job listing container' },
+              title:      { type: 'string', description: 'Selector for job title, relative to jobCard' },
+              link:       { type: 'string', description: 'Selector for the <a> link, relative to jobCard' },
+              company:    { type: ['string', 'null'], description: 'Selector for company name, relative to jobCard, or null' },
+              location:   { type: ['string', 'null'], description: 'Selector for location, relative to jobCard, or null' },
+              postedDate: { type: ['string', 'null'], description: 'Selector for posted date, relative to jobCard, or null' },
+            },
+          },
+          waitForSelector: {
+            type: ['string', 'null'],
+            description: 'A selector to wait for before scraping, or null',
+          },
+        },
+      },
+    };
+
+    let toolInput: any;
     try {
       const message = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
+        tools: [tool],
+        tool_choice: { type: 'tool', name: 'report_selectors' },
         messages: [
           {
             role: 'user',
-            content: `You are analyzing a job board webpage. Given the HTML below, extract CSS selectors for scraping jobs.
+            content: `You are an expert at reverse-engineering CSS selectors for job board scrapers.
 
-Return ONLY valid JSON (no markdown, no explanation) in this exact shape:
-{
-  "name": "<short board name>",
-  "selectors": {
-    "jobCard": "<CSS selector for each job listing container>",
-    "title": "<CSS selector for job title within card>",
-    "company": "<CSS selector for company name within card, or null>",
-    "location": "<CSS selector for location within card, or null>",
-    "link": "<CSS selector for the job link (a tag) within card>",
-    "postedDate": "<CSS selector for posted date within card, or null>"
-  },
-  "waitForSelector": "<CSS selector to wait for before scraping, or null>"
-}
+Analyze the simplified HTML below and call the report_selectors tool with the best selectors.
 
-HTML:
-${html}`,
+Rules:
+- Look for **repeating list patterns** — that is where the job cards are.
+- Prefer **stable selectors**: tag names, semantic class names, data-* attributes, id attributes, role attributes.
+- **Avoid hashed/generated class names** (e.g. sc-abc123, css-xyz789) — they break on redeployment.
+- title, company, location, link, and postedDate selectors are **relative to jobCard** (used with jobCard.querySelector(sel)).
+- If a field is not present in the HTML, set it to null.
+
+Simplified HTML (main content area only):
+${simplifiedHtml}`,
           },
         ],
       });
 
-      analysisText = message.content
-        .filter((b) => b.type === 'text')
-        .map((b) => (b as { type: 'text'; text: string }).text)
-        .join('');
+      const toolUse = message.content.find((b) => b.type === 'tool_use');
+      if (!toolUse || toolUse.type !== 'tool_use') {
+        res.status(502).json({ error: 'AI did not return a tool call' });
+        return;
+      }
+      toolInput = toolUse.input;
     } catch (err) {
       res.status(502).json({ error: `AI analysis failed: ${String(err)}` });
       return;
     }
 
-    // Defensive JSON extraction: find first { to last }
-    const start = analysisText.indexOf('{');
-    const end = analysisText.lastIndexOf('}');
-    if (start === -1 || end === -1) {
-      res.status(502).json({ error: 'AI returned unexpected response format' });
-      return;
-    }
-
-    let parsed: any;
-    try {
-      parsed = JSON.parse(analysisText.slice(start, end + 1));
-    } catch {
-      res.status(502).json({ error: 'AI returned invalid JSON' });
+    // Validate required selectors
+    const selectors = toolInput?.selectors ?? {};
+    if (!selectors.jobCard || !selectors.title || !selectors.link) {
+      res.status(502).json({
+        error: 'AI could not identify required selectors (jobCard, title, link). The page may require authentication or use a format Claude cannot parse.',
+      });
       return;
     }
 
     res.json({
       url,
-      name: parsed.name ?? '',
-      selectors: parsed.selectors ?? {},
-      waitForSelector: parsed.waitForSelector ?? undefined,
+      name: toolInput.name ?? '',
+      selectors,
+      waitForSelector: toolInput.waitForSelector ?? undefined,
     });
   });
 
