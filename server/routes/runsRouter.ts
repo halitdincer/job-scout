@@ -25,7 +25,7 @@ export function makeRunsRouter(db: Database): Router {
 
   router.get('/:id', async (req: Request, res: Response) => {
     try {
-      const run = await getScrapeRunDetail(db, req.params.id, req.userId!);
+      const run = await getScrapeRunDetail(db, req.params.id as string, req.userId!);
       if (!run) {
         res.status(404).json({ error: 'Run not found' });
         return;
