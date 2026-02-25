@@ -45,8 +45,11 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
     fromInitialSelectors(initial?.selectors)
   );
   const [waitForSelector, setWaitForSelector] = useState(initial?.waitForSelector ?? '');
-  const [paginationText, setPaginationText] = useState(
-    initial?.pagination ? JSON.stringify(initial.pagination, null, 2) : ''
+  const [paginationType, setPaginationType] = useState<string>(
+    (initial?.pagination?.type as string) ?? ''
+  );
+  const [urlTemplate, setUrlTemplate] = useState<string>(
+    (initial?.pagination as any)?.urlTemplate ?? ''
   );
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -103,6 +106,20 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
     }
   }
 
+  function buildPagination(): Record<string, unknown> | undefined {
+    if (!paginationType) return undefined;
+    if (paginationType === 'url') {
+      return { type: 'url', urlTemplate: urlTemplate.trim() || undefined, maxPages: 10 };
+    }
+    return { type: paginationType, maxPages: 10, delayMs: 500 };
+  }
+
+  function applyPaginationSuggestion(pagination: Record<string, unknown>) {
+    const pt = pagination.type as string;
+    if (pt) setPaginationType(pt);
+    if (pagination.urlTemplate) setUrlTemplate(pagination.urlTemplate as string);
+  }
+
   function applyAll() {
     if (!aiSuggestions?.selectors) return;
     setSelectors((prev) => {
@@ -114,8 +131,8 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
       return next;
     });
     if (aiSuggestions.waitForSelector) setWaitForSelector(aiSuggestions.waitForSelector);
-    if (aiSuggestions.pagination && !paginationText.trim()) {
-      setPaginationText(JSON.stringify(aiSuggestions.pagination, null, 2));
+    if (aiSuggestions.pagination && !paginationType) {
+      applyPaginationSuggestion(aiSuggestions.pagination);
     }
     setPreviewResult(null);
   }
@@ -129,16 +146,7 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
     setPreviewError('');
     setPreviewResult(null);
     try {
-      let pagination: Record<string, unknown> | undefined;
-      if (paginationText.trim()) {
-        try {
-          pagination = JSON.parse(paginationText);
-        } catch {
-          setPreviewError('Pagination JSON is invalid');
-          setPreviewLoading(false);
-          return;
-        }
-      }
+      const pagination = buildPagination();
       const res = await fetch('/api/setup/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -170,15 +178,7 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
       setError('Job Card, Title, and Link selectors are required');
       return;
     }
-    let pagination: Record<string, unknown> | undefined;
-    if (paginationText.trim()) {
-      try {
-        pagination = JSON.parse(paginationText);
-      } catch {
-        setError('Pagination must be valid JSON');
-        return;
-      }
-    }
+    const pagination = buildPagination();
     setSubmitting(true);
     try {
       await onSubmit({
@@ -311,9 +311,7 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
                 <button
                   type="button"
                   className="button button-secondary button-small"
-                  onClick={() =>
-                    setPaginationText(JSON.stringify(aiSuggestions.pagination, null, 2))
-                  }
+                  onClick={() => applyPaginationSuggestion(aiSuggestions.pagination!)}
                 >
                   Apply
                 </button>
@@ -353,14 +351,30 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
       </label>
 
       <label className="form-label">
-        Pagination (JSON, optional)
-        <textarea
-          className="input textarea"
-          value={paginationText}
-          onChange={(e) => setPaginationText(e.target.value)}
-          rows={4}
-        />
+        Pagination type
+        <select
+          className="input"
+          value={paginationType}
+          onChange={(e) => setPaginationType(e.target.value)}
+        >
+          <option value="">None</option>
+          <option value="show-more">Load More / Show More (appends without navigating)</option>
+          <option value="click">Next Page (navigates or reloads)</option>
+          <option value="url">URL-based (?page=N, &offset=N)</option>
+        </select>
       </label>
+
+      {paginationType === 'url' && (
+        <label className="form-label">
+          URL template
+          <input
+            className="input"
+            value={urlTemplate}
+            onChange={(e) => setUrlTemplate(e.target.value)}
+            placeholder="https://example.com/jobs?page={page}"
+          />
+        </label>
+      )}
 
       {/* Preview */}
       <div className="preview-section">
