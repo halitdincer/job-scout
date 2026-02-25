@@ -6,6 +6,8 @@ Job board tracker/scraper. TypeScript/Express backend + React/Vite frontend, SQL
 
 ## Deployment pipeline — READ THIS BEFORE TOUCHING ANYTHING
 
+> Full reference: [`docs/deploy.md`](docs/deploy.md)
+
 **Push to `main` = automatic deploy.** No manual steps ever needed.
 
 ```
