@@ -15,6 +15,7 @@ export type ApiBoard = {
   name: string;
   url: string;
   company?: string;
+  location?: string;
   selectors: Record<string, string | null>;
   pagination?: Record<string, unknown>;
 };

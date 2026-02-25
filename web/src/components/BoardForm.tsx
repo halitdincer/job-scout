@@ -11,7 +11,6 @@ const SELECTOR_FIELDS = [
   { key: 'jobCard', label: 'Job Card Container', required: true, placeholder: '.job-listing' },
   { key: 'title', label: 'Job Title', required: true, placeholder: 'h2.job-title' },
   { key: 'link', label: 'Job Link (a tag)', required: true, placeholder: 'a.apply-link' },
-  { key: 'location', label: 'Location', required: false, placeholder: '.job-location' },
   { key: 'nextPage', label: 'Next Page / Load More Button', required: false, placeholder: 'button[aria-label="Next"]' },
 ] as const;
 
@@ -22,7 +21,6 @@ function toSelectorRecord(s: Record<SKey, string>): Record<string, string | null
     jobCard: s.jobCard,
     title: s.title,
     link: s.link,
-    location: s.location.trim() || null,
     nextPage: s.nextPage.trim() || null,
   };
 }
@@ -32,7 +30,6 @@ function fromInitialSelectors(sel?: Record<string, string | null>): Record<SKey,
     jobCard: sel?.jobCard ?? '',
     title: sel?.title ?? '',
     link: sel?.link ?? '',
-    location: sel?.location ?? '',
     nextPage: sel?.nextPage ?? '',
   };
 }
@@ -40,6 +37,7 @@ function fromInitialSelectors(sel?: Record<string, string | null>): Record<SKey,
 export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [company, setCompany] = useState(initial?.company ?? '');
+  const [location, setLocation] = useState(initial?.location ?? '');
   const [url, setUrl] = useState(initial?.url ?? '');
   const [selectors, setSelectors] = useState<Record<SKey, string>>(
     fromInitialSelectors(initial?.selectors)
@@ -182,6 +180,7 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         name,
         url,
         ...(company.trim() ? { company: company.trim() } : {}),
+        ...(location.trim() ? { location: location.trim() } : {}),
         selectors: toSelectorRecord(selectors),
         ...(pagination ? { pagination } : {}),
       });
@@ -213,6 +212,16 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
           value={company}
           onChange={(e) => setCompany(e.target.value)}
           placeholder="Uber"
+        />
+      </label>
+
+      <label className="form-label">
+        Location
+        <input
+          className="input"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Toronto, ON"
         />
       </label>
 

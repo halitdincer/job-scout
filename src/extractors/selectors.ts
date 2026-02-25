@@ -15,8 +15,7 @@ export async function extractJobsFromSelectors(page: Page, config: BoardConfig):
 
     const company = config.company?.trim() || config.name;
 
-    const locationElement = await card.$(config.selectors.location);
-    const location = (await locationElement?.innerText())?.trim() || 'Unknown Location';
+    const location = config.location?.trim() || 'Unknown Location';
 
     const linkElement = await card.$(config.selectors.link);
     const href = (await linkElement?.getAttribute('href')) || config.url;

@@ -21,6 +21,7 @@ export interface BoardConfig {
   name: string;
   url: string;
   company?: string;
+  location?: string;
   selectors: {
     jobCard: string;
     title: string;

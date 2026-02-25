@@ -158,10 +158,6 @@ export function makeSetupRouter(): Router {
                 type: 'string',
                 description: 'CSS selector for the clickable <a> link, relative to jobCard',
               },
-              location: {
-                type: ['string', 'null'],
-                description: 'CSS selector for job location, relative to jobCard, or null if not present',
-              },
               nextPage: {
                 type: ['string', 'null'],
                 description: 'CSS selector for the "Next Page", "Next →", "Load More", or "Show More" button anywhere on the page. null ONLY if there is truly no pagination.',
@@ -192,7 +188,7 @@ URL: ${pageUrl}
 ${retryNote}
 HOW SELECTORS ARE USED (Playwright):
   • jobCard  → page.$$( jobCard )  — selects ALL job card containers. MUST match every listing.
-  • title, location, link → card.querySelector( field ) — scoped inside each card
+  • title, link → card.querySelector( field ) — scoped inside each card
   • nextPage → page.$( nextPage ) — the pagination/load-more button (anywhere on the page)
 
 SELECTOR QUALITY RULES:
@@ -201,8 +197,7 @@ SELECTOR QUALITY RULES:
     Only classes repeated across multiple elements survive — those are the structural ones to use.
   • Prefer: tag names, [role="..."], [data-*] attrs, semantic class names shared across all cards
   • Avoid: nth-child, unique IDs, any class or attribute that identifies one specific listing
-  • Child selectors (title, location, link) are relative to jobCard — do not repeat the jobCard prefix
-  • location → null if not visible in the HTML
+  • Child selectors (title, link) are relative to jobCard — do not repeat the jobCard prefix
 
 PAGINATION — nextPage is required, always set it or explicitly null:
   • Look below the job list for buttons/links: "Next", "Next page", "Load More", "Show More", ">", "→"
