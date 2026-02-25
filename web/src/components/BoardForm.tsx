@@ -338,17 +338,18 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
             </label>
           </div>
         ))}
+        <div className="selector-field">
+          <label className="form-label">
+            Wait-for selector
+            <input
+              className="input"
+              value={waitForSelector}
+              onChange={(e) => setWaitForSelector(e.target.value)}
+              placeholder=".jobs-container"
+            />
+          </label>
+        </div>
       </fieldset>
-
-      <label className="form-label">
-        Wait-for selector (optional)
-        <input
-          className="input"
-          value={waitForSelector}
-          onChange={(e) => setWaitForSelector(e.target.value)}
-          placeholder=".jobs-container"
-        />
-      </label>
 
       <label className="form-label">
         Pagination type
