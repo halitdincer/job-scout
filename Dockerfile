@@ -19,7 +19,7 @@ RUN npm run server:build
 FROM mcr.microsoft.com/playwright:v1.58.1-noble
 WORKDIR /app
 COPY package*.json ./
-RUN HUSKY=0 npm ci --omit=dev
+RUN npm ci --omit=dev
 COPY --from=server-builder /app/dist-server/ dist-server/
 COPY --from=web-builder /app/web/dist/ web/dist/
 ENV DB_PATH=/data/jobscout.sqlite
