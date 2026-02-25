@@ -301,6 +301,8 @@ button { font-family: inherit; }
 .badge-success { background: var(--c-success-bg); color: var(--c-success-text); }
 .badge-error   { background: var(--c-error-bg);   color: var(--c-error-text); }
 .badge-running { background: var(--c-warn-bg);    color: var(--c-warn-text); }
+.badge-partial { background: #FFF0E0;             color: #8A4500; }
+.badge-pending { background: #F0F0F0;             color: rgba(0,0,0,0.5); }
 
 /* ── Job list (compact feed) ─────────────────────────────── */
 .job-list {

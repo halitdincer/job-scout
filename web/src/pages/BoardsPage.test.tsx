@@ -15,6 +15,24 @@ const sampleBoards = [
   { id: 'b2', name: 'Board Beta', url: 'https://beta.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
 ];
 
+const boardsWithLastRun = [
+  {
+    id: 'b1', name: 'Board Alpha', url: 'https://alpha.com',
+    selectors: { jobCard: '.j', title: '.t', link: 'a' },
+    lastRun: { status: 'success', finishedAt: new Date().toISOString() },
+  },
+  {
+    id: 'b2', name: 'Board Beta', url: 'https://beta.com',
+    selectors: { jobCard: '.j', title: '.t', link: 'a' },
+    lastRun: null,
+  },
+  {
+    id: 'b3', name: 'Board Gamma', url: 'https://gamma.com',
+    selectors: { jobCard: '.j', title: '.t', link: 'a' },
+    lastRun: { status: 'error', finishedAt: new Date().toISOString() },
+  },
+];
+
 function renderBoardsPage(boards = sampleBoards, fetchImpl?: typeof fetch) {
   const refresh = vi.fn();
   vi.mocked(useBoardsData).mockReturnValue({
@@ -100,6 +118,55 @@ describe('BoardsPage', () => {
         expect.objectContaining({ method: 'POST' })
       );
     });
+  });
+
+  it('shows "success" badge for board with lastRun.status=success', () => {
+    vi.mocked(useBoardsData).mockReturnValue({
+      data: boardsWithLastRun as any,
+      error: null,
+      loading: false,
+      refresh: vi.fn(),
+    });
+    vi.mocked(useJobsData).mockReturnValue({
+      data: { jobs: [], total: 0, page: 1, limit: 25, pages: 0 },
+      error: null,
+      loading: false,
+    });
+    render(<MemoryRouter><BoardsPage /></MemoryRouter>);
+    expect(screen.getByText('success')).toBeInTheDocument();
+  });
+
+  it('shows no badge for board with lastRun=null', () => {
+    vi.mocked(useBoardsData).mockReturnValue({
+      data: [boardsWithLastRun[1]] as any,
+      error: null,
+      loading: false,
+      refresh: vi.fn(),
+    });
+    vi.mocked(useJobsData).mockReturnValue({
+      data: { jobs: [], total: 0, page: 1, limit: 25, pages: 0 },
+      error: null,
+      loading: false,
+    });
+    render(<MemoryRouter><BoardsPage /></MemoryRouter>);
+    expect(screen.queryByText('success')).not.toBeInTheDocument();
+    expect(screen.queryByText('error')).not.toBeInTheDocument();
+  });
+
+  it('shows "error" badge for board with lastRun.status=error', () => {
+    vi.mocked(useBoardsData).mockReturnValue({
+      data: [boardsWithLastRun[2]] as any,
+      error: null,
+      loading: false,
+      refresh: vi.fn(),
+    });
+    vi.mocked(useJobsData).mockReturnValue({
+      data: { jobs: [], total: 0, page: 1, limit: 25, pages: 0 },
+      error: null,
+      loading: false,
+    });
+    render(<MemoryRouter><BoardsPage /></MemoryRouter>);
+    expect(screen.getByText('error')).toBeInTheDocument();
   });
 
   it('delete button calls DELETE /api/boards/:id', async () => {

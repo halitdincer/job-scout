@@ -1,8 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import supertest from 'supertest';
 import { Database } from 'sqlite';
 import { createTestApp, registerAndLogin } from '../helpers';
-import { insertBoard, createRun, finishRun } from '../../../src/storage/db';
+import {
+  insertBoard,
+  createScrapeRun,
+  createScrapeRunBoard,
+} from '../../../src/storage/db';
+
+// Prevent actual Playwright scraping during POST /api/runs
+vi.mock('../../../server/cron/scrapeAllBoards', () => ({
+  scrapeForUser: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe('runs routes', () => {
   let app: any;
@@ -25,42 +34,101 @@ describe('runs routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('200 — returns runs for user', async () => {
+    it('returns ScrapeRun[] with correct shape', async () => {
+      await createScrapeRun(db, userId, 'manual');
+
+      const res = await supertest(app).get('/api/runs').set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      const run = res.body[0];
+      expect(run).toHaveProperty('triggeredBy', 'manual');
+      expect(run).toHaveProperty('boardsTotal');
+      expect(run).toHaveProperty('boardsDone');
+      expect(run).toHaveProperty('jobsFound');
+      expect(run).toHaveProperty('jobsNew');
+      expect(run).toHaveProperty('status', 'running');
+    });
+
+    it('returns empty array when user has no runs', async () => {
+      const res = await supertest(app).get('/api/runs').set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+  });
+
+  describe('GET /api/runs/:id', () => {
+    it('returns run detail with boards[]', async () => {
       const boardId = await insertBoard(
         db,
         { name: 'TestBoard', url: 'https://example.com', selectors: {} },
         userId
       );
-      const runId = await createRun(db, boardId, userId);
-      await finishRun(db, runId, 5, 2, 'success');
+      const runId = await createScrapeRun(db, userId, 'cron');
+      await createScrapeRunBoard(db, runId, boardId, 'TestBoard');
 
-      const res = await supertest(app).get('/api/runs').set('Cookie', cookie);
+      const res = await supertest(app)
+        .get(`/api/runs/${runId}`)
+        .set('Cookie', cookie);
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].status).toBe('success');
+      expect(res.body.id).toBe(runId);
+      expect(Array.isArray(res.body.boards)).toBe(true);
+      expect(res.body.boards).toHaveLength(1);
+      expect(res.body.boards[0].boardName).toBe('TestBoard');
     });
 
-    it('filters by boardId with ?boardId=', async () => {
-      const boardId1 = await insertBoard(
-        db,
-        { name: 'Board1', url: 'https://example.com', selectors: {} },
-        userId
-      );
-      const boardId2 = await insertBoard(
-        db,
-        { name: 'Board2', url: 'https://example.com', selectors: {} },
-        userId
-      );
+    it('404 for unknown run id', async () => {
+      const res = await supertest(app)
+        .get('/api/runs/00000000-0000-4000-8000-000000000000')
+        .set('Cookie', cookie);
+      expect(res.status).toBe(404);
+    });
 
-      const run1 = await createRun(db, boardId1, userId);
-      const run2 = await createRun(db, boardId2, userId);
-      await finishRun(db, run1, 0, 0, 'success');
-      await finishRun(db, run2, 0, 0, 'success');
+    it("404 for another user's run", async () => {
+      const { cookie: cookie2 } = await registerAndLogin(
+        app,
+        'user2@example.com',
+        'password123'
+      );
+      void cookie2;
+      const user2 = await db.get<{ id: string }>(
+        'SELECT id FROM users WHERE email = ?',
+        'user2@example.com'
+      );
+      const runId = await createScrapeRun(db, user2!.id, 'manual');
 
-      const res = await supertest(app).get(`/api/runs?boardId=${boardId1}`).set('Cookie', cookie);
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].boardId).toBe(boardId1);
+      const res = await supertest(app)
+        .get(`/api/runs/${runId}`)
+        .set('Cookie', cookie);
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/runs', () => {
+    it('returns 202 with runId', async () => {
+      const res = await supertest(app)
+        .post('/api/runs')
+        .set('Cookie', cookie);
+      expect(res.status).toBe(202);
+      expect(typeof res.body.runId).toBe('string');
+    });
+
+    it('401 — unauthenticated', async () => {
+      const res = await supertest(app).post('/api/runs');
+      expect(res.status).toBe(401);
+    });
+
+    it('creates a scrape_run record with status=running', async () => {
+      const res = await supertest(app)
+        .post('/api/runs')
+        .set('Cookie', cookie);
+      const runId = res.body.runId;
+
+      const row = await db.get<{ status: string; user_id: string }>(
+        'SELECT status, user_id FROM scrape_runs WHERE id = ?',
+        runId
+      );
+      expect(row?.status).toBe('running');
+      expect(row?.user_id).toBe(userId);
     });
   });
 });

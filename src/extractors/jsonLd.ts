@@ -40,7 +40,7 @@ export async function extractJobsFromJsonLd(page: Page, config: BoardConfig): Pr
       if (item['@type'] !== 'JobPosting') continue;
 
       const title = item.title || 'Unknown Title';
-      const company = item.hiringOrganization?.name || config.name;
+      const company = item.hiringOrganization?.name || config.company || config.name;
       const location = normalizeLocation(item.jobLocation);
       const url = item.url || config.url;
       const postedDate = item.datePosted || undefined;

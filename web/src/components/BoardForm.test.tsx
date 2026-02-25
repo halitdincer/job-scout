@@ -34,7 +34,7 @@ describe('BoardForm', () => {
     expect(screen.getByText(/job link/i)).toBeInTheDocument();
     expect(screen.getByText('Company')).toBeInTheDocument();
     expect(screen.getByText('Location')).toBeInTheDocument();
-    expect(screen.getByText('Posted Date')).toBeInTheDocument();
+    expect(screen.getAllByText(/next page/i).length).toBeGreaterThan(0);
   });
 
   it('shows error when required selectors are missing on submit', async () => {

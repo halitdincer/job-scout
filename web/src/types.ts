@@ -18,6 +18,7 @@ export type ApiBoard = {
   location?: string;
   selectors: Record<string, string | null>;
   pagination?: Record<string, unknown>;
+  lastRun?: { status: string; finishedAt: string | null } | null;
 };
 
 export type JobsResponse = {
@@ -33,17 +34,33 @@ export type User = {
   email: string;
 };
 
-export type Run = {
+export type ScrapeRun = {
   id: string;
-  boardId: string;
   userId: string;
+  triggeredBy: 'cron' | 'manual';
   startedAt: string;
   finishedAt: string | null;
+  status: 'running' | 'success' | 'partial' | 'error';
+  boardsTotal: number;
+  boardsDone: number;
   jobsFound: number;
   jobsNew: number;
-  status: 'running' | 'success' | 'error';
+};
+
+export type ScrapeRunBoard = {
+  id: string;
+  runId: string;
+  boardId: string;
+  boardName: string;
+  startedAt: string;
+  finishedAt: string | null;
+  status: 'pending' | 'running' | 'success' | 'error';
+  jobsFound: number;
+  jobsNew: number;
   errorMsg: string | null;
 };
+
+export type ScrapeRunDetail = ScrapeRun & { boards: ScrapeRunBoard[] };
 
 export type AnalyzeResult = {
   url: string;

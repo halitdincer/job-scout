@@ -48,15 +48,15 @@ function makePage(cards: ReturnType<typeof makeCard>[]) {
 
 describe('extractJobsFromSelectors', () => {
   it('extracts all fields when all selectors are present', async () => {
+    // company and location are now static board-level fields, not per-card selectors
+    const cfgWithStatics = { ...config, company: 'Beta Co', location: 'Remote' };
     const page = makePage([makeCard({
       title: 'Frontend Engineer',
-      company: 'Beta Co',
-      location: 'Remote',
       href: 'https://example.com/jobs/2',
       postedDate: '2026-02-02',
     })]);
 
-    const jobs = await extractJobsFromSelectors(page, config);
+    const jobs = await extractJobsFromSelectors(page, cfgWithStatics);
     expect(jobs).toHaveLength(1);
     expect(jobs[0].title).toBe('Frontend Engineer');
     expect(jobs[0].company).toBe('Beta Co');

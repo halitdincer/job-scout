@@ -121,13 +121,13 @@ describe('extractJobsFromJsonLd', () => {
 
 describe('extractJobsFromSelectors', () => {
   it('extracts a job card with all fields', async () => {
+    // company and location are static board-level fields (not per-card selectors)
+    const cfgWithStatics = { ...config, company: 'Beta Co', location: 'Remote' };
     const page: any = {
       $$: vi.fn().mockResolvedValue([{
         $: vi.fn((sel: string) => {
           const map: Record<string, any> = {
             [config.selectors.title]: { innerText: () => Promise.resolve('Frontend Engineer') },
-            [config.selectors.company!]: { innerText: () => Promise.resolve('Beta Co') },
-            [config.selectors.location]: { innerText: () => Promise.resolve('Remote') },
             [config.selectors.link]: { getAttribute: () => Promise.resolve('https://example.com/jobs/2') },
             [config.selectors.postedDate!]: { innerText: () => Promise.resolve('2026-02-02') },
           };
@@ -137,7 +137,7 @@ describe('extractJobsFromSelectors', () => {
       url: () => 'https://example.com',
     };
 
-    const jobs = await extractJobsFromSelectors(page, config);
+    const jobs = await extractJobsFromSelectors(page, cfgWithStatics);
     expect(jobs).toHaveLength(1);
     expect(jobs[0].title).toBe('Frontend Engineer');
     expect(jobs[0].company).toBe('Beta Co');

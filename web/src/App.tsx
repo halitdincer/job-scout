@@ -7,6 +7,7 @@ import JobsPage from './pages/JobsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import RunsPage from './pages/RunsPage';
+import RunDetailPage from './pages/RunDetailPage';
 
 function NavBar() {
   const { user, logout } = useAuth();
@@ -80,6 +81,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <RunsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/runs/:id"
+              element={
+                <ProtectedRoute>
+                  <RunDetailPage />
                 </ProtectedRoute>
               }
             />
