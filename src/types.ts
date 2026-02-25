@@ -20,6 +20,7 @@ export interface PaginationConfig {
 export interface BoardConfig {
   name: string;
   url: string;
+  company?: string;
   selectors: {
     jobCard: string;
     title: string;

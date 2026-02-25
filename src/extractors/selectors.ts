@@ -13,10 +13,7 @@ export async function extractJobsFromSelectors(page: Page, config: BoardConfig):
     const titleElement = await card.$(config.selectors.title);
     const title = (await titleElement?.innerText())?.trim() || 'Unknown Title';
 
-    const companyElement = config.selectors.company
-      ? await card.$(config.selectors.company)
-      : null;
-    const company = (await companyElement?.innerText())?.trim() || config.name;
+    const company = config.company?.trim() || config.name;
 
     const locationElement = await card.$(config.selectors.location);
     const location = (await locationElement?.innerText())?.trim() || 'Unknown Location';

@@ -39,6 +39,7 @@ function fromInitialSelectors(sel?: Record<string, string | null>): Record<SKey,
 
 export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
+  const [company, setCompany] = useState(initial?.company ?? '');
   const [url, setUrl] = useState(initial?.url ?? '');
   const [selectors, setSelectors] = useState<Record<SKey, string>>(
     fromInitialSelectors(initial?.selectors)
@@ -183,6 +184,7 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
       await onSubmit({
         name,
         url,
+        ...(company.trim() ? { company: company.trim() } : {}),
         selectors: toSelectorRecord(selectors),
         ...(pagination ? { pagination } : {}),
         ...(waitForSelector.trim() ? { waitForSelector: waitForSelector.trim() } : {}),
@@ -205,6 +207,16 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+        />
+      </label>
+
+      <label className="form-label">
+        Company
+        <input
+          className="input"
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+          placeholder="Uber"
         />
       </label>
 
