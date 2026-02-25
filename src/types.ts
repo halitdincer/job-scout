@@ -9,7 +9,8 @@ export interface Job {
 }
 
 export interface PaginationConfig {
-  type: 'click' | 'url';
+  /** click: navigate to next page; show-more: loads more into same page without navigation; url: URL template */
+  type: 'click' | 'show-more' | 'url';
   nextPageSelector?: string;
   urlTemplate?: string; // use {page} placeholder
   maxPages?: number;

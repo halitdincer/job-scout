@@ -14,6 +14,7 @@ const SELECTOR_FIELDS = [
   { key: 'company', label: 'Company', required: false, placeholder: '.company-name' },
   { key: 'location', label: 'Location', required: false, placeholder: '.job-location' },
   { key: 'postedDate', label: 'Posted Date', required: false, placeholder: 'time.posted' },
+  { key: 'nextPage', label: 'Next Page / Load More Button', required: false, placeholder: 'button[aria-label="Next"]' },
 ] as const;
 
 type SKey = (typeof SELECTOR_FIELDS)[number]['key'];
@@ -26,6 +27,7 @@ function toSelectorRecord(s: Record<SKey, string>): Record<string, string | null
     company: s.company.trim() || null,
     location: s.location.trim() || null,
     postedDate: s.postedDate.trim() || null,
+    nextPage: s.nextPage.trim() || null,
   };
 }
 
@@ -37,6 +39,7 @@ function fromInitialSelectors(sel?: Record<string, string | null>): Record<SKey,
     company: sel?.company ?? '',
     location: sel?.location ?? '',
     postedDate: sel?.postedDate ?? '',
+    nextPage: sel?.nextPage ?? '',
   };
 }
 
@@ -116,6 +119,9 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
       return next;
     });
     if (aiSuggestions.waitForSelector) setWaitForSelector(aiSuggestions.waitForSelector);
+    if (aiSuggestions.pagination && !paginationText.trim()) {
+      setPaginationText(JSON.stringify(aiSuggestions.pagination, null, 2));
+    }
     setPreviewResult(null);
   }
 
@@ -242,7 +248,16 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
       {aiSuggestions && (
         <div className="ai-suggestions-panel">
           <div className="ai-suggestions-header">
-            <span>AI Suggestions</span>
+            <span>
+              AI Suggestions
+              {aiSuggestions.jobsFound !== undefined && (
+                <span style={{ marginLeft: 8, fontWeight: 'normal', fontSize: '0.85em' }}>
+                  {aiSuggestions.jobsFound > 0
+                    ? `— validated: ${aiSuggestions.jobsFound} job${aiSuggestions.jobsFound !== 1 ? 's' : ''} found`
+                    : '— 0 jobs found, selectors may need adjustment'}
+                </span>
+              )}
+            </span>
             <button type="button" className="button button-small" onClick={applyAll}>
               Apply All
             </button>
@@ -273,6 +288,26 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
                   type="button"
                   className="button button-secondary button-small"
                   onClick={() => setWaitForSelector(aiSuggestions.waitForSelector!)}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+            {aiSuggestions.pagination && (
+              <div className="ai-suggestion-row">
+                <span className="ai-suggestion-label">Pagination</span>
+                <code className="ai-suggestion-value">
+                  {String(aiSuggestions.pagination.type)}
+                  {aiSuggestions.pagination.nextPageSelector
+                    ? ` — ${aiSuggestions.pagination.nextPageSelector}`
+                    : ''}
+                </code>
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={() =>
+                    setPaginationText(JSON.stringify(aiSuggestions.pagination, null, 2))
+                  }
                 >
                   Apply
                 </button>

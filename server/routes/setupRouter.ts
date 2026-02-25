@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../auth/middleware';
 import { scrapeBoard } from '../../src/scraper';
+import type { PaginationConfig } from '../../src/types';
 
 export function makeSetupRouter(): Router {
   const router = Router();
@@ -62,15 +63,27 @@ export function makeSetupRouter(): Router {
           if (!isVisible(el)) return '';
 
           // Keep only stable, meaningful attributes
+          const KEEP_ATTRS = [
+            'id', 'class', 'href', 'role', 'type',
+            'data-job-id', 'data-testid', 'data-cy', 'data-qa',
+            'data-automation-id', 'data-automation',
+            'aria-label', 'aria-disabled', 'aria-current',
+          ];
           const keepAttrs: string[] = [];
-          for (const attr of ['id', 'class', 'href', 'role', 'data-job-id', 'data-testid', 'aria-label']) {
+          for (const attr of KEEP_ATTRS) {
             const val = el.getAttribute(attr);
             if (val) {
-              // Strip hashed CSS-module class names; keep semantic ones
               if (attr === 'class') {
+                // Keep semantic class names; strip obvious CSS-in-JS hashes
+                // Hashed: sc-bdfxgf, css-1a2b3c, or anything with 5+ consecutive hex chars
                 const cleanClasses = val
                   .split(/\s+/)
-                  .filter((c) => !/^(sc-|css-|[a-z]+-[A-Za-z0-9]{6,}$)/.test(c))
+                  .filter((c) => {
+                    if (/^sc-[a-z0-9]{4,}/.test(c)) return false; // styled-components
+                    if (/^css-[a-z0-9]{4,}/.test(c)) return false; // emotion
+                    if (/[a-f0-9]{5,}/i.test(c) && /[0-9]/.test(c)) return false; // hex hash
+                    return true;
+                  })
                   .join(' ')
                   .trim();
                 if (cleanClasses) keepAttrs.push(`class="${cleanClasses}"`);
@@ -107,65 +120,127 @@ export function makeSetupRouter(): Router {
 
     const tool: Anthropic.Tool = {
       name: 'report_selectors',
-      description: 'Report the CSS selectors needed to scrape job listings from this page.',
+      description: 'Report the CSS selectors and pagination config needed to scrape job listings from this page.',
       input_schema: {
         type: 'object' as const,
-        required: ['name', 'selectors'],
+        required: ['name', 'selectors', 'paginationType'],
         properties: {
           name: { type: 'string', description: 'Short human-readable name for this job board' },
           selectors: {
             type: 'object' as const,
             required: ['jobCard', 'title', 'link'],
             properties: {
-              jobCard:    { type: 'string', description: 'Selector for each job listing container' },
-              title:      { type: 'string', description: 'Selector for job title, relative to jobCard' },
-              link:       { type: 'string', description: 'Selector for the <a> link, relative to jobCard' },
-              company:    { type: ['string', 'null'], description: 'Selector for company name, relative to jobCard, or null' },
-              location:   { type: ['string', 'null'], description: 'Selector for location, relative to jobCard, or null' },
-              postedDate: { type: ['string', 'null'], description: 'Selector for posted date, relative to jobCard, or null' },
+              jobCard: {
+                type: 'string',
+                description: 'CSS selector passed to querySelectorAll() — MUST match every job card container on the page. Look for the repeating list/grid.',
+              },
+              title: {
+                type: 'string',
+                description: 'CSS selector for job title text, relative to jobCard (used with card.querySelector)',
+              },
+              link: {
+                type: 'string',
+                description: 'CSS selector for the clickable <a> link, relative to jobCard',
+              },
+              company: {
+                type: ['string', 'null'],
+                description: 'CSS selector for company name, relative to jobCard, or null if not present',
+              },
+              location: {
+                type: ['string', 'null'],
+                description: 'CSS selector for job location, relative to jobCard, or null if not present',
+              },
+              postedDate: {
+                type: ['string', 'null'],
+                description: 'CSS selector for posted/listed date, relative to jobCard, or null if not present',
+              },
+              nextPage: {
+                type: ['string', 'null'],
+                description: 'CSS selector for the "Next Page", "Next →", "Load More", or "Show More" button. null if not found.',
+              },
             },
+          },
+          paginationType: {
+            type: ['string', 'null'],
+            enum: ['show-more', 'next-click', 'next-url', null],
+            description: '"show-more": clicking loads more jobs into the SAME page without navigating (Load More, Show More, infinite scroll trigger). "next-click": clicking navigates to or reloads the next page. "next-url": pages are URL-based (e.g. ?page=2, &start=25, &offset=20) — no button click needed. null: only one page of results.',
+          },
+          urlTemplate: {
+            type: ['string', 'null'],
+            description: 'For next-url only: the URL with {page} as a placeholder for the page number, e.g. "https://example.com/jobs?page={page}". null otherwise.',
           },
           waitForSelector: {
             type: ['string', 'null'],
-            description: 'A selector to wait for before scraping, or null',
+            description: 'A selector to wait for before scraping to confirm the page has loaded (usually same as jobCard or its parent container). null if not needed.',
           },
         },
       },
     };
 
-    let toolInput: any;
-    try {
+    function buildPrompt(html: string, pageUrl: string, failedJobCard?: string): string {
+      const retryNote = failedJobCard
+        ? `\n⚠ PREVIOUS ATTEMPT FAILED: jobCard="${failedJobCard}" matched 0 job listings when tested with Playwright. That selector is wrong — try a completely different approach.\n`
+        : '';
+
+      return `You are a web scraping expert. Analyze this simplified HTML from a job board page and identify CSS selectors to extract every job listing.
+
+URL: ${pageUrl}
+${retryNote}
+HOW SELECTORS ARE USED (Playwright):
+  • jobCard  → page.$$( jobCard )  — selects ALL job card containers. This MUST match every listing.
+  • title, company, location, link, postedDate → card.querySelector( field ) — each scoped inside one card
+  • nextPage → page.$( nextPage ) — the pagination/load-more button
+
+SELECTOR QUALITY RULES:
+  • jobCard MUST match ALL listings — look for the repeating list or grid pattern
+  • Prefer stable selectors: element[attr], [role="..."], [data-*], semantic readable class names
+  • Avoid hashed/generated class names: sc-abc123, css-1a2b3c, jfd4k3, random mixed-case strings
+  • Child selectors are relative to jobCard — do not include the jobCard selector itself
+  • If a field is not visible in the HTML → set it to null
+
+PAGINATION TYPES:
+  • "show-more": a button that appends more jobs to the current page without any navigation (Load More, Show More, infinite scroll trigger)
+  • "next-click": a button/link that navigates to the next page (page reloads or URL changes)
+  • "next-url": no button — pages are controlled purely by a URL query param (?page=2, &start=25, &offset=20)
+  • null: only one page of results, no pagination needed
+
+Simplified HTML (main content only):
+${html}`;
+    }
+
+    async function callAi(prompt: string): Promise<any> {
       const message = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         tools: [tool],
         tool_choice: { type: 'tool', name: 'report_selectors' },
-        messages: [
-          {
-            role: 'user',
-            content: `You are an expert at reverse-engineering CSS selectors for job board scrapers.
-
-Analyze the simplified HTML below and call the report_selectors tool with the best selectors.
-
-Rules:
-- Look for **repeating list patterns** — that is where the job cards are.
-- Prefer **stable selectors**: tag names, semantic class names, data-* attributes, id attributes, role attributes.
-- **Avoid hashed/generated class names** (e.g. sc-abc123, css-xyz789) — they break on redeployment.
-- title, company, location, link, and postedDate selectors are **relative to jobCard** (used with jobCard.querySelector(sel)).
-- If a field is not present in the HTML, set it to null.
-
-Simplified HTML (main content area only):
-${simplifiedHtml}`,
-          },
-        ],
+        messages: [{ role: 'user', content: prompt }],
       });
-
       const toolUse = message.content.find((b) => b.type === 'tool_use');
-      if (!toolUse || toolUse.type !== 'tool_use') {
-        res.status(502).json({ error: 'AI did not return a tool call' });
-        return;
+      if (!toolUse || toolUse.type !== 'tool_use') throw new Error('AI did not return a tool call');
+      return toolUse.input;
+    }
+
+    function buildPaginationConfig(toolInput: any): PaginationConfig | undefined {
+      const pt: string | null = toolInput.paginationType;
+      const nextPageSel: string | null = toolInput.selectors?.nextPage ?? null;
+      if (!pt) return undefined;
+      if (pt === 'next-url') {
+        if (!toolInput.urlTemplate) return undefined;
+        return { type: 'url', urlTemplate: toolInput.urlTemplate, maxPages: 10 };
       }
-      toolInput = toolUse.input;
+      if (!nextPageSel) return undefined;
+      return {
+        type: pt === 'show-more' ? 'show-more' : 'click',
+        nextPageSelector: nextPageSel,
+        maxPages: 10,
+        delayMs: 500,
+      };
+    }
+
+    let toolInput: any;
+    try {
+      toolInput = await callAi(buildPrompt(simplifiedHtml, url));
     } catch (err) {
       res.status(502).json({ error: `AI analysis failed: ${String(err)}` });
       return;
@@ -180,11 +255,51 @@ ${simplifiedHtml}`,
       return;
     }
 
+    // Test the selectors with a real scrape (page 1 only)
+    async function testSelectors(input: any): Promise<number> {
+      try {
+        const testConfig: any = {
+          name: '__ai-validate__',
+          url,
+          selectors: { ...input.selectors },
+          ...(input.waitForSelector ? { waitForSelector: input.waitForSelector } : {}),
+          // No pagination — only test page 1
+        };
+        const result = await scrapeBoard(testConfig);
+        return result.jobs.length;
+      } catch {
+        return 0;
+      }
+    }
+
+    let jobsFound = await testSelectors(toolInput);
+
+    // If 0 jobs, give AI one more chance with feedback about what failed
+    if (jobsFound === 0) {
+      try {
+        const retryInput = await callAi(buildPrompt(simplifiedHtml, url, selectors.jobCard));
+        const retrySelectors = retryInput?.selectors ?? {};
+        if (retrySelectors.jobCard && retrySelectors.title && retrySelectors.link) {
+          const retryCount = await testSelectors(retryInput);
+          if (retryCount > jobsFound) {
+            toolInput = retryInput;
+            jobsFound = retryCount;
+          }
+        }
+      } catch {
+        // keep original result
+      }
+    }
+
+    const pagination = buildPaginationConfig(toolInput);
+
     res.json({
       url,
       name: toolInput.name ?? '',
-      selectors,
+      selectors: toolInput.selectors,
       waitForSelector: toolInput.waitForSelector ?? undefined,
+      pagination,
+      jobsFound,
     });
   });
 

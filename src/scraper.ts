@@ -39,10 +39,17 @@ async function getNextPageAction(
     return { type: 'url', url };
   }
 
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }),
-    nextButton.click(),
-  ]);
+  if (pagination?.type === 'show-more') {
+    // Clicking loads more content into the same page — do NOT wait for navigation
+    await nextButton.click();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  } else {
+    // click type: clicking navigates to the next page
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }),
+      nextButton.click(),
+    ]);
+  }
 
   return { type: 'clicked' };
 }

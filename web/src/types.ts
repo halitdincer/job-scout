@@ -49,6 +49,8 @@ export type AnalyzeResult = {
   name: string;
   selectors: Record<string, string | null>;
   waitForSelector?: string;
+  pagination?: Record<string, unknown>;
+  jobsFound?: number;
 };
 
 export type PreviewJob = {
