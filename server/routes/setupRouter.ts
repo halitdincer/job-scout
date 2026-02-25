@@ -35,8 +35,6 @@ export function makeSetupRouter(): Router {
       // Run DOM simplification inside the browser so we can use computed styles and real DOM APIs
       simplifiedHtml = await page.evaluate(() => {
         const SKIP_TAGS = new Set(['script', 'style', 'svg', 'noscript', 'iframe', 'canvas']);
-
-        // Skip root-level chrome elements
         const ROOT_SKIP_TAGS = new Set(['nav', 'header', 'footer']);
 
         function isVisible(el: Element): boolean {
@@ -48,6 +46,32 @@ export function makeSetupRouter(): Router {
           return true;
         }
 
+        // Prefer main content area; fall back to body
+        const root: Element =
+          document.querySelector('main, [role="main"]') ?? document.body;
+
+        // Pass 1: count how many elements each class name appears on across the whole page.
+        // Classes that appear only once are unique identifiers — not structural selectors.
+        // Classes that appear 2+ times are shared structural classes (the ones we want).
+        const classCount = new Map<string, number>();
+        (function countClasses(el: Element) {
+          const cls = el.getAttribute('class');
+          if (cls) {
+            for (const c of cls.split(/\s+/).filter(Boolean)) {
+              classCount.set(c, (classCount.get(c) ?? 0) + 1);
+            }
+          }
+          for (const child of Array.from(el.children)) countClasses(child);
+        })(document.body);
+
+        const KEEP_ATTRS = [
+          'id', 'class', 'href', 'role', 'type',
+          'data-job-id', 'data-testid', 'data-cy', 'data-qa',
+          'data-automation-id', 'data-automation',
+          'aria-label', 'aria-disabled', 'aria-current',
+        ];
+
+        // Pass 2: build simplified HTML
         function simplifyNode(node: Node, depth: number): string {
           if (node.nodeType === Node.TEXT_NODE) {
             const text = (node.textContent ?? '').trim().slice(0, 120);
@@ -62,34 +86,28 @@ export function makeSetupRouter(): Router {
           if (depth <= 2 && ROOT_SKIP_TAGS.has(tag)) return '';
           if (!isVisible(el)) return '';
 
-          // Keep only stable, meaningful attributes
-          const KEEP_ATTRS = [
-            'id', 'class', 'href', 'role', 'type',
-            'data-job-id', 'data-testid', 'data-cy', 'data-qa',
-            'data-automation-id', 'data-automation',
-            'aria-label', 'aria-disabled', 'aria-current',
-          ];
           const keepAttrs: string[] = [];
           for (const attr of KEEP_ATTRS) {
             const val = el.getAttribute(attr);
-            if (val) {
-              if (attr === 'class') {
-                // Keep semantic class names; strip obvious CSS-in-JS hashes
-                // Hashed: sc-bdfxgf, css-1a2b3c, or anything with 5+ consecutive hex chars
-                const cleanClasses = val
-                  .split(/\s+/)
-                  .filter((c) => {
-                    if (/^sc-[a-z0-9]{4,}/.test(c)) return false; // styled-components
-                    if (/^css-[a-z0-9]{4,}/.test(c)) return false; // emotion
-                    if (/[a-f0-9]{5,}/i.test(c) && /[0-9]/.test(c)) return false; // hex hash
-                    return true;
-                  })
-                  .join(' ')
-                  .trim();
-                if (cleanClasses) keepAttrs.push(`class="${cleanClasses}"`);
-              } else {
-                keepAttrs.push(`${attr}="${val.slice(0, 200)}"`);
-              }
+            if (!val) continue;
+            if (attr === 'class') {
+              const cleanClasses = val
+                .split(/\s+/)
+                .filter((c) => {
+                  // Drop single-occurrence classes — they identify one specific element,
+                  // not a repeating pattern, so they make bad selectors for job listings
+                  if ((classCount.get(c) ?? 0) < 2) return false;
+                  // Drop obvious CSS-in-JS hashes
+                  if (/^sc-[a-z0-9]{4,}/.test(c)) return false; // styled-components
+                  if (/^css-[a-z0-9]{4,}/.test(c)) return false; // emotion
+                  if (/[a-f0-9]{5,}/i.test(c) && /[0-9]/.test(c)) return false; // hex hash
+                  return true;
+                })
+                .join(' ')
+                .trim();
+              if (cleanClasses) keepAttrs.push(`class="${cleanClasses}"`);
+            } else {
+              keepAttrs.push(`${attr}="${val.slice(0, 200)}"`);
             }
           }
 
@@ -99,15 +117,11 @@ export function makeSetupRouter(): Router {
             .join('')
             .trim();
 
-          // Keep elements with meaningful attributes even if they have no visible text
-          // (e.g. icon-only "Next" buttons: SVG is stripped but aria-label/role survives)
+          // Keep elements with meaningful attributes even with no visible text
+          // (e.g. icon-only "Next" buttons whose SVG is stripped but aria-label survives)
           if (!children && keepAttrs.length === 0) return '';
           return `<${tag}${attrStr}>${children}</${tag}>`;
         }
-
-        // Prefer main content area; fall back to body
-        const root: Element =
-          document.querySelector('main, [role="main"]') ?? document.body;
 
         return simplifyNode(root, 0).slice(0, 40000);
       });
@@ -194,10 +208,12 @@ HOW SELECTORS ARE USED (Playwright):
   • nextPage → page.$( nextPage ) — the pagination/load-more button
 
 SELECTOR QUALITY RULES:
-  • jobCard MUST match ALL listings — look for the repeating list or grid pattern
-  • Prefer stable selectors: element[attr], [role="..."], [data-*], semantic readable class names
-  • Avoid hashed/generated class names: sc-abc123, css-1a2b3c, jfd4k3, random mixed-case strings
-  • Child selectors are relative to jobCard — do not include the jobCard selector itself
+  • jobCard MUST match ALL job listings — if querySelectorAll returns only 1 element, the selector is WRONG
+  • The HTML has already stripped classes that appear only once (unique to a single element).
+    Only classes that repeat across multiple elements are shown — those are the structural ones to use.
+  • Prefer: tag names, [role="..."], [data-*] attrs, semantic class names shared across all cards
+  • Avoid: nth-child, unique IDs, any class or attribute that identifies one specific listing
+  • Child selectors are relative to jobCard — do not repeat the jobCard selector prefix
   • If a field is not visible in the HTML → set it to null
 
 PAGINATION TYPES:
