@@ -299,19 +299,27 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
                 </button>
               </div>
             )}
-            {aiSuggestions.pagination && (
+            {aiSuggestions.pagination?.type && (
               <div className="ai-suggestion-row">
-                <span className="ai-suggestion-label">Pagination</span>
-                <code className="ai-suggestion-value">
-                  {String(aiSuggestions.pagination.type)}
-                  {aiSuggestions.pagination.nextPageSelector
-                    ? ` — ${aiSuggestions.pagination.nextPageSelector}`
-                    : ''}
-                </code>
+                <span className="ai-suggestion-label">Pagination type</span>
+                <code className="ai-suggestion-value">{String(aiSuggestions.pagination.type)}</code>
                 <button
                   type="button"
                   className="button button-secondary button-small"
-                  onClick={() => applyPaginationSuggestion(aiSuggestions.pagination!)}
+                  onClick={() => setPaginationType(String(aiSuggestions.pagination!.type))}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+            {aiSuggestions.pagination?.type === 'url' && aiSuggestions.pagination.urlTemplate && (
+              <div className="ai-suggestion-row">
+                <span className="ai-suggestion-label">URL template</span>
+                <code className="ai-suggestion-value">{String(aiSuggestions.pagination.urlTemplate)}</code>
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={() => setUrlTemplate(String(aiSuggestions.pagination!.urlTemplate))}
                 >
                   Apply
                 </button>
