@@ -11,9 +11,7 @@ const SELECTOR_FIELDS = [
   { key: 'jobCard', label: 'Job Card Container', required: true, placeholder: '.job-listing' },
   { key: 'title', label: 'Job Title', required: true, placeholder: 'h2.job-title' },
   { key: 'link', label: 'Job Link (a tag)', required: true, placeholder: 'a.apply-link' },
-  { key: 'company', label: 'Company', required: false, placeholder: '.company-name' },
   { key: 'location', label: 'Location', required: false, placeholder: '.job-location' },
-  { key: 'postedDate', label: 'Posted Date', required: false, placeholder: 'time.posted' },
   { key: 'nextPage', label: 'Next Page / Load More Button', required: false, placeholder: 'button[aria-label="Next"]' },
 ] as const;
 
@@ -24,9 +22,7 @@ function toSelectorRecord(s: Record<SKey, string>): Record<string, string | null
     jobCard: s.jobCard,
     title: s.title,
     link: s.link,
-    company: s.company.trim() || null,
     location: s.location.trim() || null,
-    postedDate: s.postedDate.trim() || null,
     nextPage: s.nextPage.trim() || null,
   };
 }
@@ -36,9 +32,7 @@ function fromInitialSelectors(sel?: Record<string, string | null>): Record<SKey,
     jobCard: sel?.jobCard ?? '',
     title: sel?.title ?? '',
     link: sel?.link ?? '',
-    company: sel?.company ?? '',
     location: sel?.location ?? '',
-    postedDate: sel?.postedDate ?? '',
     nextPage: sel?.nextPage ?? '',
   };
 }

@@ -46,9 +46,9 @@ export function makeSetupRouter(): Router {
           return true;
         }
 
-        // Prefer main content area; fall back to body
-        const root: Element =
-          document.querySelector('main, [role="main"]') ?? document.body;
+        // Use full body — pagination buttons almost always live outside <main>.
+        // ROOT_SKIP_TAGS (nav, header, footer) at depth ≤ 2 keeps the output clean.
+        const root: Element = document.body;
 
         // Pass 1: count how many elements each class name appears on across the whole page.
         // Classes that appear only once are unique identifiers — not structural selectors.
@@ -144,7 +144,7 @@ export function makeSetupRouter(): Router {
           name: { type: 'string', description: 'Short human-readable name for this job board' },
           selectors: {
             type: 'object' as const,
-            required: ['jobCard', 'title', 'link'],
+            required: ['jobCard', 'title', 'link', 'nextPage'],
             properties: {
               jobCard: {
                 type: 'string',
@@ -158,21 +158,13 @@ export function makeSetupRouter(): Router {
                 type: 'string',
                 description: 'CSS selector for the clickable <a> link, relative to jobCard',
               },
-              company: {
-                type: ['string', 'null'],
-                description: 'CSS selector for company name, relative to jobCard, or null if not present',
-              },
               location: {
                 type: ['string', 'null'],
                 description: 'CSS selector for job location, relative to jobCard, or null if not present',
               },
-              postedDate: {
-                type: ['string', 'null'],
-                description: 'CSS selector for posted/listed date, relative to jobCard, or null if not present',
-              },
               nextPage: {
                 type: ['string', 'null'],
-                description: 'CSS selector for the "Next Page", "Next →", "Load More", or "Show More" button. null if not found.',
+                description: 'CSS selector for the "Next Page", "Next →", "Load More", or "Show More" button anywhere on the page. null ONLY if there is truly no pagination.',
               },
             },
           },
@@ -203,18 +195,23 @@ export function makeSetupRouter(): Router {
 URL: ${pageUrl}
 ${retryNote}
 HOW SELECTORS ARE USED (Playwright):
-  • jobCard  → page.$$( jobCard )  — selects ALL job card containers. This MUST match every listing.
-  • title, company, location, link, postedDate → card.querySelector( field ) — each scoped inside one card
-  • nextPage → page.$( nextPage ) — the pagination/load-more button
+  • jobCard  → page.$$( jobCard )  — selects ALL job card containers. MUST match every listing.
+  • title, location, link → card.querySelector( field ) — scoped inside each card
+  • nextPage → page.$( nextPage ) — the pagination/load-more button (anywhere on the page)
 
 SELECTOR QUALITY RULES:
-  • jobCard MUST match ALL job listings — if querySelectorAll returns only 1 element, the selector is WRONG
+  • jobCard MUST match ALL listings — if querySelectorAll returns only 1 result, the selector is WRONG
   • The HTML has already stripped classes that appear only once (unique to a single element).
-    Only classes that repeat across multiple elements are shown — those are the structural ones to use.
+    Only classes repeated across multiple elements survive — those are the structural ones to use.
   • Prefer: tag names, [role="..."], [data-*] attrs, semantic class names shared across all cards
   • Avoid: nth-child, unique IDs, any class or attribute that identifies one specific listing
-  • Child selectors are relative to jobCard — do not repeat the jobCard selector prefix
-  • If a field is not visible in the HTML → set it to null
+  • Child selectors (title, location, link) are relative to jobCard — do not repeat the jobCard prefix
+  • location → null if not visible in the HTML
+
+PAGINATION — nextPage is required, always set it or explicitly null:
+  • Look below the job list for buttons/links: "Next", "Next page", "Load More", "Show More", ">", "→"
+  • They are often icon-only with aria-label="Next page" — check aria-label attributes
+  • Prefer [aria-label="..."], [data-testid="..."], role="button", or readable class names
 
 PAGINATION TYPES:
   • "show-more": a button that appends more jobs to the current page without any navigation (Load More, Show More, infinite scroll trigger)
