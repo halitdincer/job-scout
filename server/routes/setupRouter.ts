@@ -99,7 +99,9 @@ export function makeSetupRouter(): Router {
             .join('')
             .trim();
 
-          if (!children && !el.hasAttribute('href')) return '';
+          // Keep elements with meaningful attributes even if they have no visible text
+          // (e.g. icon-only "Next" buttons: SVG is stripped but aria-label/role survives)
+          if (!children && keepAttrs.length === 0) return '';
           return `<${tag}${attrStr}>${children}</${tag}>`;
         }
 
