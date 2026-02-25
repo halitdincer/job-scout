@@ -31,7 +31,6 @@ export interface BoardConfig {
     nextPage?: string | null;
   };
   pagination?: PaginationConfig;
-  waitForSelector?: string;
 }
 
 export interface ScrapeResult {

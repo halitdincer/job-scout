@@ -5,7 +5,13 @@
       "Bash(brew:*)",
       "Bash(source:*)",
       "Bash(nvm:*)",
-      "Bash(chsh:*)"
+      "Bash(chsh:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm --prefix web run build)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(ssh:*)"
     ]
   }
 }

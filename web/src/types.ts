@@ -17,7 +17,6 @@ export type ApiBoard = {
   company?: string;
   selectors: Record<string, string | null>;
   pagination?: Record<string, unknown>;
-  waitForSelector?: string;
 };
 
 export type JobsResponse = {
@@ -49,7 +48,6 @@ export type AnalyzeResult = {
   url: string;
   name: string;
   selectors: Record<string, string | null>;
-  waitForSelector?: string;
   pagination?: Record<string, unknown>;
   jobsFound?: number;
 };

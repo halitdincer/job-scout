@@ -94,8 +94,8 @@ export async function scrapeBoard(config: BoardConfig): Promise<ScrapeResult> {
         await page.goto(currentUrl, { waitUntil: 'networkidle', timeout: 60000 });
       }
 
-      if (config.waitForSelector) {
-        await page.waitForSelector(config.waitForSelector, { timeout: 30000 });
+      if (config.selectors?.jobCard) {
+        await page.waitForSelector(config.selectors.jobCard, { timeout: 30000 }).catch(() => {});
       }
 
       const pageJobs = await extractJobsOnPage(page, config);

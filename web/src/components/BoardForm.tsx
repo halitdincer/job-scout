@@ -44,7 +44,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
   const [selectors, setSelectors] = useState<Record<SKey, string>>(
     fromInitialSelectors(initial?.selectors)
   );
-  const [waitForSelector, setWaitForSelector] = useState(initial?.waitForSelector ?? '');
   const [paginationType, setPaginationType] = useState<string>(
     (initial?.pagination?.type as string) ?? ''
   );
@@ -130,7 +129,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
       }
       return next;
     });
-    if (aiSuggestions.waitForSelector) setWaitForSelector(aiSuggestions.waitForSelector);
     if (aiSuggestions.pagination && !paginationType) {
       applyPaginationSuggestion(aiSuggestions.pagination);
     }
@@ -154,7 +152,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         body: JSON.stringify({
           url: url.trim(),
           selectors: toSelectorRecord(selectors),
-          ...(waitForSelector.trim() ? { waitForSelector: waitForSelector.trim() } : {}),
           ...(pagination ? { pagination } : {}),
         }),
       });
@@ -187,7 +184,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         ...(company.trim() ? { company: company.trim() } : {}),
         selectors: toSelectorRecord(selectors),
         ...(pagination ? { pagination } : {}),
-        ...(waitForSelector.trim() ? { waitForSelector: waitForSelector.trim() } : {}),
       });
     } catch (err: any) {
       setError(err.message ?? 'Failed to save board');
@@ -286,19 +282,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
                 </div>
               );
             })}
-            {aiSuggestions.waitForSelector && (
-              <div className="ai-suggestion-row">
-                <span className="ai-suggestion-label">Wait-for selector</span>
-                <code className="ai-suggestion-value">{aiSuggestions.waitForSelector}</code>
-                <button
-                  type="button"
-                  className="button button-secondary button-small"
-                  onClick={() => setWaitForSelector(aiSuggestions.waitForSelector!)}
-                >
-                  Apply
-                </button>
-              </div>
-            )}
             {aiSuggestions.pagination?.type && (
               <div className="ai-suggestion-row">
                 <span className="ai-suggestion-label">Pagination type</span>
@@ -346,17 +329,6 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
             </label>
           </div>
         ))}
-        <div className="selector-field">
-          <label className="form-label">
-            Wait-for selector
-            <input
-              className="input"
-              value={waitForSelector}
-              onChange={(e) => setWaitForSelector(e.target.value)}
-              placeholder=".jobs-container"
-            />
-          </label>
-        </div>
       </fieldset>
 
       <label className="form-label">

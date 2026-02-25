@@ -177,10 +177,6 @@ export function makeSetupRouter(): Router {
             type: ['string', 'null'],
             description: 'For next-url only: the URL with {page} as a placeholder for the page number, e.g. "https://example.com/jobs?page={page}". null otherwise.',
           },
-          waitForSelector: {
-            type: ['string', 'null'],
-            description: 'A selector to wait for before scraping to confirm the page has loaded (usually same as jobCard or its parent container). null if not needed.',
-          },
         },
       },
     };
@@ -277,7 +273,6 @@ ${html}`;
           name: '__ai-validate__',
           url,
           selectors: { ...input.selectors },
-          ...(input.waitForSelector ? { waitForSelector: input.waitForSelector } : {}),
           // No pagination — only test page 1
         };
         const result = await scrapeBoard(testConfig);
@@ -312,14 +307,13 @@ ${html}`;
       url,
       name: toolInput.name ?? '',
       selectors: toolInput.selectors,
-      waitForSelector: toolInput.waitForSelector ?? undefined,
       pagination,
       jobsFound,
     });
   });
 
   router.post('/preview', async (req: Request, res: Response) => {
-    const { url, selectors, waitForSelector, pagination } = req.body ?? {};
+    const { url, selectors, pagination } = req.body ?? {};
     if (!url || typeof url !== 'string') {
       res.status(400).json({ error: 'url is required' });
       return;
@@ -333,7 +327,6 @@ ${html}`;
       name: '__preview__',
       url,
       selectors,
-      ...(waitForSelector ? { waitForSelector } : {}),
       ...(pagination ? { pagination } : {}),
     };
 
