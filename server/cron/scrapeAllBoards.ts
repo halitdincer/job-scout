@@ -1,7 +1,7 @@
 import { Database } from 'sqlite';
 import { scrapeBoard } from '../../src/scraper';
 import {
-  loadBoardsForUser,
+  loadRunnableBoardsForUser,
   upsertJobsForUser,
   createScrapeRun,
   updateScrapeRunProgress,
@@ -36,7 +36,15 @@ async function runScrapeSession(
     const runBoardId = await createScrapeRunBoard(db, runId, board.id, board.name);
     try {
       const result = await scrapeBoard(board);
-      const newJobs = await upsertJobsForUser(db, result.jobs, board.name, userId, runId);
+      const newJobs = await upsertJobsForUser(
+        db,
+        result.jobs,
+        board.name,
+        userId,
+        runId,
+        board.id,
+        board.companyId ?? null
+      );
       await finishScrapeRunBoard(db, runBoardId, 'success', result.jobs.length, newJobs.length);
       totalJobsFound += result.jobs.length;
       totalJobsNew += newJobs.length;
@@ -75,7 +83,7 @@ export async function scrapeAllBoards(
   for (const user of users) {
     let boards: any[];
     try {
-      boards = await loadBoardsForUser(db, user.id);
+      boards = await loadRunnableBoardsForUser(db, user.id);
     } catch (err) {
       console.error(`[cron] Failed to load boards for user ${user.email}:`, err);
       continue;
@@ -102,6 +110,6 @@ export async function scrapeForUser(
   userId: string,
   runId: string
 ): Promise<void> {
-  const boards = await loadBoardsForUser(db, userId);
+  const boards = await loadRunnableBoardsForUser(db, userId);
   await runScrapeSession(db, userId, boards, runId);
 }

@@ -116,19 +116,46 @@ describe('db integration', () => {
       expect(result).toBeNull();
     });
 
-    it('deleteBoardById removes board and returns true', async () => {
+    it('deleteBoardById soft-deletes board and returns true', async () => {
       const id = await insertBoard(db, makeBoard(), 'u1');
       const deleted = await deleteBoardById(db, id, 'u1');
       expect(deleted).toBe(true);
 
-      const boards = await loadBoardsForUser(db, 'u1');
-      expect(boards).toHaveLength(0);
+      const row = await db.get<{ state: string; deleted_at: string | null }>(
+        'SELECT state, deleted_at FROM boards WHERE id = ? AND user_id = ?',
+        id,
+        'u1'
+      );
+      expect(row?.state).toBe('deleted');
+      expect(row?.deleted_at).not.toBeNull();
     });
 
     it('deleteBoardById returns false for wrong userId', async () => {
       const id = await insertBoard(db, makeBoard(), 'u1');
       const deleted = await deleteBoardById(db, id, 'u2');
       expect(deleted).toBe(false);
+    });
+
+    it('new boards default to active state', async () => {
+      const id = await insertBoard(db, makeBoard(), 'u1');
+      const row = await db.get<{ state: string }>('SELECT state FROM boards WHERE id = ?', id);
+      expect(row?.state).toBe('active');
+    });
+
+    it('deleted boards can still be edited', async () => {
+      const id = await insertBoard(db, makeBoard(), 'u1');
+      await deleteBoardById(db, id, 'u1');
+
+      const result = await db.run(
+        'UPDATE boards SET name = ? WHERE id = ? AND user_id = ?',
+        'Edited While Deleted',
+        id,
+        'u1'
+      );
+      expect((result.changes ?? 0) > 0).toBe(true);
+
+      const row = await db.get<{ name: string }>('SELECT name FROM boards WHERE id = ?', id);
+      expect(row?.name).toBe('Edited While Deleted');
     });
   });
 

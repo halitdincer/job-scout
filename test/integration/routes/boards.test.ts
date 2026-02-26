@@ -13,10 +13,11 @@ describe('boards routes', () => {
   let app: any;
   let db: Database;
   let cookie: string;
+  let userId: string;
 
   beforeEach(async () => {
     ({ app, db } = await createTestApp());
-    ({ cookie } = await registerAndLogin(app));
+    ({ cookie, userId } = await registerAndLogin(app));
   });
 
   afterEach(async () => {
@@ -36,6 +37,15 @@ describe('boards routes', () => {
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
       expect(res.body[0].name).toBe('My Board');
+    });
+
+    it('excludes deleted boards from main list', async () => {
+      const createRes = await supertest(app).post('/api/boards').set('Cookie', cookie).send(boardPayload);
+      await supertest(app).delete(`/api/boards/${createRes.body.id}`).set('Cookie', cookie);
+
+      const res = await supertest(app).get('/api/boards').set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(0);
     });
 
     it('401 — unauthenticated', async () => {
@@ -102,15 +112,22 @@ describe('boards routes', () => {
   });
 
   describe('DELETE /api/boards/:id', () => {
-    it('200 — removes board', async () => {
+    it('200 — soft deletes board', async () => {
       const createRes = await supertest(app).post('/api/boards').set('Cookie', cookie).send(boardPayload);
       const id = createRes.body.id;
 
       const res = await supertest(app).delete(`/api/boards/${id}`).set('Cookie', cookie);
       expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
 
       const getBoards = await supertest(app).get('/api/boards').set('Cookie', cookie);
       expect(getBoards.body).toHaveLength(0);
+
+      const deletedRes = await supertest(app).get('/api/boards/deleted').set('Cookie', cookie);
+      expect(deletedRes.status).toBe(200);
+      expect(deletedRes.body).toHaveLength(1);
+      expect(deletedRes.body[0].name).toBe('My Board');
+      expect(deletedRes.body[0].state).toBe('deleted');
     });
 
     it('404 — wrong user\'s board', async () => {
@@ -120,6 +137,56 @@ describe('boards routes', () => {
 
       const res = await supertest(app).delete(`/api/boards/${id}`).set('Cookie', cookie);
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('board state actions', () => {
+    it('POST /api/boards/:id/toggle flips active to inactive', async () => {
+      const createRes = await supertest(app).post('/api/boards').set('Cookie', cookie).send(boardPayload);
+      const id = createRes.body.id;
+
+      const res = await supertest(app).post(`/api/boards/${id}/toggle`).set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body.state).toBe('inactive');
+    });
+
+    it('POST /api/boards/:id/restore restores deleted board as inactive', async () => {
+      const createRes = await supertest(app).post('/api/boards').set('Cookie', cookie).send(boardPayload);
+      const id = createRes.body.id;
+      await supertest(app).delete(`/api/boards/${id}`).set('Cookie', cookie);
+
+      const res = await supertest(app).post(`/api/boards/${id}/restore`).set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body.state).toBe('inactive');
+    });
+
+    it('POST /api/boards/:id/duplicate creates a copied board', async () => {
+      const createRes = await supertest(app).post('/api/boards').set('Cookie', cookie).send(boardPayload);
+      const id = createRes.body.id;
+
+      const res = await supertest(app).post(`/api/boards/${id}/duplicate`).set('Cookie', cookie);
+      expect(res.status).toBe(201);
+      expect(res.body.id).not.toBe(id);
+      expect(res.body.name).toMatch(/My Board \(Copy\)/);
+    });
+  });
+
+  describe('GET /api/boards/:id/jobs', () => {
+    it('returns jobs linked to board', async () => {
+      const createRes = await supertest(app).post('/api/boards').set('Cookie', cookie).send(boardPayload);
+      const id = createRes.body.id;
+
+      await db.run(
+        `INSERT INTO jobs (id, title, company, location, url, board, first_seen_at, last_seen_at, user_id, board_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        'j1', 'Engineer', 'Acme', 'Remote', 'https://example.com/job/1',
+        'My Board', new Date().toISOString(), new Date().toISOString(), userId, id
+      );
+
+      const res = await supertest(app).get(`/api/boards/${id}/jobs`).set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.jobs[0].id).toBe('j1');
     });
   });
 });

@@ -315,6 +315,60 @@ export async function openDb({ dbPath }: DbOptions): Promise<Database> {
     }
   }
 
+  if (currentVersion < 5) {
+    await db.exec('BEGIN');
+    try {
+      const boardCols5 = await db.all<{ name: string }[]>('PRAGMA table_info(boards)');
+      const boardColNames5 = boardCols5.map((c) => c.name);
+
+      if (!boardColNames5.includes('state')) {
+        await db.exec(`ALTER TABLE boards ADD COLUMN state TEXT NOT NULL DEFAULT 'active'`);
+      }
+      if (!boardColNames5.includes('deleted_at')) {
+        await db.exec(`ALTER TABLE boards ADD COLUMN deleted_at TEXT`);
+      }
+
+      const jobCols5 = await db.all<{ name: string }[]>('PRAGMA table_info(jobs)');
+      const jobColNames5 = jobCols5.map((c) => c.name);
+
+      if (!jobColNames5.includes('board_id')) {
+        await db.exec(`ALTER TABLE jobs ADD COLUMN board_id TEXT`);
+      }
+      if (!jobColNames5.includes('company_id')) {
+        await db.exec(`ALTER TABLE jobs ADD COLUMN company_id TEXT`);
+      }
+
+      await db.exec(`
+        UPDATE jobs
+        SET board_id = (
+          SELECT b.id
+          FROM boards b
+          WHERE b.user_id = jobs.user_id AND b.name = jobs.board
+          ORDER BY b.updated_at DESC
+          LIMIT 1
+        )
+        WHERE board_id IS NULL
+      `);
+
+      await db.exec(`
+        UPDATE jobs
+        SET company_id = (
+          SELECT b.company_id
+          FROM boards b
+          WHERE b.id = jobs.board_id
+          LIMIT 1
+        )
+        WHERE company_id IS NULL
+      `);
+
+      await db.exec(`INSERT OR IGNORE INTO schema_version (version) VALUES (5)`);
+      await db.exec('COMMIT');
+    } catch (err) {
+      await db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
   return db;
 }
 
@@ -633,6 +687,8 @@ function rowToBoard(row: {
   company_name?: string | null;
   location_key?: string | null;
   location_label?: string | null;
+  state?: string | null;
+  deleted_at?: string | null;
 }): any {
   const pagination = row.pag_type
     ? {
@@ -653,6 +709,8 @@ function rowToBoard(row: {
     ...(row.company_name ? { companyName: row.company_name } : {}),
     ...(row.location_key ? { locationKey: row.location_key } : {}),
     ...(row.location_label ? { locationLabel: row.location_label } : {}),
+    state: row.state ?? 'active',
+    deletedAt: row.deleted_at ?? null,
     selectors: {
       jobCard: row.sel_job_card ?? '',
       title: row.sel_title ?? '',
@@ -682,6 +740,8 @@ export async function loadBoardsForUser(db: Database, userId: string): Promise<a
     company_name: string | null;
     location_key: string | null;
     location_label: string | null;
+    state: string | null;
+    deleted_at: string | null;
     last_run_status: string | null;
     last_run_finished_at: string | null;
   }[]>(
@@ -690,6 +750,7 @@ export async function loadBoardsForUser(db: Database, userId: string): Promise<a
             b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
             b.company_id, c.name AS company_name,
             b.location_key, b.location_label,
+            b.state, b.deleted_at,
             srb.status AS last_run_status,
             srb.finished_at AS last_run_finished_at
      FROM boards b
@@ -702,7 +763,7 @@ export async function loadBoardsForUser(db: Database, userId: string): Promise<a
        ORDER BY srb2.started_at DESC
        LIMIT 1
      )
-     WHERE b.user_id = ?
+     WHERE b.user_id = ? AND COALESCE(b.state, 'active') != 'deleted'
      ORDER BY b.name`,
     userId,
     userId
@@ -740,6 +801,49 @@ export async function loadBoardsForUser(db: Database, userId: string): Promise<a
       ? { status: row.last_run_status, finishedAt: row.last_run_finished_at }
       : null,
   }));
+}
+
+export async function loadDeletedBoardsForUser(db: Database, userId: string): Promise<any[]> {
+  const rows = await db.all<{
+    id: string;
+    name: string;
+    url: string;
+    company: string | null;
+    location: string | null;
+    sel_job_card: string | null;
+    sel_title: string | null;
+    sel_link: string | null;
+    sel_next_page: string | null;
+    pag_type: string | null;
+    pag_url_template: string | null;
+    pag_max_pages: number | null;
+    pag_delay_ms: number | null;
+    company_id: string | null;
+    company_name: string | null;
+    location_key: string | null;
+    location_label: string | null;
+    state: string | null;
+    deleted_at: string | null;
+  }[]>(
+    `SELECT b.id, b.name, b.url, b.company, b.location,
+            b.sel_job_card, b.sel_title, b.sel_link, b.sel_next_page,
+            b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
+            b.company_id, c.name AS company_name,
+            b.location_key, b.location_label,
+            b.state, b.deleted_at
+     FROM boards b
+     LEFT JOIN companies c ON c.id = b.company_id
+     WHERE b.user_id = ? AND COALESCE(b.state, 'active') = 'deleted'
+     ORDER BY b.deleted_at DESC, b.name`,
+    userId
+  );
+
+  return rows.map((row) => ({ ...rowToBoard(row), tags: [], lastRun: null }));
+}
+
+export async function loadRunnableBoardsForUser(db: Database, userId: string): Promise<any[]> {
+  const boards = await loadBoardsForUser(db, userId);
+  return boards.filter((b) => b.state === 'active');
 }
 
 export async function listBoardNames(db: Database): Promise<string[]> {
@@ -781,8 +885,8 @@ export async function insertBoard(
     `INSERT INTO boards (id, name, url, config_json, updated_at, user_id,
        company, location, sel_job_card, sel_title, sel_link, sel_next_page,
        pag_type, pag_url_template, pag_max_pages, pag_delay_ms, created_at,
-       company_id, location_key, location_label)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       company_id, location_key, location_label, state, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     board?.name ?? '',
     board?.url ?? '',
@@ -802,7 +906,9 @@ export async function insertBoard(
     now,
     board?.companyId ?? null,
     board?.locationKey ?? null,
-    board?.locationLabel ?? null
+    board?.locationLabel ?? null,
+    board?.state ?? 'active',
+    null
   );
 
   if (tagIds && tagIds.length > 0) {
@@ -862,8 +968,49 @@ export async function deleteBoardById(
   id: string,
   userId: string
 ): Promise<boolean> {
+  const now = new Date().toISOString();
   const result = await db.run(
-    'DELETE FROM boards WHERE id = ? AND user_id = ?',
+    `UPDATE boards
+     SET state = 'deleted', deleted_at = ?
+     WHERE id = ? AND user_id = ? AND COALESCE(state, 'active') != 'deleted'`,
+    now,
+    id,
+    userId
+  );
+  return (result.changes ?? 0) > 0;
+}
+
+export async function toggleBoardStateById(
+  db: Database,
+  id: string,
+  userId: string
+): Promise<boolean> {
+  const row = await db.get<{ state: string | null }>(
+    'SELECT state FROM boards WHERE id = ? AND user_id = ?',
+    id,
+    userId
+  );
+  if (!row) return false;
+  const current = row.state ?? 'active';
+  if (current === 'deleted') return false;
+  const next = current === 'active' ? 'inactive' : 'active';
+  const result = await db.run(
+    `UPDATE boards SET state = ?, deleted_at = NULL WHERE id = ? AND user_id = ?`,
+    next,
+    id,
+    userId
+  );
+  return (result.changes ?? 0) > 0;
+}
+
+export async function restoreBoardById(
+  db: Database,
+  id: string,
+  userId: string
+): Promise<boolean> {
+  const result = await db.run(
+    `UPDATE boards SET state = 'inactive', deleted_at = NULL
+     WHERE id = ? AND user_id = ? AND COALESCE(state, 'active') = 'deleted'`,
     id,
     userId
   );
@@ -893,11 +1040,14 @@ export async function getBoardById(
     company_name: string | null;
     location_key: string | null;
     location_label: string | null;
+    state: string | null;
+    deleted_at: string | null;
   } | undefined>(
     `SELECT b.id, b.name, b.url, b.company, b.location,
             b.sel_job_card, b.sel_title, b.sel_link, b.sel_next_page,
             b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
-            b.company_id, c.name AS company_name, b.location_key, b.location_label
+            b.company_id, c.name AS company_name, b.location_key, b.location_label,
+            b.state, b.deleted_at
      FROM boards b
      LEFT JOIN companies c ON c.id = b.company_id
      WHERE b.id = ? AND b.user_id = ?`,
@@ -916,6 +1066,91 @@ export async function getBoardById(
   );
 
   return { ...rowToBoard(row), tags: tagRows };
+}
+
+async function nextCopyName(db: Database, userId: string, baseName: string): Promise<string> {
+  const first = `${baseName} (Copy)`;
+  const firstExists = await db.get<{ count: number }>(
+    'SELECT COUNT(*) as count FROM boards WHERE user_id = ? AND name = ?',
+    userId,
+    first
+  );
+  if ((firstExists?.count ?? 0) === 0) return first;
+
+  let i = 2;
+  while (i < 5000) {
+    const candidate = `${baseName} (Copy ${i})`;
+    const exists = await db.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM boards WHERE user_id = ? AND name = ?',
+      userId,
+      candidate
+    );
+    if ((exists?.count ?? 0) === 0) return candidate;
+    i++;
+  }
+  return `${baseName} (Copy ${Date.now()})`;
+}
+
+export async function duplicateBoardById(
+  db: Database,
+  id: string,
+  userId: string
+): Promise<string | null> {
+  const board = await getBoardById(db, id, userId);
+  if (!board) return null;
+
+  const name = await nextCopyName(db, userId, board.name);
+  const tagIds = (board.tags ?? []).map((t: { id: string }) => t.id);
+  const cloned = {
+    ...board,
+    name,
+    state: 'inactive',
+  };
+  delete cloned.id;
+
+  return insertBoard(db, cloned, userId, tagIds);
+}
+
+export async function listJobsForBoardIdForUser(
+  db: Database,
+  boardId: string,
+  userId: string,
+  page = 1,
+  limit = 25
+): Promise<{ jobs: any[]; total: number }> {
+  const board = await db.get<{ id: string; name: string }>(
+    'SELECT id, name FROM boards WHERE id = ? AND user_id = ?',
+    boardId,
+    userId
+  );
+  if (!board) return { jobs: [], total: 0 };
+
+  const offset = (Math.max(1, page) - 1) * limit;
+  const count = await db.get<{ total: number }>(
+    `SELECT COUNT(*) as total
+     FROM jobs
+     WHERE user_id = ? AND (board_id = ? OR (board_id IS NULL AND board = ?))`,
+    userId,
+    boardId,
+    board.name
+  );
+
+  const jobs = await db.all(
+    `SELECT id, title, company, location, url,
+            posted_date AS postedDate, board,
+            first_seen_at AS firstSeenAt, last_seen_at AS lastSeenAt
+     FROM jobs
+     WHERE user_id = ? AND (board_id = ? OR (board_id IS NULL AND board = ?))
+     ORDER BY first_seen_at DESC
+     LIMIT ? OFFSET ?`,
+    userId,
+    boardId,
+    board.name,
+    limit,
+    offset
+  );
+
+  return { jobs, total: count?.total ?? 0 };
 }
 
 export async function deleteBoard(db: Database, name: string): Promise<number> {
@@ -1009,11 +1244,27 @@ export async function upsertJobsForUser(
   jobs: Job[],
   board: string,
   userId: string,
-  runId?: string
+  runId?: string,
+  boardId?: string,
+  companyId?: string | null
 ): Promise<Job[]> {
   if (jobs.length === 0) return [];
 
   const now = new Date().toISOString();
+  let resolvedBoardId = boardId;
+  let resolvedCompanyId = companyId;
+
+  if (!resolvedBoardId) {
+    const boardRow = await db.get<{ id: string; company_id: string | null }>(
+      `SELECT id, company_id FROM boards WHERE user_id = ? AND name = ? ORDER BY updated_at DESC LIMIT 1`,
+      userId,
+      board
+    );
+    resolvedBoardId = boardRow?.id;
+    if (resolvedCompanyId === undefined) {
+      resolvedCompanyId = boardRow?.company_id ?? null;
+    }
+  }
   const ids = jobs.map((job) => job.id);
   const existing = new Set<string>();
 
@@ -1035,13 +1286,13 @@ export async function upsertJobsForUser(
   try {
     const insertStmt = await db.prepare(`
       INSERT INTO jobs (
-        id, title, company, location, url, posted_date, board, first_seen_at, last_seen_at, user_id, found_in_run_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, title, company, location, url, posted_date, board, first_seen_at, last_seen_at, user_id, found_in_run_id, board_id, company_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const updateStmt = await db.prepare(`
       UPDATE jobs
-      SET title = ?, company = ?, location = ?, url = ?, posted_date = ?, board = ?, last_seen_at = ?
+      SET title = ?, company = ?, location = ?, url = ?, posted_date = ?, board = ?, last_seen_at = ?, board_id = COALESCE(?, board_id), company_id = COALESCE(?, company_id)
       WHERE id = ? AND user_id = ?
     `);
 
@@ -1058,7 +1309,9 @@ export async function upsertJobsForUser(
           now,
           now,
           userId,
-          runId ?? null
+          runId ?? null,
+          resolvedBoardId ?? null,
+          resolvedCompanyId ?? null
         );
         newJobs.push(job);
       } else {
@@ -1070,6 +1323,8 @@ export async function upsertJobsForUser(
           job.postedDate ?? null,
           board,
           now,
+          resolvedBoardId ?? null,
+          resolvedCompanyId ?? null,
           job.id,
           userId
         );
@@ -1103,9 +1358,11 @@ export async function listCompaniesForUser(
             COUNT(DISTINCT b.id) AS board_count,
             COUNT(DISTINCT j.id) AS job_count
      FROM companies c
-     LEFT JOIN boards b ON b.company_id = c.id AND b.user_id = c.user_id
-     LEFT JOIN jobs j ON j.board = b.name AND j.user_id = c.user_id
-     WHERE c.user_id = ?
+      LEFT JOIN boards b ON b.company_id = c.id AND b.user_id = c.user_id
+      LEFT JOIN jobs j ON j.user_id = c.user_id AND (
+        j.company_id = c.id OR (j.company_id IS NULL AND j.board = b.name)
+      )
+      WHERE c.user_id = ?
      GROUP BY c.id, c.name
      ORDER BY c.name`,
     userId
@@ -1147,6 +1404,20 @@ export async function deleteCompany(
   userId: string,
   companyId: string
 ): Promise<void> {
+  await db.run(
+    `UPDATE boards
+     SET company_id = NULL
+     WHERE user_id = ? AND company_id = ?`,
+    userId,
+    companyId
+  );
+  await db.run(
+    `UPDATE jobs
+     SET company_id = NULL
+     WHERE user_id = ? AND company_id = ?`,
+    userId,
+    companyId
+  );
   await db.run('DELETE FROM companies WHERE id = ? AND user_id = ?', companyId, userId);
 }
 
@@ -1298,12 +1569,16 @@ export async function listJobsForUser(
   let joinClause = '';
 
   if (needsBoardJoin) {
-    joinClause = 'JOIN boards b ON b.name = j.board AND b.user_id = j.user_id';
+    joinClause = `JOIN boards b
+      ON b.user_id = j.user_id
+     AND (b.id = j.board_id OR (j.board_id IS NULL AND b.name = j.board))`;
   }
 
   if (boardIds.length > 0) {
     if (!needsBoardJoin) {
-      joinClause = 'JOIN boards b ON b.name = j.board AND b.user_id = j.user_id';
+      joinClause = `JOIN boards b
+        ON b.user_id = j.user_id
+       AND (b.id = j.board_id OR (j.board_id IS NULL AND b.name = j.board))`;
     }
     const ph = boardIds.map(() => '?').join(',');
     conditions.push(`b.id IN (${ph})`);

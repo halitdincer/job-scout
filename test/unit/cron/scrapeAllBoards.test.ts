@@ -120,6 +120,34 @@ describe('scrapeAllBoards', () => {
     expect(run?.boards_done).toBe(1);
     expect(run?.boards_total).toBe(1);
   });
+
+  it('skips inactive and deleted boards', async () => {
+    await db.run(
+      `INSERT INTO boards (id, name, url, config_json, updated_at, user_id, sel_job_card, sel_title, sel_link, state)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      'b2', 'Inactive Board', 'https://example.com/inactive',
+      JSON.stringify({ name: 'Inactive Board', url: 'https://example.com/inactive', selectors: {} }),
+      new Date().toISOString(), 'u1', '.job', '.title', 'a', 'inactive'
+    );
+    await db.run(
+      `INSERT INTO boards (id, name, url, config_json, updated_at, user_id, sel_job_card, sel_title, sel_link, state)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      'b3', 'Deleted Board', 'https://example.com/deleted',
+      JSON.stringify({ name: 'Deleted Board', url: 'https://example.com/deleted', selectors: {} }),
+      new Date().toISOString(), 'u1', '.job', '.title', 'a', 'deleted'
+    );
+
+    vi.mocked(scrapeBoard).mockResolvedValue({ board: 'TestBoard', jobs: [] });
+    await scrapeAllBoards(db);
+    expect(scrapeBoard).toHaveBeenCalledTimes(1);
+
+    const run = await db.get<{ boards_total: number; boards_done: number }>(
+      'SELECT boards_total, boards_done FROM scrape_runs WHERE user_id = ? ORDER BY started_at DESC LIMIT 1',
+      'u1'
+    );
+    expect(run?.boards_total).toBe(1);
+    expect(run?.boards_done).toBe(1);
+  });
 });
 
 describe('scrapeAllBoards — partial status', () => {

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import BoardsPage from './pages/BoardsPage';
+import BoardDetailPage from './pages/BoardDetailPage';
 import JobsPage from './pages/JobsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -69,6 +70,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <BoardsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/boards/:id"
+              element={
+                <ProtectedRoute>
+                  <BoardDetailPage />
                 </ProtectedRoute>
               }
             />

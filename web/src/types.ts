@@ -34,6 +34,8 @@ export type ApiBoard = {
   id: string;
   name: string;
   url: string;
+  state?: 'active' | 'inactive' | 'deleted';
+  deletedAt?: string | null;
   company?: string;
   location?: string;
   companyId?: string;

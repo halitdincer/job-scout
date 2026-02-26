@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import BoardsPage from './BoardsPage';
@@ -17,8 +17,8 @@ vi.mock('../components/GeoCombobox', () => ({
 import { useBoardsData, useJobsData } from '../hooks';
 
 const sampleBoards = [
-  { id: 'b1', name: 'Board Alpha', url: 'https://alpha.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
-  { id: 'b2', name: 'Board Beta', url: 'https://beta.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
+  { id: 'b1', name: 'Board Alpha', state: 'active', tags: [], url: 'https://alpha.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
+  { id: 'b2', name: 'Board Beta', state: 'inactive', tags: [], url: 'https://beta.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
 ];
 
 const boardsWithLastRun = [
@@ -53,7 +53,7 @@ function renderBoardsPage(boards = sampleBoards, fetchImpl?: typeof fetch) {
     loading: false,
   });
 
-  if (fetchImpl) vi.stubGlobal('fetch', fetchImpl);
+  vi.stubGlobal('fetch', fetchImpl ?? vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }));
 
   render(
     <MemoryRouter>
@@ -66,11 +66,29 @@ function renderBoardsPage(boards = sampleBoards, fetchImpl?: typeof fetch) {
 
 describe('BoardsPage', () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.unstubAllGlobals());
 
-  it('lists boards from useBoardsData', () => {
+  it('splits active and inactive boards', () => {
     renderBoardsPage();
+    expect(screen.getByText('Active Boards')).toBeInTheDocument();
+    expect(screen.getByText('Inactive Boards')).toBeInTheDocument();
     expect(screen.getByText('Board Alpha')).toBeInTheDocument();
     expect(screen.getByText('Board Beta')).toBeInTheDocument();
+  });
+
+  it('loads deleted boards section from API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([
+        { id: 'b9', name: 'Old Board', state: 'deleted', tags: [], url: 'https://old.example.com', selectors: {} },
+      ]),
+    });
+    renderBoardsPage(sampleBoards, fetchMock);
+
+    await waitFor(() => {
+      expect(screen.getByText('Deleted Boards')).toBeInTheDocument();
+      expect(screen.getByText('Old Board')).toBeInTheDocument();
+    });
   });
 
   it('"+ Add Board" opens the board form', async () => {
@@ -184,7 +202,7 @@ describe('BoardsPage', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderBoardsPage(sampleBoards, fetchMock);
 
-    const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+    const deleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
@@ -192,6 +210,50 @@ describe('BoardsPage', () => {
         '/api/boards/b1',
         expect.objectContaining({ method: 'DELETE' })
       );
+    });
+  });
+
+  it('toggle button calls POST /api/boards/:id/toggle', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: 'b1', state: 'inactive' }) });
+
+    renderBoardsPage(sampleBoards, fetchMock);
+    fireEvent.click(screen.getByRole('button', { name: /set inactive/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/boards/b1/toggle', expect.objectContaining({ method: 'POST' }));
+    });
+  });
+
+  it('restore button calls POST /api/boards/:id/restore', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([{ id: 'd1', name: 'Discarded', state: 'deleted', tags: [], url: 'https://discarded', selectors: {} }]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: 'd1', state: 'inactive' }) });
+
+    renderBoardsPage(sampleBoards, fetchMock);
+
+    await waitFor(() => screen.getByText('Discarded'));
+    fireEvent.click(screen.getByRole('button', { name: /restore/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/boards/d1/restore', expect.objectContaining({ method: 'POST' }));
+    });
+  });
+
+  it('duplicate button calls POST /api/boards/:id/duplicate', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: 'b3' }) });
+
+    renderBoardsPage(sampleBoards, fetchMock);
+    fireEvent.click(screen.getAllByRole('button', { name: /duplicate/i })[0]);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/boards/b1/duplicate', expect.objectContaining({ method: 'POST' }));
     });
   });
 });
