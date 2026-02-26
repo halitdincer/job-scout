@@ -1,4 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import os from 'os';
+import path from 'path';
+import fs from 'fs-extra';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
 import { Database } from 'sqlite';
 import {
   openDb,
@@ -93,6 +98,57 @@ describe('db integration', () => {
   });
 
   describe('sources CRUD', () => {
+    it('migrates legacy sources schema and can still list sources', async () => {
+      const tmpDbPath = path.join(
+        os.tmpdir(),
+        `job-scout-legacy-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+      );
+
+      const legacyDb = await open({
+        filename: tmpDbPath,
+        driver: sqlite3.Database,
+      });
+
+      await legacyDb.exec(`
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL UNIQUE,
+          password_hash TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE sources (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          url TEXT NOT NULL,
+          config_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          user_id TEXT
+        );
+
+        INSERT INTO users (id, email, password_hash, created_at)
+        VALUES ('u1', 'legacy@test.com', 'hash', datetime('now'));
+
+        INSERT INTO sources (id, name, url, config_json, updated_at, user_id)
+        VALUES ('s1', 'Legacy Source', 'https://example.com/jobs', '{}', datetime('now'), 'u1');
+      `);
+      await legacyDb.close();
+
+      const migratedDb = await openDb({ dbPath: tmpDbPath });
+      const columns = await migratedDb.all<{ name: string }[]>('PRAGMA table_info(sources)');
+      const columnNames = columns.map((column) => column.name);
+
+      expect(columnNames).toContain('analyze_url');
+      expect(columnNames).toContain('state');
+
+      const sources = await loadSourcesForUser(migratedDb, 'u1');
+      expect(sources).toHaveLength(1);
+      expect(sources[0].name).toBe('Legacy Source');
+
+      await migratedDb.close();
+      await fs.remove(tmpDbPath);
+    });
+
     it('insertSource / loadSourcesForUser / getSourceById round-trip', async () => {
       const id = await insertSource(db, makeSource(), 'u1');
       expect(typeof id).toBe('string');

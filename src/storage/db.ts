@@ -162,7 +162,48 @@ export async function openDb({ dbPath }: DbOptions): Promise<Database> {
     CREATE INDEX IF NOT EXISTS idx_source_tags_source_id ON source_tags(source_id);
   `);
 
+  await runMigrations(db);
+
   return db;
+}
+
+type TableColumn = { name: string };
+
+async function hasColumn(db: Database, tableName: string, columnName: string): Promise<boolean> {
+  const columns = await db.all<TableColumn[]>(`PRAGMA table_info(${tableName})`);
+  return columns.some((column) => column.name === columnName);
+}
+
+async function ensureColumn(
+  db: Database,
+  tableName: string,
+  columnName: string,
+  columnDefinition: string
+): Promise<void> {
+  if (await hasColumn(db, tableName, columnName)) return;
+  await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`);
+}
+
+async function runMigrations(db: Database): Promise<void> {
+  // Sources columns expected by current API responses and CRUD.
+  await ensureColumn(db, 'sources', 'analyze_url', 'analyze_url TEXT');
+  await ensureColumn(db, 'sources', 'company', 'company TEXT');
+  await ensureColumn(db, 'sources', 'location', 'location TEXT');
+  await ensureColumn(db, 'sources', 'sel_job_card', 'sel_job_card TEXT');
+  await ensureColumn(db, 'sources', 'sel_title', 'sel_title TEXT');
+  await ensureColumn(db, 'sources', 'sel_link', 'sel_link TEXT');
+  await ensureColumn(db, 'sources', 'sel_next_page', 'sel_next_page TEXT');
+  await ensureColumn(db, 'sources', 'pag_type', 'pag_type TEXT');
+  await ensureColumn(db, 'sources', 'pag_url_template', 'pag_url_template TEXT');
+  await ensureColumn(db, 'sources', 'pag_max_pages', 'pag_max_pages INTEGER');
+  await ensureColumn(db, 'sources', 'pag_delay_ms', 'pag_delay_ms INTEGER');
+  await ensureColumn(db, 'sources', 'created_at', 'created_at TEXT');
+  await ensureColumn(db, 'sources', 'state', "state TEXT NOT NULL DEFAULT 'active'");
+  await ensureColumn(db, 'sources', 'deleted_at', 'deleted_at TEXT');
+
+  // Jobs columns used by multi-run tracking and source linking.
+  await ensureColumn(db, 'jobs', 'found_in_run_id', 'found_in_run_id TEXT');
+  await ensureColumn(db, 'jobs', 'source_id', 'source_id TEXT');
 }
 
 function chunkArray<T>(items: T[], size: number) {
