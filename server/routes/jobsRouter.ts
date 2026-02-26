@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Database } from 'sqlite';
 import { requireAuth } from '../auth/middleware';
-import { listJobsForUser } from '../../src/storage/db';
+import { listJobsForUser, deleteJobsByIds } from '../../src/storage/db';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -104,6 +104,21 @@ export function makeJobsRouter(db: Database): Router {
       });
     } catch (err) {
       console.error('GET /api/jobs error:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  router.delete('/', async (req: Request, res: Response) => {
+    const userId = req.userId!;
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' });
+    }
+    try {
+      const deleted = await deleteJobsByIds(db, userId, ids);
+      res.json({ ok: true, deleted });
+    } catch (err) {
+      console.error('DELETE /api/jobs error:', err);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

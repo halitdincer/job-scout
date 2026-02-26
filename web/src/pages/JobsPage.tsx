@@ -140,6 +140,9 @@ export default function JobsPage() {
   const [locationLabel, setLocationLabel] = useState('');
   const [datePreset, setDatePreset] = useState('');
   const [sortBy, setSortBy] = useState('newest');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   const debouncedQuery = useDebounce(query, 300);
   const { dateFrom, dateTo } = getDateRange(datePreset);
@@ -147,6 +150,9 @@ export default function JobsPage() {
   useEffect(() => { setPage(1); }, [
     debouncedQuery, selectedBoards, selectedCompanies, selectedTags, locationKey, datePreset, sortBy,
   ]);
+
+  // Clear selection when results change
+  useEffect(() => { setSelectedIds(new Set()); }, [refreshKey, page]);
 
   const { data, error, loading } = useJobsData({
     q: debouncedQuery,
@@ -159,6 +165,7 @@ export default function JobsPage() {
     sortBy,
     page,
     limit: 50,
+    refreshKey,
   });
 
   const boards = useBoardsData();
@@ -188,6 +195,43 @@ export default function JobsPage() {
   }
   function toggleTag(id: string) {
     setSelectedTags((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
+  }
+
+  const currentJobIds = (data?.jobs ?? []).map((j) => j.id);
+  const allSelected = currentJobIds.length > 0 && currentJobIds.every((id) => selectedIds.has(id));
+
+  function toggleJobSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(currentJobIds));
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} job${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await fetch('/api/jobs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      setSelectedIds(new Set());
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const activeFilterCount =
@@ -295,6 +339,40 @@ export default function JobsPage() {
         )}
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-bar">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              style={{ width: 16, height: 16 }}
+            />
+            <span className="muted" style={{ fontSize: 13 }}>
+              {selectedIds.size} of {currentJobIds.length} selected
+            </span>
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="button button-danger button-small"
+              onClick={handleBulkDelete}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting…' : `Delete ${selectedIds.size}`}
+            </button>
+            <button
+              type="button"
+              className="button button-secondary button-small"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading && <p className="muted">Loading…</p>}
 
       {!loading && (data?.jobs ?? []).length === 0 && (
@@ -305,8 +383,35 @@ export default function JobsPage() {
 
       {(data?.jobs ?? []).length > 0 && (
         <div className="job-list">
+          <div className="job-row job-row-header">
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                style={{ width: 15, height: 15 }}
+              />
+            </label>
+            <span className="muted" style={{ fontSize: 12 }}>
+              {currentJobIds.length} job{currentJobIds.length !== 1 ? 's' : ''} on this page
+            </span>
+            <span />
+          </div>
           {(data?.jobs ?? []).map((job) => (
-            <div key={job.id} className="job-row">
+            <div
+              key={job.id}
+              className={`job-row${selectedIds.has(job.id) ? ' job-row-selected' : ''}`}
+              onClick={() => toggleJobSelect(job.id)}
+              style={{ cursor: 'pointer' }}
+            >
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(job.id)}
+                  onChange={() => toggleJobSelect(job.id)}
+                  style={{ width: 15, height: 15 }}
+                />
+              </label>
               <div className="job-row-main">
                 <a
                   className="job-title-link"
@@ -334,7 +439,7 @@ export default function JobsPage() {
                   )}
                 </div>
               </div>
-              <div className="job-row-actions">
+              <div className="job-row-actions" onClick={(e) => e.stopPropagation()}>
                 <span className="job-time">{timeAgo(job.firstSeenAt)}</span>
                 <a
                   className="button button-secondary button-small"

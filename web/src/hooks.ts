@@ -13,6 +13,7 @@ export interface JobsParams {
   page?: number;
   limit?: number;
   sortBy?: string;
+  refreshKey?: number;
 }
 
 export function useJobsData(params: JobsParams = {}) {
@@ -28,6 +29,7 @@ export function useJobsData(params: JobsParams = {}) {
     page = 1,
     limit = 25,
     sortBy = 'newest',
+    refreshKey = 0,
   } = params;
 
   const [data, setData] = useState<JobsResponse | null>(null);
@@ -65,7 +67,7 @@ export function useJobsData(params: JobsParams = {}) {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, board, boardsKey, companiesKey, tagsKey, locationKey, dateFrom, dateTo, page, limit, sortBy]);
+  }, [q, board, boardsKey, companiesKey, tagsKey, locationKey, dateFrom, dateTo, page, limit, sortBy, refreshKey]);
 
   return { data, error, loading };
 }

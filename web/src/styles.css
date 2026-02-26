@@ -315,12 +315,23 @@ button { font-family: inherit; }
 
 .job-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 28px 1fr auto;
   align-items: center;
-  gap: 16px;
-  padding: 11px 16px;
+  gap: 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--c-border);
   transition: background 0.1s;
+}
+
+.job-row-header {
+  background: #FAFAFA;
+  border-bottom: 1px solid var(--c-border);
+  padding: 8px 14px;
+  cursor: default !important;
+}
+
+.job-row-selected {
+  background: #EEF3FB;
 }
 
 .job-row:last-child {
@@ -688,6 +699,18 @@ button { font-family: inherit; }
 .filter-chip:hover { background: #F0F4FF; border-color: var(--c-primary); color: var(--c-primary); }
 .filter-chip-active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
 
+/* ── Bulk action bar ─────────────────────────────────────── */
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #EEF3FB;
+  border: 1px solid #C8DAF0;
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+}
+
 /* ── Advanced filters layout ─────────────────────────────── */
 .filters-advanced {
   display: flex;
@@ -733,7 +756,7 @@ button { font-family: inherit; }
   .header-inner { padding: 0 12px; }
   .content { padding: 16px 12px 48px; }
   .nav a { padding: 6px 8px; font-size: 13px; }
-  .job-row { grid-template-columns: 1fr; gap: 8px; }
+  .job-row { grid-template-columns: 28px 1fr; gap: 8px; }
   .job-row-actions { justify-content: flex-end; }
   .grid { grid-template-columns: 1fr 1fr; }
 }

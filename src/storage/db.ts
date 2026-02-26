@@ -1368,6 +1368,20 @@ export async function listJobsForUser(
   return { jobs, total };
 }
 
+export async function deleteJobsByIds(
+  db: Database,
+  userId: string,
+  ids: string[]
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const ph = ids.map(() => '?').join(',');
+  const result = await db.run(
+    `DELETE FROM jobs WHERE id IN (${ph}) AND user_id = ?`,
+    [...ids, userId]
+  );
+  return result.changes ?? 0;
+}
+
 function generateUuid(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
