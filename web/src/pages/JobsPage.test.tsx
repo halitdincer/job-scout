@@ -70,16 +70,27 @@ describe('JobsPage', () => {
     expect(searchInput).toBeInTheDocument();
   });
 
-  it('board filter chips are present', () => {
+  it('boards dropdown button is present', () => {
     renderJobsPage();
-    expect(screen.getByRole('button', { name: 'BoardA' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'BoardB' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Boards/i })).toBeInTheDocument();
   });
 
-  it('clicking a board filter chip calls useJobsData', () => {
+  it('clicking the boards dropdown reveals board option buttons', () => {
     renderJobsPage();
-    const boardBtn = screen.getByRole('button', { name: 'BoardA' });
-    fireEvent.click(boardBtn);
-    expect(vi.mocked(useJobsData)).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Boards/i }));
+    // Board options appear as buttons inside the dropdown
+    const boardBtns = screen.getAllByRole('button', { name: /^BoardA$|^BoardB$/ });
+    expect(boardBtns.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('sort select has Newest/Oldest/Title options', () => {
+    renderJobsPage();
+    const allSelects = document.querySelectorAll('.filter-select') as NodeListOf<HTMLSelectElement>;
+    const sortEl = Array.from(allSelects).find((el) => el.textContent?.includes('Newest first'));
+    expect(sortEl).toBeTruthy();
+    const options = Array.from((sortEl as HTMLSelectElement).options).map((o) => o.value);
+    expect(options).toContain('newest');
+    expect(options).toContain('oldest');
+    expect(options).toContain('title');
   });
 });

@@ -1265,6 +1265,7 @@ export interface ListJobsParams {
   dateTo?: string;
   page?: number;
   limit?: number;
+  sortBy?: 'newest' | 'oldest' | 'title';
 }
 
 export async function listJobsForUser(
@@ -1282,7 +1283,13 @@ export async function listJobsForUser(
     dateTo = '',
     page = 1,
     limit = 25,
+    sortBy = 'newest',
   } = params;
+
+  const orderBy =
+    sortBy === 'oldest' ? 'j.first_seen_at ASC' :
+    sortBy === 'title'  ? 'j.title ASC, j.first_seen_at DESC' :
+    'j.first_seen_at DESC';
 
   const conditions: string[] = ['j.user_id = ?'];
   const countParams: unknown[] = [userId];
@@ -1353,7 +1360,7 @@ export async function listJobsForUser(
             j.posted_date AS postedDate, j.board,
             j.first_seen_at AS firstSeenAt, j.last_seen_at AS lastSeenAt
      FROM jobs j ${joinClause} ${where}
-     ORDER BY j.last_seen_at DESC
+     ORDER BY ${orderBy}
      LIMIT ? OFFSET ?`,
     selectParams
   );

@@ -32,6 +32,14 @@ export function makeJobsRouter(db: Database): Router {
     const locationKey = typeof req.query.locationKey === 'string' ? req.query.locationKey.trim() : '';
     const dateFrom = typeof req.query.dateFrom === 'string' ? req.query.dateFrom.trim() : '';
     const dateTo = typeof req.query.dateTo === 'string' ? req.query.dateTo.trim() : '';
+    const sortByRaw = typeof req.query.sortBy === 'string' ? req.query.sortBy : '';
+    const sortBy = (['newest', 'oldest', 'title'] as const).includes(sortByRaw as any)
+      ? (sortByRaw as 'newest' | 'oldest' | 'title')
+      : 'newest';
+    const orderByLegacy =
+      sortBy === 'oldest' ? 'first_seen_at ASC' :
+      sortBy === 'title'  ? 'title ASC, first_seen_at DESC' :
+      'first_seen_at DESC';
 
     // Legacy single-board filter (backward compat)
     const boardName = typeof req.query.board === 'string' ? req.query.board.trim() : '';
@@ -65,7 +73,7 @@ export function makeJobsRouter(db: Database): Router {
           `SELECT id, title, company, location, url, posted_date as postedDate, board,
                   first_seen_at as firstSeenAt, last_seen_at as lastSeenAt
            FROM jobs ${where}
-           ORDER BY last_seen_at DESC
+           ORDER BY ${orderByLegacy}
            LIMIT ? OFFSET ?`,
           [...params, limit, offset]
         );
@@ -81,6 +89,7 @@ export function makeJobsRouter(db: Database): Router {
           dateTo,
           page,
           limit,
+          sortBy,
         });
       }
 

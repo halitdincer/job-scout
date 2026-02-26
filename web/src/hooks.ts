@@ -12,6 +12,7 @@ export interface JobsParams {
   dateTo?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
 }
 
 export function useJobsData(params: JobsParams = {}) {
@@ -26,6 +27,7 @@ export function useJobsData(params: JobsParams = {}) {
     dateTo = '',
     page = 1,
     limit = 25,
+    sortBy = 'newest',
   } = params;
 
   const [data, setData] = useState<JobsResponse | null>(null);
@@ -47,6 +49,7 @@ export function useJobsData(params: JobsParams = {}) {
     if (locationKey) query.set('locationKey', locationKey);
     if (dateFrom) query.set('dateFrom', dateFrom);
     if (dateTo) query.set('dateTo', dateTo);
+    if (sortBy && sortBy !== 'newest') query.set('sortBy', sortBy);
     query.set('page', String(page));
     query.set('limit', String(limit));
 
@@ -62,7 +65,7 @@ export function useJobsData(params: JobsParams = {}) {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, board, boardsKey, companiesKey, tagsKey, locationKey, dateFrom, dateTo, page, limit]);
+  }, [q, board, boardsKey, companiesKey, tagsKey, locationKey, dateFrom, dateTo, page, limit, sortBy]);
 
   return { data, error, loading };
 }
