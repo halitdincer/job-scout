@@ -84,4 +84,29 @@ describe('jobs routes', () => {
       expect(res.body.limit).toBe(100);
     });
   });
+
+  describe('DELETE /api/jobs', () => {
+    it('400 — rejects missing ids', async () => {
+      const res = await supertest(app).delete('/api/jobs').set('Cookie', cookie).send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('200 — deletes only requested jobs for the user', async () => {
+      await upsertJobsForUser(db, makeJobs(3, 'SourceA', 'del-'), 'SourceA', userId);
+
+      const res = await supertest(app)
+        .delete('/api/jobs')
+        .set('Cookie', cookie)
+        .send({ ids: ['del-job-0', 'del-job-1'] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.deleted).toBe(2);
+
+      const listRes = await supertest(app).get('/api/jobs').set('Cookie', cookie);
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.total).toBe(1);
+      expect(listRes.body.jobs[0].id).toBe('del-job-2');
+    });
+  });
 });

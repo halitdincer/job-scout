@@ -83,6 +83,23 @@ describe('sources routes', () => {
     });
   });
 
+  describe('GET /api/sources/:id', () => {
+    it('200 — returns source by id', async () => {
+      const createRes = await supertest(app).post('/api/sources').set('Cookie', cookie).send(sourcePayload);
+      const id = createRes.body.id;
+
+      const res = await supertest(app).get(`/api/sources/${id}`).set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(id);
+      expect(res.body.name).toBe('My Source');
+    });
+
+    it('404 — unknown source id', async () => {
+      const res = await supertest(app).get('/api/sources/not-found').set('Cookie', cookie);
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('PUT /api/sources/:id', () => {
     it('200 — updates source', async () => {
       const createRes = await supertest(app).post('/api/sources').set('Cookie', cookie).send(sourcePayload);
@@ -108,6 +125,18 @@ describe('sources routes', () => {
         .send({ ...sourcePayload, name: 'Stolen' });
 
       expect(res.status).toBe(404);
+    });
+
+    it('400 — missing name', async () => {
+      const createRes = await supertest(app).post('/api/sources').set('Cookie', cookie).send(sourcePayload);
+      const id = createRes.body.id;
+
+      const res = await supertest(app)
+        .put(`/api/sources/${id}`)
+        .set('Cookie', cookie)
+        .send({ url: 'https://example.com', selectors: {} });
+
+      expect(res.status).toBe(400);
     });
   });
 
@@ -169,6 +198,21 @@ describe('sources routes', () => {
       expect(res.body.id).not.toBe(id);
       expect(res.body.name).toMatch(/My Source \(Copy\)/);
     });
+
+    it('POST /api/sources/:id/toggle returns 404 for unknown source', async () => {
+      const res = await supertest(app).post('/api/sources/not-found/toggle').set('Cookie', cookie);
+      expect(res.status).toBe(404);
+    });
+
+    it('POST /api/sources/:id/restore returns 404 for unknown source', async () => {
+      const res = await supertest(app).post('/api/sources/not-found/restore').set('Cookie', cookie);
+      expect(res.status).toBe(404);
+    });
+
+    it('POST /api/sources/:id/duplicate returns 404 for unknown source', async () => {
+      const res = await supertest(app).post('/api/sources/not-found/duplicate').set('Cookie', cookie);
+      expect(res.status).toBe(404);
+    });
   });
 
   describe('GET /api/sources/:id/jobs', () => {
@@ -187,6 +231,11 @@ describe('sources routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.total).toBe(1);
       expect(res.body.jobs[0].id).toBe('j1');
+    });
+
+    it('404 — source not found', async () => {
+      const res = await supertest(app).get('/api/sources/not-found/jobs').set('Cookie', cookie);
+      expect(res.status).toBe(404);
     });
   });
 });
