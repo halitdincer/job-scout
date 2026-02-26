@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import JobsPage from './JobsPage';
 
 vi.mock('../hooks', () => ({
   useJobsData: vi.fn(),
   useBoardsData: vi.fn(),
+  useTagsData: vi.fn(),
+  useCompaniesData: vi.fn(),
 }));
 
-import { useJobsData, useBoardsData } from '../hooks';
+vi.mock('../components/GeoCombobox', () => ({
+  default: () => <input placeholder="Filter by country, state, city…" />,
+}));
+
+import { useJobsData, useBoardsData, useTagsData, useCompaniesData } from '../hooks';
 
 const sampleJobs = [
   { id: 'j1', title: 'Software Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString(), board: 'BoardA' },
@@ -23,12 +29,23 @@ function renderJobsPage(jobs = sampleJobs) {
   });
   vi.mocked(useBoardsData).mockReturnValue({
     data: [
-      { id: 'b1', name: 'BoardA', url: 'https://a.com', selectors: {} },
-      { id: 'b2', name: 'BoardB', url: 'https://b.com', selectors: {} },
+      { id: 'b1', name: 'BoardA', url: 'https://a.com', selectors: {}, tags: [] },
+      { id: 'b2', name: 'BoardB', url: 'https://b.com', selectors: {}, tags: [] },
     ],
     error: null,
     loading: false,
     refresh: vi.fn(),
+  });
+  vi.mocked(useTagsData).mockReturnValue({
+    data: [],
+    error: null,
+    loading: false,
+    refresh: vi.fn(),
+  });
+  vi.mocked(useCompaniesData).mockReturnValue({
+    data: [],
+    error: null,
+    loading: false,
   });
 
   render(
@@ -53,19 +70,16 @@ describe('JobsPage', () => {
     expect(searchInput).toBeInTheDocument();
   });
 
-  it('board dropdown is present with board options', () => {
+  it('board filter chips are present', () => {
     renderJobsPage();
-    const select = screen.getByRole('combobox');
-    expect(select).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'BoardA' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'BoardB' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'BoardA' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'BoardB' })).toBeInTheDocument();
   });
 
-  it('changing board dropdown triggers useJobsData with board param', () => {
+  it('clicking a board filter chip calls useJobsData', () => {
     renderJobsPage();
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'BoardA' } });
-    // useJobsData is called with updated board param — check it was called
+    const boardBtn = screen.getByRole('button', { name: 'BoardA' });
+    fireEvent.click(boardBtn);
     expect(vi.mocked(useJobsData)).toHaveBeenCalled();
   });
 });

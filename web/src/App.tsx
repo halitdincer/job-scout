@@ -8,6 +8,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import RunsPage from './pages/RunsPage';
 import RunDetailPage from './pages/RunDetailPage';
+import CompaniesPage from './pages/CompaniesPage';
+import LocationsPage from './pages/LocationsPage';
 
 function NavBar() {
   const { user, logout } = useAuth();
@@ -25,6 +27,8 @@ function NavBar() {
               <NavLink to="/" end>Home</NavLink>
               <NavLink to="/jobs">Jobs</NavLink>
               <NavLink to="/boards">Boards</NavLink>
+              <NavLink to="/companies">Companies</NavLink>
+              <NavLink to="/locations">Locations</NavLink>
               <NavLink to="/runs">Runs</NavLink>
               <button className="button button-secondary button-small" onClick={logout}>
                 Sign out
@@ -89,6 +93,22 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <RunDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/companies"
+              element={
+                <ProtectedRoute>
+                  <CompaniesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/locations"
+              element={
+                <ProtectedRoute>
+                  <LocationsPage />
                 </ProtectedRoute>
               }
             />

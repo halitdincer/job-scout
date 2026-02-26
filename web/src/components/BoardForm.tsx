@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { ApiBoard, AnalyzeResult, PreviewResult } from '../types';
+import Combobox from './Combobox';
+import GeoCombobox from './GeoCombobox';
+import TagSelect from './TagSelect';
+import { useCompaniesData, useTagsData } from '../hooks';
 
 interface BoardFormProps {
   initial?: Partial<ApiBoard>;
@@ -37,8 +41,18 @@ function fromInitialSelectors(sel?: Record<string, string | null>): Record<SKey,
 export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [company, setCompany] = useState(initial?.company ?? '');
+  const [companyId, setCompanyId] = useState(initial?.companyId ?? '');
+  const [companyQuery, setCompanyQuery] = useState('');
   const [location, setLocation] = useState(initial?.location ?? '');
+  const [locationKey, setLocationKey] = useState(initial?.locationKey ?? '');
+  const [locationLabel, setLocationLabel] = useState(initial?.locationLabel ?? '');
+  const [selectedTags, setSelectedTags] = useState<string[]>(
+    (initial?.tags ?? []).map((t) => t.id)
+  );
   const [url, setUrl] = useState(initial?.url ?? '');
+
+  const { data: companies } = useCompaniesData(companyQuery);
+  const { data: allTags } = useTagsData();
   const [selectors, setSelectors] = useState<Record<SKey, string>>(
     fromInitialSelectors(initial?.selectors)
   );
@@ -180,10 +194,14 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         name,
         url,
         ...(company.trim() ? { company: company.trim() } : {}),
+        ...(companyId ? { companyId } : {}),
         ...(location.trim() ? { location: location.trim() } : {}),
+        ...(locationKey ? { locationKey, locationLabel } : {}),
+        tags: (allTags ?? []).filter((t) => selectedTags.includes(t.id)),
+        tagIds: selectedTags,
         selectors: toSelectorRecord(selectors),
         ...(pagination ? { pagination } : {}),
-      });
+      } as any);
     } catch (err: any) {
       setError(err.message ?? 'Failed to save board');
     } finally {
@@ -206,22 +224,57 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
       </label>
 
       <label className="form-label">
+        Tags
+        <div style={{ marginTop: 4 }}>
+          <TagSelect
+            selected={selectedTags}
+            onChange={setSelectedTags}
+            tags={allTags ?? []}
+          />
+        </div>
+      </label>
+
+      <label className="form-label">
         Company
-        <input
-          className="input"
+        <Combobox
           value={company}
-          onChange={(e) => setCompany(e.target.value)}
+          onChange={(val, id) => {
+            setCompany(val);
+            setCompanyId(id ?? '');
+          }}
+          suggestions={(companies ?? []).map((c) => ({ id: c.id, label: c.name }))}
+          onCreateNew={async (label) => {
+            try {
+              const res = await fetch('/api/companies', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ name: label }),
+              });
+              if (res.ok) {
+                const created = await res.json();
+                setCompany(created.name);
+                setCompanyId(created.id);
+              }
+            } catch {
+              // ignore
+            }
+          }}
           placeholder="Uber"
+          onQueryChange={setCompanyQuery}
         />
       </label>
 
       <label className="form-label">
         Location
-        <input
-          className="input"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="Toronto, ON"
+        <GeoCombobox
+          locationKey={locationKey}
+          locationLabel={locationLabel}
+          onChange={(key, label) => {
+            setLocationKey(key);
+            setLocationLabel(label);
+            setLocation(label);
+          }}
         />
       </label>
 

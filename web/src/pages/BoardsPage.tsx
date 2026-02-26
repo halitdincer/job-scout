@@ -121,7 +121,23 @@ export default function BoardsPage() {
               <h3 style={{ margin: 0 }}>{board.name}</h3>
               {lastRunBadge(board.lastRun)}
             </div>
+            {board.companyName && (
+              <p className="muted" style={{ marginBottom: 2 }}>{board.companyName}</p>
+            )}
             <p className="muted">{board.url}</p>
+            {(board.tags ?? []).length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+                {(board.tags ?? []).map((tag: { id: string; name: string; color: string }) => (
+                  <span
+                    key={tag.id}
+                    className="tag-badge"
+                    style={{ backgroundColor: tag.color, color: '#fff', fontSize: 11 }}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
             <p className="stat">{boardJobs.get(board.name) ?? 0} jobs</p>
             <div className="card-actions">
               <button

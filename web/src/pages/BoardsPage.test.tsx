@@ -6,6 +6,12 @@ import BoardsPage from './BoardsPage';
 vi.mock('../hooks', () => ({
   useBoardsData: vi.fn(),
   useJobsData: vi.fn(),
+  useCompaniesData: vi.fn(() => ({ data: [], error: null, loading: false })),
+  useTagsData: vi.fn(() => ({ data: [], error: null, loading: false, refresh: vi.fn() })),
+}));
+
+vi.mock('../components/GeoCombobox', () => ({
+  default: () => <input placeholder="Type a country, state, or city…" />,
 }));
 
 import { useBoardsData, useJobsData } from '../hooks';

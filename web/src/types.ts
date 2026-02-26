@@ -10,12 +10,37 @@ export type Job = {
   board: string;
 };
 
+export type Tag = {
+  id: string;
+  name: string;
+  color: string;
+  boardCount?: number;
+};
+
+export type Company = {
+  id: string;
+  name: string;
+  boardCount?: number;
+  jobCount?: number;
+};
+
+export type GeoResult = {
+  key: string;
+  label: string;
+  type: 'country' | 'state' | 'city';
+};
+
 export type ApiBoard = {
   id: string;
   name: string;
   url: string;
   company?: string;
   location?: string;
+  companyId?: string;
+  companyName?: string;
+  locationKey?: string;
+  locationLabel?: string;
+  tags: Tag[];
   selectors: Record<string, string | null>;
   pagination?: Record<string, unknown>;
   lastRun?: { status: string; finishedAt: string | null } | null;

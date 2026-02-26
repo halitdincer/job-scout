@@ -2,6 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BoardForm from './BoardForm';
 
+vi.mock('../hooks', () => ({
+  useCompaniesData: vi.fn(() => ({ data: [], error: null, loading: false })),
+  useTagsData: vi.fn(() => ({ data: [], error: null, loading: false, refresh: vi.fn() })),
+}));
+
+vi.mock('./GeoCombobox', () => ({
+  default: ({ onChange }: any) => (
+    <input
+      placeholder="Type a country, state, or city…"
+      onChange={(e) => onChange('', e.target.value)}
+    />
+  ),
+}));
+
 const defaultProps = {
   onSubmit: vi.fn(),
   onCancel: vi.fn(),

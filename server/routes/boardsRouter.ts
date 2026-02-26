@@ -25,13 +25,13 @@ export function makeBoardsRouter(db: Database): Router {
   });
 
   router.post('/', async (req: Request, res: Response) => {
-    const board = req.body;
+    const { tagIds, ...board } = req.body ?? {};
     if (!board?.name || !board?.url) {
       res.status(400).json({ error: 'name and url are required' });
       return;
     }
     try {
-      const id = await insertBoard(db, board, req.userId!);
+      const id = await insertBoard(db, board, req.userId!, Array.isArray(tagIds) ? tagIds : undefined);
       const created = await getBoardById(db, id, req.userId!);
       res.status(201).json(created);
     } catch (err) {
@@ -42,13 +42,16 @@ export function makeBoardsRouter(db: Database): Router {
 
   router.put('/:id', async (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const board = req.body;
+    const { tagIds, ...board } = req.body ?? {};
     if (!board?.name || !board?.url) {
       res.status(400).json({ error: 'name and url are required' });
       return;
     }
     try {
-      const updated = await updateBoardById(db, id, board, req.userId!);
+      const updated = await updateBoardById(
+        db, id, board, req.userId!,
+        Array.isArray(tagIds) ? tagIds : undefined
+      );
       if (!updated) {
         res.status(404).json({ error: 'Board not found' });
         return;
