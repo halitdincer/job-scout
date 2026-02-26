@@ -38,7 +38,7 @@ function makeSource(overrides: Record<string, unknown> = {}) {
   return {
     name: 'Test Source',
     url: 'https://example.com/jobs',
-    selectors: { jobCard: '.job', title: '.title', link: 'a', location: '.loc' },
+    selectors: { jobCard: '.job', title: '.title', link: 'a' },
     ...overrides,
   };
 }

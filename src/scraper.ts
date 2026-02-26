@@ -4,6 +4,7 @@ import { extractJobsFromJsonLd } from './extractors/jsonLd';
 import { extractJobsFromSelectors } from './extractors/selectors';
 
 const DEFAULT_MAX_PAGES = 1;
+const DEFAULT_STOP_AFTER_EMPTY_PAGES = 2;
 
 function shouldStopForMaxPages(pageIndex: number, maxPages?: number) {
   const limit = maxPages && maxPages > 0 ? maxPages : DEFAULT_MAX_PAGES;
@@ -88,6 +89,7 @@ export async function scrapeSource(config: SourceConfig): Promise<ScrapeResult> 
     let pageIndex = 0;
     let currentUrl = config.url;
     let stayOnPage = false;
+    let consecutiveEmptyPages = 0;
 
     while (true) {
       if (!stayOnPage) {
@@ -98,12 +100,24 @@ export async function scrapeSource(config: SourceConfig): Promise<ScrapeResult> 
         await page.waitForSelector(config.selectors.jobCard, { timeout: 30000 }).catch(() => {});
       }
 
+      const prevCount = jobs.length;
       const pageJobs = await extractJobsOnPage(page, config);
       for (const job of pageJobs) {
         if (!seenIds.has(job.id)) {
           seenIds.add(job.id);
           jobs.push(job);
         }
+      }
+      const newOnThisPage = jobs.length - prevCount;
+
+      // Stop after consecutive pages with no new unique jobs
+      if (newOnThisPage === 0) {
+        consecutiveEmptyPages += 1;
+        if (consecutiveEmptyPages >= DEFAULT_STOP_AFTER_EMPTY_PAGES) {
+          break;
+        }
+      } else {
+        consecutiveEmptyPages = 0;
       }
 
       pageIndex += 1;

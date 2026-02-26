@@ -5,7 +5,6 @@ export interface Job {
   location: string;
   url: string;
   foundAt: string;
-  postedDate?: string;
 }
 
 export interface PaginationConfig {
@@ -20,15 +19,13 @@ export interface PaginationConfig {
 export interface SourceConfig {
   name: string;
   url: string;
+  analyzeUrl?: string;
   company?: string;
   location?: string;
   selectors: {
     jobCard: string;
     title: string;
-    location: string;
     link: string;
-    company?: string | null;
-    postedDate?: string | null;
     nextPage?: string | null;
   };
   pagination?: PaginationConfig;

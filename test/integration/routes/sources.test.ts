@@ -6,7 +6,7 @@ import { createTestApp, registerAndLogin } from '../helpers';
 const sourcePayload = {
   name: 'My Source',
   url: 'https://jobs.example.com',
-  selectors: { jobCard: '.job', title: '.title', link: 'a', location: '.loc' },
+  selectors: { jobCard: '.job', title: '.title', link: 'a' },
 };
 
 describe('sources routes', () => {

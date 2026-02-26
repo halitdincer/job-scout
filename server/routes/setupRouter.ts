@@ -3,7 +3,76 @@ import { chromium } from 'playwright';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../auth/middleware';
 import { scrapeSource } from '../../src/scraper';
-import type { PaginationConfig } from '../../src/types';
+import type { PaginationConfig, Job } from '../../src/types';
+
+// ── Scoring / quality-gate constants ──────────────────────────────────────────
+
+const MIN_JOBS_PAGE1 = 3;
+const MIN_UNIQUE_URL_RATIO = 0.85;
+const MIN_TITLE_NON_EMPTY_RATIO = 0.9;
+
+// ── Scoring helpers ───────────────────────────────────────────────────────────
+
+interface ValidationResult {
+  score: number;
+  status: 'pass' | 'warn' | 'fail';
+  jobsFound: number;
+  uniqueUrlRatio: number;
+  titleNonEmptyRatio: number;
+  reasons: string[];
+}
+
+function scoreJobs(jobs: Job[]): ValidationResult {
+  const reasons: string[] = [];
+  const total = jobs.length;
+
+  if (total === 0) {
+    return { score: 0, status: 'fail', jobsFound: 0, uniqueUrlRatio: 0, titleNonEmptyRatio: 0, reasons: ['No jobs found'] };
+  }
+
+  const uniqueUrls = new Set(jobs.map((j) => j.url));
+  const uniqueUrlRatio = uniqueUrls.size / total;
+  const titleNonEmptyRatio = jobs.filter((j) => j.title && j.title !== 'Unknown Title').length / total;
+
+  let score = 0;
+
+  // Job count score (0-40)
+  if (total >= MIN_JOBS_PAGE1) {
+    score += Math.min(40, total * 2);
+  } else {
+    reasons.push(`Only ${total} jobs found (min ${MIN_JOBS_PAGE1})`);
+    score += total * 5;
+  }
+
+  // Unique URL ratio (0-30)
+  if (uniqueUrlRatio >= MIN_UNIQUE_URL_RATIO) {
+    score += 30;
+  } else {
+    reasons.push(`Low unique URL ratio: ${(uniqueUrlRatio * 100).toFixed(0)}% (min ${MIN_UNIQUE_URL_RATIO * 100}%)`);
+    score += Math.round(uniqueUrlRatio * 30);
+  }
+
+  // Title quality (0-30)
+  if (titleNonEmptyRatio >= MIN_TITLE_NON_EMPTY_RATIO) {
+    score += 30;
+  } else {
+    reasons.push(`Low title quality: ${(titleNonEmptyRatio * 100).toFixed(0)}% non-empty (min ${MIN_TITLE_NON_EMPTY_RATIO * 100}%)`);
+    score += Math.round(titleNonEmptyRatio * 30);
+  }
+
+  let status: 'pass' | 'warn' | 'fail';
+  if (score >= 70 && reasons.length === 0) {
+    status = 'pass';
+  } else if (score >= 40) {
+    status = 'warn';
+  } else {
+    status = 'fail';
+  }
+
+  return { score, status, jobsFound: total, uniqueUrlRatio, titleNonEmptyRatio, reasons };
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
 
 export function makeSetupRouter(): Router {
   const router = Router();
@@ -16,11 +85,14 @@ export function makeSetupRouter(): Router {
       return;
     }
 
-    const { url } = req.body ?? {};
+    const { url, analyzeUrl } = req.body ?? {};
     if (!url || typeof url !== 'string') {
       res.status(400).json({ error: 'url is required' });
       return;
     }
+
+    // Use analyzeUrl for discovery if provided, otherwise fall back to url
+    const discoveryUrl = (typeof analyzeUrl === 'string' && analyzeUrl.trim()) ? analyzeUrl.trim() : url.trim();
 
     let browser;
     let simplifiedHtml = '';
@@ -28,11 +100,9 @@ export function makeSetupRouter(): Router {
       browser = await chromium.launch();
       const page = await browser.newPage();
 
-      // domcontentloaded is fast; networkidle gives SPAs extra time but won't fail if they never idle
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.goto(discoveryUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-      // Run DOM simplification inside the browser so we can use computed styles and real DOM APIs
       simplifiedHtml = await page.evaluate(() => {
         const SKIP_TAGS = new Set(['script', 'style', 'svg', 'noscript', 'iframe', 'canvas']);
         const ROOT_SKIP_TAGS = new Set(['nav', 'header', 'footer']);
@@ -46,13 +116,8 @@ export function makeSetupRouter(): Router {
           return true;
         }
 
-        // Use full body — pagination buttons almost always live outside <main>.
-        // ROOT_SKIP_TAGS (nav, header, footer) at depth ≤ 2 keeps the output clean.
         const root: Element = document.body;
 
-        // Pass 1: count how many elements each class name appears on across the whole page.
-        // Classes that appear only once are unique identifiers — not structural selectors.
-        // Classes that appear 2+ times are shared structural classes (the ones we want).
         const classCount = new Map<string, number>();
         (function countClasses(el: Element) {
           const cls = el.getAttribute('class');
@@ -71,7 +136,6 @@ export function makeSetupRouter(): Router {
           'aria-label', 'aria-disabled', 'aria-current',
         ];
 
-        // Pass 2: build simplified HTML
         function simplifyNode(node: Node, depth: number): string {
           if (node.nodeType === Node.TEXT_NODE) {
             const text = (node.textContent ?? '').trim().slice(0, 120);
@@ -94,13 +158,10 @@ export function makeSetupRouter(): Router {
               const cleanClasses = val
                 .split(/\s+/)
                 .filter((c) => {
-                  // Drop single-occurrence classes — they identify one specific element,
-                  // not a repeating pattern, so they make bad selectors for job listings
                   if ((classCount.get(c) ?? 0) < 2) return false;
-                  // Drop obvious CSS-in-JS hashes
-                  if (/^sc-[a-z0-9]{4,}/.test(c)) return false; // styled-components
-                  if (/^css-[a-z0-9]{4,}/.test(c)) return false; // emotion
-                  if (/[a-f0-9]{5,}/i.test(c) && /[0-9]/.test(c)) return false; // hex hash
+                  if (/^sc-[a-z0-9]{4,}/.test(c)) return false;
+                  if (/^css-[a-z0-9]{4,}/.test(c)) return false;
+                  if (/[a-f0-9]{5,}/i.test(c) && /[0-9]/.test(c)) return false;
                   return true;
                 })
                 .join(' ')
@@ -117,8 +178,6 @@ export function makeSetupRouter(): Router {
             .join('')
             .trim();
 
-          // Keep elements with meaningful attributes even with no visible text
-          // (e.g. icon-only "Next" buttons whose SVG is stripped but aria-label survives)
           if (!children && keepAttrs.length === 0) return '';
           return `<${tag}${attrStr}>${children}</${tag}>`;
         }
@@ -134,52 +193,57 @@ export function makeSetupRouter(): Router {
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+    // Tool schema: AI returns ranked candidate sets, not single selectors
     const tool: Anthropic.Tool = {
-      name: 'report_selectors',
-      description: 'Report the CSS selectors and pagination config needed to scrape job listings from this page.',
+      name: 'report_selector_candidates',
+      description: 'Report ranked CSS selector candidates and pagination config for scraping job listings from this page.',
       input_schema: {
         type: 'object' as const,
-        required: ['name', 'selectors', 'paginationType'],
+        required: ['name', 'candidates', 'paginationType'],
         properties: {
           name: { type: 'string', description: 'Short human-readable name for this job source' },
-          selectors: {
+          candidates: {
             type: 'object' as const,
-            required: ['jobCard', 'title', 'link', 'nextPage'],
+            required: ['jobCard', 'title', 'link'],
             properties: {
               jobCard: {
-                type: 'string',
-                description: 'CSS selector passed to querySelectorAll() — MUST match every job card container on the page. Look for the repeating list/grid.',
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Top 3-5 CSS selectors for querySelectorAll() — each MUST match every job card container. Ranked best-first.',
               },
               title: {
-                type: 'string',
-                description: 'CSS selector for job title text, relative to jobCard (used with card.querySelector)',
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Top 3-5 CSS selectors for job title, relative to jobCard. Ranked best-first.',
               },
               link: {
-                type: 'string',
-                description: 'CSS selector for the clickable <a> link, relative to jobCard',
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Top 3-5 CSS selectors for the <a> link, relative to jobCard. Ranked best-first.',
               },
               nextPage: {
-                type: ['string', 'null'],
-                description: 'CSS selector for the "Next Page", "Next →", "Load More", or "Show More" button anywhere on the page. null ONLY if there is truly no pagination.',
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Top 1-3 CSS selectors for the pagination/load-more button. Empty array if no pagination.',
               },
             },
           },
           paginationType: {
             type: ['string', 'null'],
             enum: ['show-more', 'next-click', 'next-url', null],
-            description: '"show-more": clicking loads more jobs into the SAME page without navigating (Load More, Show More, infinite scroll trigger). "next-click": clicking navigates to or reloads the next page. "next-url": pages are URL-based (e.g. ?page=2, &start=25, &offset=20) — no button click needed. null: only one page of results.',
+            description: '"show-more": clicking loads more jobs into the SAME page. "next-click": clicking navigates to the next page. "next-url": pages are URL-based (?page=2). null: only one page.',
           },
           urlTemplate: {
             type: ['string', 'null'],
-            description: 'For next-url only: the URL with {page} as a placeholder for the page number, e.g. "https://example.com/jobs?page={page}". null otherwise.',
+            description: 'For next-url only: the URL with {page} as a placeholder. null otherwise.',
           },
         },
       },
     };
 
-    function buildPrompt(html: string, pageUrl: string, failedJobCard?: string): string {
-      const retryNote = failedJobCard
-        ? `\n⚠ PREVIOUS ATTEMPT FAILED: jobCard="${failedJobCard}" matched 0 job listings when tested with Playwright. That selector is wrong — try a completely different approach.\n`
+    function buildPrompt(html: string, pageUrl: string, failedCandidates?: string[]): string {
+      const retryNote = failedCandidates && failedCandidates.length > 0
+        ? `\n⚠ PREVIOUS ATTEMPT FAILED: The following jobCard selectors were tested and matched 0 valid job listings: ${failedCandidates.map(s => `"${s}"`).join(', ')}. These are WRONG — try completely different approaches.\n`
         : '';
 
       return `You are a web scraping expert. Analyze this simplified HTML from a job source page and identify CSS selectors to extract every job listing.
@@ -191,6 +255,11 @@ HOW SELECTORS ARE USED (Playwright):
   • title, link → card.querySelector( field ) — scoped inside each card
   • nextPage → page.$( nextPage ) — the pagination/load-more button (anywhere on the page)
 
+YOU MUST RETURN RANKED CANDIDATES (3-5 per field):
+  • Return an array of 3-5 selectors per field, ranked best-first
+  • The system will automatically test every combination and pick the best one
+  • More candidates = higher chance of success
+
 SELECTOR QUALITY RULES:
   • jobCard MUST match ALL listings — if querySelectorAll returns only 1 result, the selector is WRONG
   • The HTML has already stripped classes that appear only once (unique to a single element).
@@ -199,13 +268,13 @@ SELECTOR QUALITY RULES:
   • Avoid: nth-child, unique IDs, any class or attribute that identifies one specific listing
   • Child selectors (title, link) are relative to jobCard — do not repeat the jobCard prefix
 
-PAGINATION — nextPage is required, always set it or explicitly null:
+PAGINATION — nextPage candidates are required, always set it or explicitly empty array:
   • Look below the job list for buttons/links: "Next", "Next page", "Load More", "Show More", ">", "→"
   • They are often icon-only with aria-label="Next page" — check aria-label attributes
   • Prefer [aria-label="..."], [data-testid="..."], role="button", or readable class names
 
 PAGINATION TYPES:
-  • "show-more": a button that appends more jobs to the current page without any navigation (Load More, Show More, infinite scroll trigger)
+  • "show-more": a button that appends more jobs to the current page without any navigation
   • "next-click": a button/link that navigates to the next page (page reloads or URL changes)
   • "next-url": no button — pages are controlled purely by a URL query param (?page=2, &start=25, &offset=20)
   • null: only one page of results, no pagination needed
@@ -217,9 +286,9 @@ ${html}`;
     async function callAi(prompt: string): Promise<any> {
       const message = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: 1500,
         tools: [tool],
-        tool_choice: { type: 'tool', name: 'report_selectors' },
+        tool_choice: { type: 'tool', name: 'report_selector_candidates' },
         messages: [{ role: 'user', content: prompt }],
       });
       const toolUse = message.content.find((b) => b.type === 'tool_use');
@@ -227,68 +296,107 @@ ${html}`;
       return toolUse.input;
     }
 
-    function buildPaginationConfig(toolInput: any): PaginationConfig | undefined {
-      const pt: string | null = toolInput.paginationType;
-      const nextPageSel: string | null = toolInput.selectors?.nextPage ?? null;
-      if (!pt) return undefined;
-      if (pt === 'next-url') {
-        if (!toolInput.urlTemplate) return undefined;
-        return { type: 'url', urlTemplate: toolInput.urlTemplate, maxPages: 10 };
+    function buildPaginationConfig(paginationType: string | null, nextPageSelector: string | null, urlTemplate?: string | null): PaginationConfig | undefined {
+      if (!paginationType) return undefined;
+      if (paginationType === 'next-url') {
+        if (!urlTemplate) return undefined;
+        return { type: 'url', urlTemplate, maxPages: 10 };
       }
-      if (!nextPageSel) return undefined;
+      if (!nextPageSelector) return undefined;
       return {
-        type: pt === 'show-more' ? 'show-more' : 'click',
-        nextPageSelector: nextPageSel,
+        type: paginationType === 'show-more' ? 'show-more' : 'click',
+        nextPageSelector,
         maxPages: 10,
         delayMs: 500,
       };
     }
 
+    // Test a specific selector combination and return scored results
+    async function testCandidate(
+      targetUrl: string,
+      jobCard: string,
+      title: string,
+      link: string,
+    ): Promise<{ jobs: Job[]; validation: ValidationResult }> {
+      try {
+        const testConfig: any = {
+          name: '__ai-validate__',
+          url: targetUrl,
+          selectors: { jobCard, title, link },
+        };
+        const result = await scrapeSource(testConfig);
+        const validation = scoreJobs(result.jobs);
+        return { jobs: result.jobs, validation };
+      } catch {
+        return {
+          jobs: [],
+          validation: { score: 0, status: 'fail', jobsFound: 0, uniqueUrlRatio: 0, titleNonEmptyRatio: 0, reasons: ['Scrape threw an error'] },
+        };
+      }
+    }
+
+    // Test candidate combinations and find the best one
+    async function findBestCandidate(
+      targetUrl: string,
+      candidates: { jobCard: string[]; title: string[]; link: string[] },
+    ): Promise<{ jobCard: string; title: string; link: string; validation: ValidationResult } | null> {
+      let best: { jobCard: string; title: string; link: string; validation: ValidationResult } | null = null;
+
+      // Test top jobCard candidates with top title/link candidates
+      // Limit combinatorics: max 5 jobCards × top 2 titles × top 2 links = 20 combos max
+      const jobCards = (candidates.jobCard || []).slice(0, 5);
+      const titles = (candidates.title || []).slice(0, 2);
+      const links = (candidates.link || []).slice(0, 2);
+
+      for (const jc of jobCards) {
+        for (const t of titles) {
+          for (const l of links) {
+            const result = await testCandidate(targetUrl, jc, t, l);
+            if (!best || result.validation.score > best.validation.score) {
+              best = { jobCard: jc, title: t, link: l, validation: result.validation };
+            }
+            // Early exit if we find a passing config
+            if (result.validation.status === 'pass') {
+              return best;
+            }
+          }
+        }
+      }
+
+      return best;
+    }
+
     let toolInput: any;
     try {
-      toolInput = await callAi(buildPrompt(simplifiedHtml, url));
+      toolInput = await callAi(buildPrompt(simplifiedHtml, discoveryUrl));
     } catch (err) {
       res.status(502).json({ error: `AI analysis failed: ${String(err)}` });
       return;
     }
 
-    // Validate required selectors
-    const selectors = toolInput?.selectors ?? {};
-    if (!selectors.jobCard || !selectors.title || !selectors.link) {
+    const candidates = toolInput?.candidates ?? {};
+    if (!candidates.jobCard?.length || !candidates.title?.length || !candidates.link?.length) {
       res.status(502).json({
-        error: 'AI could not identify required selectors (jobCard, title, link). The page may require authentication or use a format Claude cannot parse.',
+        error: 'AI could not identify required selector candidates (jobCard, title, link). The page may require authentication or use a format Claude cannot parse.',
       });
       return;
     }
 
-    // Test the selectors with a real scrape (page 1 only)
-    async function testSelectors(input: any): Promise<number> {
-      try {
-        const testConfig: any = {
-          name: '__ai-validate__',
-          url,
-          selectors: { ...input.selectors },
-          // No pagination — only test page 1
-        };
-        const result = await scrapeSource(testConfig);
-        return result.jobs.length;
-      } catch {
-        return 0;
-      }
-    }
+    // Test the actual scrape URL (not analyzeUrl) to validate the selectors work on the target page
+    const testUrl = url.trim();
+    let best = await findBestCandidate(testUrl, candidates);
 
-    let jobsFound = await testSelectors(toolInput);
-
-    // If 0 jobs, give AI one more chance with feedback about what failed
-    if (jobsFound === 0) {
+    // Retry: if best score is poor, ask AI again with failure feedback
+    if (!best || best.validation.status === 'fail') {
       try {
-        const retryInput = await callAi(buildPrompt(simplifiedHtml, url, selectors.jobCard));
-        const retrySelectors = retryInput?.selectors ?? {};
-        if (retrySelectors.jobCard && retrySelectors.title && retrySelectors.link) {
-          const retryCount = await testSelectors(retryInput);
-          if (retryCount > jobsFound) {
+        const failedJobCards = candidates.jobCard.slice(0, 3);
+        const retryInput = await callAi(buildPrompt(simplifiedHtml, discoveryUrl, failedJobCards));
+        const retryCandidates = retryInput?.candidates ?? {};
+        if (retryCandidates.jobCard?.length && retryCandidates.title?.length && retryCandidates.link?.length) {
+          const retryBest = await findBestCandidate(testUrl, retryCandidates);
+          if (retryBest && (!best || retryBest.validation.score > best.validation.score)) {
+            best = retryBest;
             toolInput = retryInput;
-            jobsFound = retryCount;
           }
         }
       } catch {
@@ -296,14 +404,33 @@ ${html}`;
       }
     }
 
-    const pagination = buildPaginationConfig(toolInput);
+    if (!best) {
+      res.status(502).json({
+        error: 'All selector candidates failed validation. The page may require authentication or use a format that cannot be scraped.',
+      });
+      return;
+    }
+
+    // Determine pagination config from AI suggestion + best nextPage candidate
+    const nextPageCandidates: string[] = candidates.nextPage || toolInput?.candidates?.nextPage || [];
+    const bestNextPage = nextPageCandidates[0] || null;
+    const pagination = buildPaginationConfig(
+      toolInput.paginationType,
+      bestNextPage,
+      toolInput.urlTemplate,
+    );
 
     res.json({
       url,
       name: toolInput.name ?? '',
-      selectors: toolInput.selectors,
+      selectors: {
+        jobCard: best.jobCard,
+        title: best.title,
+        link: best.link,
+        nextPage: bestNextPage,
+      },
       pagination,
-      jobsFound,
+      validation: best.validation,
     });
   });
 

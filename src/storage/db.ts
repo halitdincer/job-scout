@@ -66,6 +66,7 @@ export async function openDb({ dbPath }: DbOptions): Promise<Database> {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       url TEXT NOT NULL,
+      analyze_url TEXT,
       config_json TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       user_id TEXT,
@@ -465,6 +466,7 @@ function rowToSource(row: {
   id: string;
   name: string;
   url: string;
+  analyze_url?: string | null;
   company: string | null;
   location: string | null;
   sel_job_card: string | null;
@@ -491,6 +493,7 @@ function rowToSource(row: {
     id: row.id,
     name: row.name,
     url: row.url,
+    ...(row.analyze_url ? { analyzeUrl: row.analyze_url } : {}),
     ...(row.company ? { company: row.company } : {}),
     ...(row.location ? { location: row.location } : {}),
     state: row.state ?? 'active',
@@ -525,7 +528,7 @@ export async function loadSourcesForUser(db: Database, userId: string): Promise<
     last_run_status: string | null;
     last_run_finished_at: string | null;
   }[]>(
-    `SELECT b.id, b.name, b.url, b.company, b.location,
+    `SELECT b.id, b.name, b.url, b.analyze_url, b.company, b.location,
             b.sel_job_card, b.sel_title, b.sel_link, b.sel_next_page,
             b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
             b.state, b.deleted_at,
@@ -598,7 +601,7 @@ export async function loadDeletedSourcesForUser(db: Database, userId: string): P
     state: string | null;
     deleted_at: string | null;
   }[]>(
-    `SELECT b.id, b.name, b.url, b.company, b.location,
+    `SELECT b.id, b.name, b.url, b.analyze_url, b.company, b.location,
             b.sel_job_card, b.sel_title, b.sel_link, b.sel_next_page,
             b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
             b.state, b.deleted_at
@@ -652,14 +655,15 @@ export async function insertSource(
   const id = generateUuid();
 
   await db.run(
-     `INSERT INTO sources (id, name, url, config_json, updated_at, user_id,
+     `INSERT INTO sources (id, name, url, analyze_url, config_json, updated_at, user_id,
        company, location, sel_job_card, sel_title, sel_link, sel_next_page,
        pag_type, pag_url_template, pag_max_pages, pag_delay_ms, created_at,
        state, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     source?.name ?? '',
     source?.url ?? '',
+    source?.analyzeUrl ?? null,
     JSON.stringify(source),
     now,
     userId,
@@ -696,13 +700,14 @@ export async function updateSourceById(
 
   const result = await db.run(
     `UPDATE sources SET
-       name = ?, url = ?, config_json = ?, updated_at = ?,
+       name = ?, url = ?, analyze_url = ?, config_json = ?, updated_at = ?,
        company = ?, location = ?,
        sel_job_card = ?, sel_title = ?, sel_link = ?, sel_next_page = ?,
        pag_type = ?, pag_url_template = ?, pag_max_pages = ?, pag_delay_ms = ?
      WHERE id = ? AND user_id = ?`,
     source?.name ?? '',
     source?.url ?? '',
+    source?.analyzeUrl ?? null,
     JSON.stringify(source),
     now,
     source?.company ?? null,
@@ -802,7 +807,7 @@ export async function getSourceById(
     state: string | null;
     deleted_at: string | null;
   } | undefined>(
-    `SELECT b.id, b.name, b.url, b.company, b.location,
+    `SELECT b.id, b.name, b.url, b.analyze_url, b.company, b.location,
             b.sel_job_card, b.sel_title, b.sel_link, b.sel_next_page,
             b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
             b.state, b.deleted_at
@@ -893,8 +898,7 @@ export async function listJobsForSourceIdForUser(
   );
 
   const jobs = await db.all(
-    `SELECT id, title, company, location, url,
-            posted_date AS postedDate, source,
+    `SELECT id, title, company, location, url, source,
             first_seen_at AS firstSeenAt, last_seen_at AS lastSeenAt
      FROM jobs
      WHERE user_id = ? AND (source_id = ? OR (source_id IS NULL AND source = ?))
@@ -953,7 +957,7 @@ export async function upsertJobs(db: Database, jobs: Job[], source: string): Pro
 
     const updateStmt = await db.prepare(`
       UPDATE jobs
-      SET title = ?, company = ?, location = ?, url = ?, posted_date = ?, source = ?, last_seen_at = ?
+      SET title = ?, company = ?, location = ?, url = ?, source = ?, last_seen_at = ?
       WHERE id = ?
     `);
 
@@ -965,7 +969,7 @@ export async function upsertJobs(db: Database, jobs: Job[], source: string): Pro
           job.company,
           job.location,
           job.url,
-          job.postedDate ?? null,
+          null,
           source,
           now,
           now
@@ -977,7 +981,6 @@ export async function upsertJobs(db: Database, jobs: Job[], source: string): Pro
           job.company,
           job.location,
           job.url,
-          job.postedDate ?? null,
           source,
           now,
           job.id
@@ -1044,7 +1047,7 @@ export async function upsertJobsForUser(
 
     const updateStmt = await db.prepare(`
       UPDATE jobs
-      SET title = ?, company = ?, location = ?, url = ?, posted_date = ?, source = ?, last_seen_at = ?, source_id = COALESCE(?, source_id)
+      SET title = ?, company = ?, location = ?, url = ?, source = ?, last_seen_at = ?, source_id = COALESCE(?, source_id)
       WHERE id = ? AND user_id = ?
     `);
 
@@ -1056,7 +1059,7 @@ export async function upsertJobsForUser(
           job.company,
           job.location,
           job.url,
-          job.postedDate ?? null,
+          null,
           source,
           now,
           now,
@@ -1071,7 +1074,6 @@ export async function upsertJobsForUser(
           job.company,
           job.location,
           job.url,
-          job.postedDate ?? null,
           source,
           now,
           resolvedSourceId ?? null,
@@ -1272,8 +1274,7 @@ export async function listJobsForUser(
 
   const selectParams = [...countParams, limit, offset];
   const jobs = await db.all(
-    `SELECT j.id, j.title, j.company, j.location, j.url,
-            j.posted_date AS postedDate, j.source,
+    `SELECT j.id, j.title, j.company, j.location, j.url, j.source,
             j.first_seen_at AS firstSeenAt, j.last_seen_at AS lastSeenAt
      FROM jobs j ${joinClause} ${where}
      ORDER BY ${orderBy}

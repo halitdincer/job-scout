@@ -13,8 +13,8 @@ vi.mock('../hooks', () => ({
 import { useSourcesData, useJobsData } from '../hooks';
 
 const sampleSources: ApiSource[] = [
-  { id: 'b1', name: 'Source Alpha', state: 'active', tags: [], url: 'https://alpha.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
-  { id: 'b2', name: 'Source Beta', state: 'inactive', tags: [], url: 'https://beta.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
+  { id: 'b1', name: 'Source Alpha', state: 'active', tags: [], url: 'https://alpha.com', selectors: { jobCard: '.j', title: '.t', link: 'a' } },
+  { id: 'b2', name: 'Source Beta', state: 'inactive', tags: [], url: 'https://beta.com', selectors: { jobCard: '.j', title: '.t', link: 'a' } },
 ];
 
 const sourcesWithLastRun = [
@@ -112,6 +112,13 @@ describe('SourcesPage', () => {
     // Fill minimal required fields via label
     const inputs = screen.getAllByRole('textbox');
     fireEvent.change(inputs[0], { target: { value: 'New Source' } }); // Name
+
+    // Fill required Company and Location fields
+    const companyInput = document.querySelector('input[placeholder="Uber"]') as HTMLInputElement;
+    const locationInput = document.querySelector('input[placeholder="Toronto, ON"]') as HTMLInputElement;
+    if (companyInput) fireEvent.change(companyInput, { target: { value: 'Acme Corp' } });
+    if (locationInput) fireEvent.change(locationInput, { target: { value: 'New York, NY' } });
+
     const urlInputs = screen.getAllByDisplayValue('');
     const urlInput = urlInputs.find((el) => el.getAttribute('type') === 'url');
     if (urlInput) fireEvent.change(urlInput, { target: { value: 'https://new.com' } });

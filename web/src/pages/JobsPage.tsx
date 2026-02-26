@@ -379,12 +379,6 @@ export default function JobsPage() {
                   )}
                   <span className="job-meta-sep">·</span>
                   <span className="tag">{job.source}</span>
-                  {job.postedDate && (
-                    <>
-                      <span className="job-meta-sep">·</span>
-                      <span>{job.postedDate}</span>
-                    </>
-                  )}
                 </div>
               </div>
               <div className="job-row-actions" onClick={(e) => e.stopPropagation()}>

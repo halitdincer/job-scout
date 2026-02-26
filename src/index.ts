@@ -9,7 +9,6 @@ const DEFAULT_DB = path.join(__dirname, '../data/jobscout.sqlite');
 type CliArgs = {
   dbPath: string;
   help: boolean;
-  days?: number;
   addSourcePath?: string;
   listSources?: boolean;
   removeSource?: string;
@@ -20,7 +19,6 @@ function parseArgs(argv: string[]): CliArgs {
   const result: CliArgs = {
     dbPath: DEFAULT_DB,
     help: false,
-    days: undefined,
     addSourcePath: undefined,
     listSources: false,
     removeSource: undefined,
@@ -30,12 +28,6 @@ function parseArgs(argv: string[]): CliArgs {
     const arg = args[i];
     if (arg === '--db' && args[i + 1]) {
       result.dbPath = args[i + 1];
-      i += 1;
-    } else if (arg === '--days' && args[i + 1]) {
-      const parsed = Number(args[i + 1]);
-      if (!Number.isNaN(parsed) && parsed > 0) {
-        result.days = parsed;
-      }
       i += 1;
     } else if (arg === '--add-source' && args[i + 1]) {
       result.addSourcePath = args[i + 1];
@@ -61,7 +53,6 @@ function printHelp() {
   console.log('');
   console.log('Options:');
   console.log('  --db <path>       Path to SQLite database');
-  console.log('  --days <number>   Only show jobs posted within the last N days (if postedDate is available)');
   console.log('  --add-source <path>  Add or update a source from a JSON file');
   console.log('  --list-sources       List source names stored in SQLite');
   console.log('  --remove-source <name>  Remove a source by name');
@@ -70,18 +61,10 @@ function printHelp() {
 
 function printNewJobs(jobs: Job[], source: string) {
   for (const job of jobs) {
-    const posted = job.postedDate ? ` | Posted: ${job.postedDate}` : '';
     console.log(`[${source}] ${job.title} @ ${job.company} — ${job.location}`);
-    console.log(`${job.url}${posted}`);
+    console.log(`${job.url}`);
     console.log('');
   }
-}
-
-function isWithinDays(postedDate: string, days: number) {
-  const parsed = Date.parse(postedDate);
-  if (Number.isNaN(parsed)) return false;
-  const diffMs = Date.now() - parsed;
-  return diffMs >= 0 && diffMs <= days * 24 * 60 * 60 * 1000;
 }
 
 async function main() {
@@ -139,20 +122,7 @@ async function main() {
     const result = await scrapeSource(config);
     console.log(`Scraped ${result.jobs.length} jobs from ${config.name}`);
 
-    const filteredJobs =
-      args.days && args.days > 0
-        ? result.jobs.filter((job) => {
-            if (!job.postedDate) return true;
-            return isWithinDays(job.postedDate, args.days!);
-          })
-        : result.jobs;
-
-    if (args.days && args.days > 0 && filteredJobs.length !== result.jobs.length) {
-      const skipped = result.jobs.length - filteredJobs.length;
-      console.log(`Filtered out ${skipped} job(s) older than ${args.days} days.`);
-    }
-
-    const newJobs = await upsertJobs(db, filteredJobs, config.name);
+    const newJobs = await upsertJobs(db, result.jobs, config.name);
     if (newJobs.length > 0) {
       totalNew += newJobs.length;
       printNewJobs(newJobs, config.name);

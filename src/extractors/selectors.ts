@@ -7,24 +7,18 @@ export async function extractJobsFromSelectors(page: Page, config: SourceConfig)
 
   if (!config.selectors?.jobCard) return jobs;
 
+  const company = config.company?.trim() || config.name;
+  const location = config.location?.trim() || 'Unknown Location';
+
   const jobCardElements = await page.$$(config.selectors.jobCard);
 
   for (const card of jobCardElements) {
     const titleElement = await card.$(config.selectors.title);
     const title = (await titleElement?.innerText())?.trim() || 'Unknown Title';
 
-    const company = config.company?.trim() || config.name;
-
-    const location = config.location?.trim() || 'Unknown Location';
-
     const linkElement = await card.$(config.selectors.link);
     const href = (await linkElement?.getAttribute('href')) || config.url;
     const url = href.startsWith('http') ? href : new URL(href, config.url).toString();
-
-    const postedDateElement = config.selectors.postedDate
-      ? await card.$(config.selectors.postedDate)
-      : null;
-    const postedDate = (await postedDateElement?.innerText())?.trim() || undefined;
 
     const job: Job = {
       id: buildJobId({ url, title, company, location }, config.name),
@@ -33,7 +27,6 @@ export async function extractJobsFromSelectors(page: Page, config: SourceConfig)
       location,
       url,
       foundAt: new Date().toISOString(),
-      postedDate,
     };
 
     jobs.push(job);

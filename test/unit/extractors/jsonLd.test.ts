@@ -5,7 +5,9 @@ import { SourceConfig } from '../../../src/types';
 const config: SourceConfig = {
   name: 'Test Source',
   url: 'https://example.com/jobs',
-  selectors: { jobCard: '.job', title: '.title', link: 'a', location: '.loc' },
+  company: 'Acme',
+  location: 'Toronto, ON',
+  selectors: { jobCard: '.job', title: '.title', link: 'a' },
 };
 
 function makePage(ldObjects: (object | null)[]) {
@@ -15,12 +17,12 @@ function makePage(ldObjects: (object | null)[]) {
 }
 
 describe('extractJobsFromJsonLd', () => {
-  it('extracts title, company, location, url, postedDate from a valid JobPosting', async () => {
+  it('extracts title and url from a valid JobPosting, uses source-level company/location', async () => {
     const page = makePage([{
       '@type': 'JobPosting',
       title: 'Backend Engineer',
-      hiringOrganization: { name: 'Acme' },
-      jobLocation: { address: { addressLocality: 'Toronto', addressRegion: 'ON' } },
+      hiringOrganization: { name: 'Ignored Org' },
+      jobLocation: { address: { addressLocality: 'Ignored', addressRegion: 'XX' } },
       url: 'https://example.com/jobs/1',
       datePosted: '2026-02-01',
     }]);
@@ -31,10 +33,11 @@ describe('extractJobsFromJsonLd', () => {
     expect(jobs[0].company).toBe('Acme');
     expect(jobs[0].location).toBe('Toronto, ON');
     expect(jobs[0].url).toBe('https://example.com/jobs/1');
-    expect(jobs[0].postedDate).toBe('2026-02-01');
+    // postedDate is no longer extracted
+    expect((jobs[0] as any).postedDate).toBeUndefined();
   });
 
-  it('extracts jobs from an ItemList containing JobPosting items', async () => {
+  it('extracts jobs from an array of JobPosting items', async () => {
     const page = makePage([[
       {
         '@type': 'JobPosting',
@@ -67,7 +70,7 @@ describe('extractJobsFromJsonLd', () => {
     expect(jobs[0].title).toBe('Good Job');
   });
 
-  it('normalizes array location to "City, Region" string', async () => {
+  it('uses source-level location even when JSON-LD has jobLocation', async () => {
     const page = makePage([{
       '@type': 'JobPosting',
       title: 'Dev',
@@ -78,12 +81,17 @@ describe('extractJobsFromJsonLd', () => {
     }]);
 
     const jobs = await extractJobsFromJsonLd(page, config);
-    expect(jobs[0].location).toBe('Vancouver, BC');
+    expect(jobs[0].location).toBe('Toronto, ON');
   });
 
-  it('falls back to "Unknown" when no location data', async () => {
+  it('falls back to "Unknown Location" when source has no location', async () => {
+    const cfgNoLoc: SourceConfig = {
+      name: 'Test Source',
+      url: 'https://example.com/jobs',
+      selectors: { jobCard: '.job', title: '.title', link: 'a' },
+    };
     const page = makePage([{ '@type': 'JobPosting', title: 'Dev', url: 'https://x.com' }]);
-    const jobs = await extractJobsFromJsonLd(page, config);
-    expect(jobs[0].location).toBe('Unknown');
+    const jobs = await extractJobsFromJsonLd(page, cfgNoLoc);
+    expect(jobs[0].location).toBe('Unknown Location');
   });
 });

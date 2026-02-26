@@ -44,7 +44,6 @@ const baseConfig: SourceConfig = {
     jobCard: '.job-card',
     title: '.job-title',
     link: 'a',
-    location: '.location',
   },
 };
 

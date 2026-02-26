@@ -33,7 +33,7 @@ async function main() {
 
   await db.close();
 
-  allJobs.sort((a, b) => (a.postedDate || '').localeCompare(b.postedDate || '')).reverse();
+  allJobs.sort((a, b) => (a.foundAt || '').localeCompare(b.foundAt || '')).reverse();
 
   await fs.ensureDir(OUTPUT_DIR);
 

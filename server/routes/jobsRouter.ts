@@ -68,7 +68,7 @@ export function makeJobsRouter(db: Database): Router {
         );
         const total = countRow?.total ?? 0;
         const jobs = await db.all(
-          `SELECT id, title, company, location, url, posted_date as postedDate, source,
+          `SELECT id, title, company, location, url, source,
                   first_seen_at as firstSeenAt, last_seen_at as lastSeenAt
            FROM jobs ${where}
            ORDER BY ${orderByLegacy}

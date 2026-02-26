@@ -25,13 +25,26 @@ const {
   const mockCreate = vi.fn().mockResolvedValue({
     content: [{
       type: 'tool_use',
-      name: 'report_selectors',
-      input: { name: 'Test Source', selectors: { jobCard: '.job-card', title: 'h2', link: 'a' }, waitForSelector: null },
+      name: 'report_selector_candidates',
+      input: {
+        name: 'Test Source',
+        candidates: {
+          jobCard: ['.job-card', '.listing'],
+          title: ['h2', '.title'],
+          link: ['a', 'a.link'],
+          nextPage: [],
+        },
+        paginationType: null,
+      },
     }],
   });
   const mockScrapeSource = vi.fn().mockResolvedValue({
-    source: '__preview__',
-    jobs: [{ id: '1', title: 'Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', foundAt: new Date().toISOString() }],
+    source: '__ai-validate__',
+    jobs: [
+      { id: '1', title: 'Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', foundAt: new Date().toISOString() },
+      { id: '2', title: 'Designer', company: 'Acme', location: 'Remote', url: 'https://x.com/2', foundAt: new Date().toISOString() },
+      { id: '3', title: 'PM', company: 'Acme', location: 'Remote', url: 'https://x.com/3', foundAt: new Date().toISOString() },
+    ],
   });
   return { mockLaunch, mockCreate, mockScrapeSource, mockPage };
 });
@@ -60,7 +73,6 @@ describe('setup routes', () => {
     ({ app, db } = await createTestApp());
     ({ cookie } = await registerAndLogin(app));
 
-    // Reset mocks to safe defaults
     mockLaunch.mockResolvedValue({
       newPage: vi.fn().mockResolvedValue(mockPage),
       close: vi.fn(),
@@ -68,13 +80,26 @@ describe('setup routes', () => {
     mockCreate.mockResolvedValue({
       content: [{
         type: 'tool_use',
-        name: 'report_selectors',
-        input: { name: 'Test Source', selectors: { jobCard: '.job-card', title: 'h2', link: 'a' }, waitForSelector: null },
+        name: 'report_selector_candidates',
+        input: {
+          name: 'Test Source',
+          candidates: {
+            jobCard: ['.job-card', '.listing'],
+            title: ['h2', '.title'],
+            link: ['a', 'a.link'],
+            nextPage: [],
+          },
+          paginationType: null,
+        },
       }],
     });
     mockScrapeSource.mockResolvedValue({
-      source: '__preview__',
-      jobs: [{ id: '1', title: 'Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', foundAt: new Date().toISOString() }],
+      source: '__ai-validate__',
+      jobs: [
+        { id: '1', title: 'Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', foundAt: new Date().toISOString() },
+        { id: '2', title: 'Designer', company: 'Acme', location: 'Remote', url: 'https://x.com/2', foundAt: new Date().toISOString() },
+        { id: '3', title: 'PM', company: 'Acme', location: 'Remote', url: 'https://x.com/3', foundAt: new Date().toISOString() },
+      ],
     });
     mockPage.evaluate.mockResolvedValue('<div class="job-card"><a href="/job/1"><h2>Engineer</h2></a></div>');
   });
@@ -131,13 +156,13 @@ describe('setup routes', () => {
       expect(res.status).toBe(502);
     });
 
-    it('502 — required selectors are empty strings', async () => {
+    it('502 — required candidates are empty arrays', async () => {
       process.env.ANTHROPIC_API_KEY = 'test-key';
       mockCreate.mockResolvedValueOnce({
         content: [{
           type: 'tool_use',
-          name: 'report_selectors',
-          input: { name: 'Source', selectors: { jobCard: '', title: '', link: '' } },
+          name: 'report_selector_candidates',
+          input: { name: 'Source', candidates: { jobCard: [], title: [], link: [] }, paginationType: null },
         }],
       });
 
@@ -148,7 +173,7 @@ describe('setup routes', () => {
       expect(res.status).toBe(502);
     });
 
-    it('200 — happy path returns url, name, selectors, waitForSelector', async () => {
+    it('200 — happy path returns url, name, selectors, validation', async () => {
       process.env.ANTHROPIC_API_KEY = 'test-key';
 
       const res = await supertest(app)
@@ -161,6 +186,24 @@ describe('setup routes', () => {
       expect(res.body).toHaveProperty('name');
       expect(res.body).toHaveProperty('selectors');
       expect(res.body.selectors).toHaveProperty('jobCard');
+      expect(res.body).toHaveProperty('validation');
+      expect(res.body.validation).toHaveProperty('score');
+      expect(res.body.validation).toHaveProperty('status');
+      expect(res.body.validation).toHaveProperty('jobsFound');
+      expect(res.body.validation).toHaveProperty('uniqueUrlRatio');
+      expect(res.body.validation).toHaveProperty('titleNonEmptyRatio');
+    });
+
+    it('200 — accepts analyzeUrl parameter', async () => {
+      process.env.ANTHROPIC_API_KEY = 'test-key';
+
+      const res = await supertest(app)
+        .post('/api/setup/analyze')
+        .set('Cookie', cookie)
+        .send({ url: 'https://example.com/jobs?filter=eng', analyzeUrl: 'https://example.com/jobs' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.url).toBe('https://example.com/jobs?filter=eng');
     });
   });
 

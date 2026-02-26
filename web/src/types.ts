@@ -6,7 +6,6 @@ export type Job = {
   url: string;
   firstSeenAt: string;
   lastSeenAt: string;
-  postedDate?: string;
   source: string;
 };
 
@@ -21,6 +20,7 @@ export type ApiSource = {
   id: string;
   name: string;
   url: string;
+  analyzeUrl?: string;
   state?: 'active' | 'inactive' | 'deleted';
   deletedAt?: string | null;
   company?: string;
@@ -78,7 +78,14 @@ export type AnalyzeResult = {
   name: string;
   selectors: Record<string, string | null>;
   pagination?: Record<string, unknown>;
-  jobsFound?: number;
+  validation: {
+    score: number;
+    status: 'pass' | 'warn' | 'fail';
+    jobsFound: number;
+    uniqueUrlRatio: number;
+    titleNonEmptyRatio: number;
+    reasons: string[];
+  };
 };
 
 export type PreviewJob = {
@@ -87,7 +94,6 @@ export type PreviewJob = {
   company: string;
   location: string;
   url: string;
-  postedDate?: string;
 };
 
 export type PreviewResult = {

@@ -44,6 +44,7 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
     (initial?.tags ?? []).map((t) => t.id)
   );
   const [url, setUrl] = useState(initial?.url ?? '');
+  const [analyzeUrl, setAnalyzeUrl] = useState(initial?.analyzeUrl ?? '');
 
   const { data: allTags } = useTagsData();
   const [selectors, setSelectors] = useState<Record<SKey, string>>(
@@ -61,52 +62,68 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
   // AI state
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
-  const [aiSuggestions, setAiSuggestions] = useState<AnalyzeResult | null>(null);
+  const [aiResult, setAiResult] = useState<AnalyzeResult | null>(null);
 
   // Preview state
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
   const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
 
+  // Save override for failed validation
+  const [failOverride, setFailOverride] = useState(false);
+
   function setSelector(key: SKey, val: string) {
     setSelectors((prev) => ({ ...prev, [key]: val }));
     setPreviewResult(null);
   }
 
-  async function runAi() {
+  async function runAnalyze() {
     if (!url.trim()) {
-      setAiError('Enter a URL first');
+      setAiError('Enter a Scrape URL first');
       return;
     }
     setAiLoading(true);
     setAiError('');
-    setAiSuggestions(null);
+    setAiResult(null);
+    setFailOverride(false);
     try {
       const res = await fetch('/api/setup/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({
+          url: url.trim(),
+          analyzeUrl: analyzeUrl.trim() || undefined,
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
         setAiError(body.error ?? 'AI analysis failed');
         return;
       }
-      setAiSuggestions(body as AnalyzeResult);
-      if (!name && body.name) setName(body.name);
+      const result = body as AnalyzeResult;
+      setAiResult(result);
+      if (!name && result.name) setName(result.name);
+
+      // Auto-apply the validated best selectors
+      if (result.selectors) {
+        setSelectors({
+          jobCard: (result.selectors.jobCard as string) ?? '',
+          title: (result.selectors.title as string) ?? '',
+          link: (result.selectors.link as string) ?? '',
+          nextPage: (result.selectors.nextPage as string) ?? '',
+        });
+      }
+      if (result.pagination) {
+        const pt = result.pagination.type as string;
+        if (pt) setPaginationType(pt);
+        if (result.pagination.urlTemplate) setUrlTemplate(result.pagination.urlTemplate as string);
+      }
+      setPreviewResult(null);
     } catch (err: any) {
       setAiError(err.message ?? 'Network error');
     } finally {
       setAiLoading(false);
-    }
-  }
-
-  function applyOne(key: SKey) {
-    const val = aiSuggestions?.selectors?.[key];
-    if (val) {
-      setSelectors((prev) => ({ ...prev, [key]: val }));
-      setPreviewResult(null);
     }
   }
 
@@ -116,28 +133,6 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
       return { type: 'url', urlTemplate: urlTemplate.trim() || undefined, maxPages: 10 };
     }
     return { type: paginationType, maxPages: 10, delayMs: 500 };
-  }
-
-  function applyPaginationSuggestion(pagination: Record<string, unknown>) {
-    const pt = pagination.type as string;
-    if (pt) setPaginationType(pt);
-    if (pagination.urlTemplate) setUrlTemplate(pagination.urlTemplate as string);
-  }
-
-  function applyAll() {
-    if (!aiSuggestions?.selectors) return;
-    setSelectors((prev) => {
-      const next = { ...prev };
-      for (const f of SELECTOR_FIELDS) {
-        const v = aiSuggestions.selectors[f.key];
-        if (v) next[f.key] = v;
-      }
-      return next;
-    });
-    if (aiSuggestions.pagination && !paginationType) {
-      applyPaginationSuggestion(aiSuggestions.pagination);
-    }
-    setPreviewResult(null);
   }
 
   async function runPreview() {
@@ -173,9 +168,20 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
     }
   }
 
+  const validationStatus = aiResult?.validation?.status;
+  const canSave = validationStatus !== 'fail' || failOverride;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (!company.trim()) {
+      setError('Company is required');
+      return;
+    }
+    if (!location.trim()) {
+      setError('Location is required');
+      return;
+    }
     if (!selectors.jobCard.trim() || !selectors.title.trim() || !selectors.link.trim()) {
       setError('Job Card, Title, and Link selectors are required');
       return;
@@ -186,6 +192,7 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
       await onSubmit({
         name,
         url,
+        ...(analyzeUrl.trim() ? { analyzeUrl: analyzeUrl.trim() } : {}),
         ...(company.trim() ? { company: company.trim() } : {}),
         ...(location.trim() ? { location: location.trim() } : {}),
         tags: (allTags ?? []).filter((t) => selectedTags.includes(t.id)),
@@ -226,29 +233,31 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
       </label>
 
       <label className="form-label">
-        Company
+        Company <span className="required-star">*</span>
         <input
           className="input"
           value={company}
           onChange={(e) => setCompany(e.target.value)}
           placeholder="Uber"
+          required
         />
       </label>
 
       <label className="form-label">
-        Location
+        Location <span className="required-star">*</span>
         <input
           className="input"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="Toronto, ON"
+          required
         />
       </label>
 
-      {/* URL + Run AI */}
+      {/* Scrape URL + Analyze & Auto-Test */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
         <label className="form-label" style={{ flex: 1 }}>
-          URL
+          Scrape URL <span className="required-star">*</span>
           <input
             className="input"
             type="url"
@@ -256,7 +265,8 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
             onChange={(e) => {
               setUrl(e.target.value);
               setPreviewResult(null);
-              setAiSuggestions(null);
+              setAiResult(null);
+              setFailOverride(false);
             }}
             required
           />
@@ -265,76 +275,73 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
           type="button"
           className="button button-secondary"
           style={{ flexShrink: 0, marginBottom: 1 }}
-          onClick={runAi}
+          onClick={runAnalyze}
           disabled={aiLoading || !url.trim()}
-          title="Ask AI to suggest CSS selectors for this URL"
+          title="AI will propose selector candidates, test all combinations, and return the best validated config"
         >
-          {aiLoading ? 'Analyzing…' : 'Run AI'}
+          {aiLoading ? 'Analyzing & Testing...' : 'Analyze & Auto-Test'}
         </button>
       </div>
 
+      <label className="form-label">
+        Analyze URL <span className="muted">(optional — broader page for pagination/structure discovery)</span>
+        <input
+          className="input"
+          type="url"
+          value={analyzeUrl}
+          onChange={(e) => {
+            setAnalyzeUrl(e.target.value);
+            setAiResult(null);
+            setFailOverride(false);
+          }}
+          placeholder="https://example.com/careers (unfiltered listing page)"
+        />
+      </label>
+
       {aiError && <p className="error">{aiError}</p>}
 
-      {/* AI suggestions panel */}
-      {aiSuggestions && (
-        <div className="ai-suggestions-panel">
+      {/* Validation report */}
+      {aiResult?.validation && (
+        <div className={`ai-suggestions-panel validation-${aiResult.validation.status}`}>
           <div className="ai-suggestions-header">
             <span>
-              AI Suggestions
-              {aiSuggestions.jobsFound !== undefined && (
-                <span style={{ marginLeft: 8, fontWeight: 'normal', fontSize: '0.85em' }}>
-                  {aiSuggestions.jobsFound > 0
-                    ? `— validated: ${aiSuggestions.jobsFound} job${aiSuggestions.jobsFound !== 1 ? 's' : ''} found`
-                    : '— 0 jobs found, selectors may need adjustment'}
-                </span>
-              )}
+              Validation Report
+              <span style={{ marginLeft: 8, fontWeight: 'normal', fontSize: '0.85em' }}>
+                — Score: {aiResult.validation.score}/100
+                {' '}({aiResult.validation.status.toUpperCase()})
+              </span>
             </span>
-            <button type="button" className="button button-small" onClick={applyAll}>
-              Apply All
-            </button>
           </div>
           <div className="ai-suggestions-body">
-            {SELECTOR_FIELDS.map((f) => {
-              const val = aiSuggestions.selectors[f.key];
-              if (!val) return null;
-              return (
-                <div key={f.key} className="ai-suggestion-row">
-                  <span className="ai-suggestion-label">{f.label}</span>
-                  <code className="ai-suggestion-value">{val}</code>
-                  <button
-                    type="button"
-                    className="button button-secondary button-small"
-                    onClick={() => applyOne(f.key)}
-                  >
-                    Apply
-                  </button>
-                </div>
-              );
-            })}
-            {Boolean(aiSuggestions.pagination?.type) && (
-              <div className="ai-suggestion-row">
-                <span className="ai-suggestion-label">Pagination type</span>
-                <code className="ai-suggestion-value">{String(aiSuggestions.pagination?.type ?? '')}</code>
-                <button
-                  type="button"
-                  className="button button-secondary button-small"
-                  onClick={() => setPaginationType(String(aiSuggestions.pagination!.type))}
-                >
-                  Apply
-                </button>
+            <div className="ai-suggestion-row">
+              <span className="ai-suggestion-label">Jobs found</span>
+              <code className="ai-suggestion-value">{aiResult.validation.jobsFound}</code>
+            </div>
+            <div className="ai-suggestion-row">
+              <span className="ai-suggestion-label">Unique URL ratio</span>
+              <code className="ai-suggestion-value">{(aiResult.validation.uniqueUrlRatio * 100).toFixed(0)}%</code>
+            </div>
+            <div className="ai-suggestion-row">
+              <span className="ai-suggestion-label">Title quality</span>
+              <code className="ai-suggestion-value">{(aiResult.validation.titleNonEmptyRatio * 100).toFixed(0)}%</code>
+            </div>
+            {aiResult.validation.reasons.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                {aiResult.validation.reasons.map((reason, i) => (
+                  <p key={i} className="error" style={{ margin: '2px 0', fontSize: '0.85em' }}>{reason}</p>
+                ))}
               </div>
             )}
-            {aiSuggestions.pagination?.type === 'url' && Boolean(aiSuggestions.pagination.urlTemplate) && (
-              <div className="ai-suggestion-row">
-                <span className="ai-suggestion-label">URL template</span>
-                <code className="ai-suggestion-value">{String(aiSuggestions.pagination.urlTemplate)}</code>
-                <button
-                  type="button"
-                  className="button button-secondary button-small"
-                  onClick={() => setUrlTemplate(String(aiSuggestions.pagination!.urlTemplate))}
-                >
-                  Apply
-                </button>
+            {aiResult.validation.status === 'fail' && (
+              <div style={{ marginTop: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85em' }}>
+                  <input
+                    type="checkbox"
+                    checked={failOverride}
+                    onChange={(e) => setFailOverride(e.target.checked)}
+                  />
+                  I understand the validation failed — save anyway
+                </label>
               </div>
             )}
           </div>
@@ -396,7 +403,7 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
             onClick={runPreview}
             disabled={previewLoading || !url.trim() || !selectors.jobCard.trim()}
           >
-            {previewLoading ? 'Scraping…' : 'Preview Scrape'}
+            {previewLoading ? 'Scraping...' : 'Preview Scrape'}
           </button>
         </div>
 
@@ -415,8 +422,7 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
                   <thead>
                     <tr>
                       <th>Title</th>
-                      <th>Company</th>
-                      <th>Location</th>
+                      <th>URL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -427,8 +433,9 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
                             {job.title}
                           </a>
                         </td>
-                        <td>{job.company}</td>
-                        <td>{job.location}</td>
+                        <td className="muted" style={{ fontSize: '0.85em', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {job.url}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -440,8 +447,8 @@ export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormPr
       </div>
 
       <div className="form-actions">
-        <button className="button" type="submit" disabled={submitting}>
-          {submitting ? 'Saving…' : 'Save'}
+        <button className="button" type="submit" disabled={submitting || !canSave}>
+          {submitting ? 'Saving...' : 'Save'}
         </button>
         <button className="button button-secondary" type="button" onClick={onCancel}>
           Cancel

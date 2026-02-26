@@ -41,14 +41,14 @@ describe('SourceForm', () => {
     expect(screen.getAllByText(/next page/i).length).toBeGreaterThan(0);
   });
 
-  it('shows error when required selectors are missing on submit', async () => {
+  it('shows error when company is missing on submit', async () => {
     render(<SourceForm {...defaultProps} />);
     // Submit the form directly to bypass browser native HTML5 validation
     const form = document.querySelector('form.source-form') as HTMLFormElement;
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(screen.getByText('Job Card, Title, and Link selectors are required')).toBeInTheDocument();
+      expect(screen.getByText('Company is required')).toBeInTheDocument();
     });
   });
 
@@ -59,6 +59,14 @@ describe('SourceForm', () => {
     // Fill name
     const nameInput = document.querySelector('input.input:not([type])') as HTMLInputElement;
     if (nameInput) fireEvent.change(nameInput, { target: { value: 'My Source' } });
+
+    // Fill Company
+    const companyInput = document.querySelector('input[placeholder="Uber"]') as HTMLInputElement;
+    if (companyInput) fireEvent.change(companyInput, { target: { value: 'Acme' } });
+
+    // Fill Location
+    const locationInput = document.querySelector('input[placeholder="Toronto, ON"]') as HTMLInputElement;
+    if (locationInput) fireEvent.change(locationInput, { target: { value: 'Remote' } });
 
     // Fill URL
     const urlInput = document.querySelector('input[type="url"]') as HTMLInputElement;

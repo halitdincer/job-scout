@@ -6,27 +6,19 @@ import { SourceConfig } from '../src/types';
 const config: SourceConfig = {
   name: 'Fixture Source',
   url: 'https://example.com/jobs',
+  company: 'Beta Co',
+  location: 'Remote',
   selectors: {
     jobCard: '.job-card',
     title: '.job-title',
-    location: '.job-location',
     link: 'a.job-link',
-    company: '.job-company',
-    postedDate: '.job-posted',
     nextPage: null,
   },
 };
 
-function makeJobPostingScript(data: object) {
-  return JSON.stringify(data);
-}
-
 function makeMockPage(ldJsonContents: object[], cards: Array<{
   title?: string;
-  company?: string;
-  location?: string;
   href?: string;
-  postedDate?: string;
 } | null>) {
   const page: any = {
     $$eval: vi.fn((_selector: string, _fn: Function) => {
@@ -38,10 +30,7 @@ function makeMockPage(ldJsonContents: object[], cards: Array<{
         return {
           $: vi.fn((sel: string) => {
             if (sel === config.selectors.title) return Promise.resolve({ innerText: () => Promise.resolve(card.title ?? '') });
-            if (sel === config.selectors.company) return Promise.resolve(card.company !== undefined ? { innerText: () => Promise.resolve(card.company!) } : null);
-            if (sel === config.selectors.location) return Promise.resolve({ innerText: () => Promise.resolve(card.location ?? '') });
             if (sel === config.selectors.link) return Promise.resolve({ getAttribute: () => Promise.resolve(card.href ?? '') });
-            if (sel === config.selectors.postedDate) return Promise.resolve(card.postedDate !== undefined ? { innerText: () => Promise.resolve(card.postedDate!) } : null);
             return Promise.resolve(null);
           }),
         };
@@ -53,12 +42,12 @@ function makeMockPage(ldJsonContents: object[], cards: Array<{
 }
 
 describe('extractJobsFromJsonLd', () => {
-  it('extracts a valid JobPosting', async () => {
+  it('extracts a valid JobPosting, uses source-level company/location', async () => {
     const page = makeMockPage([{
       '@context': 'https://schema.org',
       '@type': 'JobPosting',
       title: 'Backend Engineer',
-      hiringOrganization: { name: 'Acme' },
+      hiringOrganization: { name: 'Ignored' },
       jobLocation: { address: { addressLocality: 'Toronto', addressRegion: 'ON' } },
       url: 'https://example.com/jobs/1',
       datePosted: '2026-02-01',
@@ -67,10 +56,10 @@ describe('extractJobsFromJsonLd', () => {
     const jobs = await extractJobsFromJsonLd(page, config);
     expect(jobs).toHaveLength(1);
     expect(jobs[0].title).toBe('Backend Engineer');
-    expect(jobs[0].company).toBe('Acme');
-    expect(jobs[0].location).toBe('Toronto, ON');
+    expect(jobs[0].company).toBe('Beta Co');
+    expect(jobs[0].location).toBe('Remote');
     expect(jobs[0].url).toBe('https://example.com/jobs/1');
-    expect(jobs[0].postedDate).toBe('2026-02-01');
+    expect((jobs[0] as any).postedDate).toBeUndefined();
   });
 
   it('skips non-JobPosting JSON-LD types', async () => {
@@ -93,7 +82,7 @@ describe('extractJobsFromJsonLd', () => {
     expect(jobs).toHaveLength(0);
   });
 
-  it('normalizes array location to "City, Region" string', async () => {
+  it('uses source-level location regardless of JSON-LD jobLocation', async () => {
     const page = makeMockPage([{
       '@type': 'JobPosting',
       title: 'Dev',
@@ -105,7 +94,7 @@ describe('extractJobsFromJsonLd', () => {
     }], []);
 
     const jobs = await extractJobsFromJsonLd(page, config);
-    expect(jobs[0].location).toBe('Vancouver, BC');
+    expect(jobs[0].location).toBe('Remote');
   });
 
   it('uses config.url when job url is missing', async () => {
@@ -120,16 +109,13 @@ describe('extractJobsFromJsonLd', () => {
 });
 
 describe('extractJobsFromSelectors', () => {
-  it('extracts a job card with all fields', async () => {
-    // company and location are static source-level fields (not per-card selectors)
-    const cfgWithStatics = { ...config, company: 'Beta Co', location: 'Remote' };
+  it('extracts a job card with title + link, uses source-level company/location', async () => {
     const page: any = {
       $$: vi.fn().mockResolvedValue([{
         $: vi.fn((sel: string) => {
           const map: Record<string, any> = {
             [config.selectors.title]: { innerText: () => Promise.resolve('Frontend Engineer') },
             [config.selectors.link]: { getAttribute: () => Promise.resolve('https://example.com/jobs/2') },
-            [config.selectors.postedDate!]: { innerText: () => Promise.resolve('2026-02-02') },
           };
           return Promise.resolve(map[sel] ?? null);
         }),
@@ -137,12 +123,12 @@ describe('extractJobsFromSelectors', () => {
       url: () => 'https://example.com',
     };
 
-    const jobs = await extractJobsFromSelectors(page, cfgWithStatics);
+    const jobs = await extractJobsFromSelectors(page, config);
     expect(jobs).toHaveLength(1);
     expect(jobs[0].title).toBe('Frontend Engineer');
     expect(jobs[0].company).toBe('Beta Co');
     expect(jobs[0].location).toBe('Remote');
-    expect(jobs[0].postedDate).toBe('2026-02-02');
+    expect((jobs[0] as any).postedDate).toBeUndefined();
   });
 
   it('returns empty array when no jobCard selector', async () => {
@@ -158,7 +144,6 @@ describe('extractJobsFromSelectors', () => {
         $: vi.fn((sel: string) => {
           if (sel === config.selectors.link) return Promise.resolve({ getAttribute: () => Promise.resolve('/jobs/99') });
           if (sel === config.selectors.title) return Promise.resolve({ innerText: () => Promise.resolve('Job') });
-          if (sel === config.selectors.location) return Promise.resolve({ innerText: () => Promise.resolve('NYC') });
           return Promise.resolve(null);
         }),
       }]),

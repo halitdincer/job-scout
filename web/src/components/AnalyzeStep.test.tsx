@@ -13,7 +13,7 @@ describe('AnalyzeStep', () => {
 
   it('renders URL input and Analyze button', () => {
     render(<AnalyzeStep {...defaultProps} />);
-    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    expect(screen.getAllByRole('textbox').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: /analyze/i })).toBeInTheDocument();
   });
 
@@ -22,7 +22,7 @@ describe('AnalyzeStep', () => {
       url: 'https://example.com/jobs',
       name: 'Test Source',
       selectors: { jobCard: '.job', title: '.title', link: 'a' },
-      waitForSelector: null,
+      validation: { score: 80, status: 'pass', jobsFound: 10, uniqueUrlRatio: 1, titleNonEmptyRatio: 1, reasons: [] },
     };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -31,8 +31,9 @@ describe('AnalyzeStep', () => {
 
     render(<AnalyzeStep {...defaultProps} />);
 
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'https://example.com/jobs' } });
-    fireEvent.submit(screen.getByRole('textbox').closest('form')!);
+    const urlInput = screen.getAllByRole('textbox')[0];
+    fireEvent.change(urlInput, { target: { value: 'https://example.com/jobs' } });
+    fireEvent.submit(urlInput.closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText('AI Analysis Result')).toBeInTheDocument();
@@ -49,8 +50,9 @@ describe('AnalyzeStep', () => {
 
     render(<AnalyzeStep {...defaultProps} />);
 
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'https://example.com' } });
-    fireEvent.submit(screen.getByRole('textbox').closest('form')!);
+    const urlInput = screen.getAllByRole('textbox')[0];
+    fireEvent.change(urlInput, { target: { value: 'https://example.com' } });
+    fireEvent.submit(urlInput.closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText('AI did not return a tool call')).toBeInTheDocument();
