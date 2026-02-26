@@ -14,6 +14,16 @@ import {
   finishScrapeRunBoard,
   listScrapeRunsForUser,
   getScrapeRunDetail,
+  listCompaniesForUser,
+  upsertCompany,
+  deleteCompany,
+  searchCompanies,
+  listTagsForUser,
+  createTag,
+  updateTag,
+  deleteTag,
+  setBoardTags,
+  listJobsForUser,
 } from '../../src/storage/db';
 import { Job } from '../../src/types';
 
@@ -308,6 +318,173 @@ describe('db integration', () => {
       const boards = await loadBoardsForUser(db, 'u1');
       // Most recent run was 'success'
       expect(boards[0].lastRun.status).toBe('success');
+    });
+  });
+
+  describe('companies', () => {
+    it('upsertCompany creates a new company and returns id', async () => {
+      const id = await upsertCompany(db, 'u1', 'Acme Corp');
+      expect(id).toBeTruthy();
+    });
+
+    it('upsertCompany returns existing id for duplicate name', async () => {
+      const id1 = await upsertCompany(db, 'u1', 'Same');
+      const id2 = await upsertCompany(db, 'u1', 'Same');
+      expect(id1).toBe(id2);
+    });
+
+    it('listCompaniesForUser returns created companies', async () => {
+      await upsertCompany(db, 'u1', 'Alpha');
+      await upsertCompany(db, 'u1', 'Beta');
+      const list = await listCompaniesForUser(db, 'u1');
+      expect(list.map((c) => c.name).sort()).toEqual(['Alpha', 'Beta']);
+      expect(list[0]).toHaveProperty('boardCount');
+      expect(list[0]).toHaveProperty('jobCount');
+    });
+
+    it('listCompaniesForUser is user-isolated', async () => {
+      await upsertCompany(db, 'u1', 'U1Co');
+      const list = await listCompaniesForUser(db, 'u2');
+      expect(list).toHaveLength(0);
+    });
+
+    it('deleteCompany removes it from the list', async () => {
+      const id = await upsertCompany(db, 'u1', 'ToDelete');
+      await deleteCompany(db, 'u1', id);
+      const list = await listCompaniesForUser(db, 'u1');
+      expect(list).toHaveLength(0);
+    });
+
+    it('searchCompanies filters by name substring', async () => {
+      await upsertCompany(db, 'u1', 'Acme Corp');
+      await upsertCompany(db, 'u1', 'Beta LLC');
+      const results = await searchCompanies(db, 'u1', 'acme');
+      expect(results).toHaveLength(1);
+      expect(results[0].name).toBe('Acme Corp');
+    });
+  });
+
+  describe('tags', () => {
+    it('createTag creates a tag and listTagsForUser returns it', async () => {
+      const id = await createTag(db, 'u1', 'frontend', '#ff0000');
+      const tags = await listTagsForUser(db, 'u1');
+      expect(tags).toHaveLength(1);
+      expect(tags[0].id).toBe(id);
+      expect(tags[0].name).toBe('frontend');
+      expect(tags[0].color).toBe('#ff0000');
+      expect(tags[0].boardCount).toBe(0);
+    });
+
+    it('updateTag changes name and color', async () => {
+      const id = await createTag(db, 'u1', 'old', '#000');
+      await updateTag(db, 'u1', id, 'new', '#fff');
+      const tags = await listTagsForUser(db, 'u1');
+      expect(tags[0].name).toBe('new');
+      expect(tags[0].color).toBe('#fff');
+    });
+
+    it('deleteTag removes the tag', async () => {
+      const id = await createTag(db, 'u1', 'gone', '#abc');
+      await deleteTag(db, 'u1', id);
+      expect(await listTagsForUser(db, 'u1')).toHaveLength(0);
+    });
+
+    it('listTagsForUser is user-isolated', async () => {
+      await createTag(db, 'u1', 'u1tag', '#111');
+      expect(await listTagsForUser(db, 'u2')).toHaveLength(0);
+    });
+
+    it('setBoardTags assigns tags to a board', async () => {
+      const boardId = await insertBoard(db, makeBoard(), 'u1');
+      const tagId = await createTag(db, 'u1', 'react', '#00f');
+      await setBoardTags(db, boardId, 'u1', [tagId]);
+
+      const boards = await loadBoardsForUser(db, 'u1');
+      expect(boards[0].tags).toHaveLength(1);
+      expect(boards[0].tags[0].name).toBe('react');
+    });
+
+    it('setBoardTags replaces existing tags', async () => {
+      const boardId = await insertBoard(db, makeBoard(), 'u1');
+      const tag1 = await createTag(db, 'u1', 'tag1', '#111');
+      const tag2 = await createTag(db, 'u1', 'tag2', '#222');
+      await setBoardTags(db, boardId, 'u1', [tag1]);
+      await setBoardTags(db, boardId, 'u1', [tag2]);
+
+      const boards = await loadBoardsForUser(db, 'u1');
+      expect(boards[0].tags).toHaveLength(1);
+      expect(boards[0].tags[0].name).toBe('tag2');
+    });
+
+    it('boardCount reflects how many boards use a tag', async () => {
+      const tagId = await createTag(db, 'u1', 'shared', '#abc');
+      const b1 = await insertBoard(db, makeBoard({ name: 'B1' }), 'u1');
+      const b2 = await insertBoard(db, makeBoard({ name: 'B2' }), 'u1');
+      await setBoardTags(db, b1, 'u1', [tagId]);
+      await setBoardTags(db, b2, 'u1', [tagId]);
+      const tags = await listTagsForUser(db, 'u1');
+      expect(tags[0].boardCount).toBe(2);
+    });
+  });
+
+  describe('listJobsForUser', () => {
+    it('returns all jobs for user when no filters', async () => {
+      const boardId = await insertBoard(db, makeBoard(), 'u1');
+      await upsertJobsForUser(db, [makeJob('j1'), makeJob('j2')], 'Test Board', 'u1');
+      const { jobs, total } = await listJobsForUser(db, 'u1');
+      expect(total).toBe(2);
+      expect(jobs).toHaveLength(2);
+    });
+
+    it('filters by boardIds', async () => {
+      const b1 = await insertBoard(db, makeBoard({ name: 'B1' }), 'u1');
+      await insertBoard(db, makeBoard({ name: 'B2' }), 'u1');
+      await upsertJobsForUser(db, [makeJob('j1')], 'B1', 'u1');
+      await upsertJobsForUser(db, [makeJob('j2')], 'B2', 'u1');
+      const { jobs } = await listJobsForUser(db, 'u1', { boardIds: [b1] });
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].board).toBe('B1');
+    });
+
+    it('filters by tagIds', async () => {
+      const b1 = await insertBoard(db, makeBoard({ name: 'Tagged' }), 'u1');
+      await insertBoard(db, makeBoard({ name: 'Untagged' }), 'u1');
+      const tagId = await createTag(db, 'u1', 'special', '#abc');
+      await setBoardTags(db, b1, 'u1', [tagId]);
+      await upsertJobsForUser(db, [makeJob('j1')], 'Tagged', 'u1');
+      await upsertJobsForUser(db, [makeJob('j2')], 'Untagged', 'u1');
+      const { jobs } = await listJobsForUser(db, 'u1', { tagIds: [tagId] });
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].board).toBe('Tagged');
+    });
+
+    it('filters by locationKey prefix', async () => {
+      await insertBoard(db, makeBoard({ name: 'CA Board', locationKey: 'CA-ON-Toronto' }), 'u1');
+      await insertBoard(db, makeBoard({ name: 'US Board', locationKey: 'US-NY-New York' }), 'u1');
+      await upsertJobsForUser(db, [makeJob('j1')], 'CA Board', 'u1');
+      await upsertJobsForUser(db, [makeJob('j2')], 'US Board', 'u1');
+      const { jobs } = await listJobsForUser(db, 'u1', { locationKey: 'CA' });
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].board).toBe('CA Board');
+    });
+
+    it('filters by text query q', async () => {
+      await insertBoard(db, makeBoard(), 'u1');
+      await upsertJobsForUser(db, [
+        { ...makeJob('j1'), title: 'Senior Engineer' },
+        { ...makeJob('j2'), title: 'Product Manager' },
+      ], 'Test Board', 'u1');
+      const { jobs } = await listJobsForUser(db, 'u1', { q: 'engineer' });
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].board).toBeDefined();
+    });
+
+    it('paginates correctly', async () => {
+      await insertBoard(db, makeBoard(), 'u1');
+      await upsertJobsForUser(db, [makeJob('j1'), makeJob('j2'), makeJob('j3')], 'Test Board', 'u1');
+      const { jobs, total } = await listJobsForUser(db, 'u1', { page: 2, limit: 2 });
+      expect(total).toBe(3);
+      expect(jobs).toHaveLength(1);
     });
   });
 });
