@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import { useJobsData, useBoardsData, useRunsData, useRunDetail } from './hooks';
+import { useJobsData, useSourcesData, useRunsData, useRunDetail } from './hooks';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -38,52 +38,52 @@ describe('useJobsData', () => {
     expect(result.current.error).toContain('HTTP');
   });
 
-  it('passes q, board, page, limit as query params', async () => {
+  it('passes q, source, page, limit as query params', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ jobs: [], total: 0, page: 2, limit: 10, pages: 0 }),
     }));
 
-    renderHook(() => useJobsData({ q: 'eng', board: 'BoardA', page: 2, limit: 10 }));
+    renderHook(() => useJobsData({ q: 'eng', source: 'SourceA', page: 2, limit: 10 }));
     await waitFor(() => {
       const url = vi.mocked(fetch).mock.calls[0]?.[0] as string;
       expect(url).toContain('q=eng');
-      expect(url).toContain('board=BoardA');
+      expect(url).toContain('source=SourceA');
       expect(url).toContain('page=2');
       expect(url).toContain('limit=10');
     });
   });
 });
 
-describe('useBoardsData', () => {
-  it('fetches boards and returns data', async () => {
-    const boards = [{ id: 'b1', name: 'Board', url: 'https://x.com', selectors: {} }];
+describe('useSourcesData', () => {
+  it('fetches sources and returns data', async () => {
+    const sources = [{ id: 'b1', name: 'Source', url: 'https://x.com', selectors: {} }];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(boards),
+      json: () => Promise.resolve(sources),
     }));
 
-    const { result } = renderHook(() => useBoardsData());
+    const { result } = renderHook(() => useSourcesData());
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data).toEqual(boards);
+    expect(result.current.data).toEqual(sources);
   });
 
   it('sets error on HTTP failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
-    const { result } = renderHook(() => useBoardsData());
+    const { result } = renderHook(() => useSourcesData());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).not.toBeNull();
   });
 
-  it('refresh() re-fetches boards', async () => {
+  it('refresh() re-fetches sources', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([]),
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result } = renderHook(() => useBoardsData());
+    const { result } = renderHook(() => useSourcesData());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     result.current.refresh();
@@ -131,7 +131,7 @@ describe('useRunDetail', () => {
   it('fetches /api/runs/:id with the correct run ID', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 'r1', status: 'success', boards: [] }),
+      json: () => Promise.resolve({ id: 'r1', status: 'success', sources: [] }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -143,7 +143,7 @@ describe('useRunDetail', () => {
   });
 
   it('returns data on success', async () => {
-    const detail = { id: 'r1', status: 'success', boards: [] };
+    const detail = { id: 'r1', status: 'success', sources: [] };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(detail),
@@ -170,7 +170,7 @@ describe('useRunDetail', () => {
     // which interact poorly with @testing-library/react's async utilities.
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 'r1', status: 'running', boards: [] }),
+      json: () => Promise.resolve({ id: 'r1', status: 'running', sources: [] }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -187,7 +187,7 @@ describe('useRunDetail', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ id: 'r1', status: 'success', boards: [] }),
+        json: () => Promise.resolve({ id: 'r1', status: 'success', sources: [] }),
       });
     vi.stubGlobal('fetch', fetchMock);
 

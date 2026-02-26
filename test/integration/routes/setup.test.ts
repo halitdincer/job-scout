@@ -6,7 +6,7 @@ import { createTestApp, registerAndLogin } from '../helpers';
 const {
   mockLaunch,
   mockCreate,
-  mockScrapeBoard,
+  mockScrapeSource,
   mockPage,
 } = vi.hoisted(() => {
   const mockPage = {
@@ -26,14 +26,14 @@ const {
     content: [{
       type: 'tool_use',
       name: 'report_selectors',
-      input: { name: 'Test Board', selectors: { jobCard: '.job-card', title: 'h2', link: 'a' }, waitForSelector: null },
+      input: { name: 'Test Source', selectors: { jobCard: '.job-card', title: 'h2', link: 'a' }, waitForSelector: null },
     }],
   });
-  const mockScrapeBoard = vi.fn().mockResolvedValue({
-    board: '__preview__',
+  const mockScrapeSource = vi.fn().mockResolvedValue({
+    source: '__preview__',
     jobs: [{ id: '1', title: 'Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', foundAt: new Date().toISOString() }],
   });
-  return { mockLaunch, mockCreate, mockScrapeBoard, mockPage };
+  return { mockLaunch, mockCreate, mockScrapeSource, mockPage };
 });
 
 vi.mock('playwright', () => ({
@@ -48,7 +48,7 @@ vi.mock('@anthropic-ai/sdk', () => {
 });
 
 vi.mock('../../../src/scraper', () => ({
-  scrapeBoard: mockScrapeBoard,
+  scrapeSource: mockScrapeSource,
 }));
 
 describe('setup routes', () => {
@@ -69,11 +69,11 @@ describe('setup routes', () => {
       content: [{
         type: 'tool_use',
         name: 'report_selectors',
-        input: { name: 'Test Board', selectors: { jobCard: '.job-card', title: 'h2', link: 'a' }, waitForSelector: null },
+        input: { name: 'Test Source', selectors: { jobCard: '.job-card', title: 'h2', link: 'a' }, waitForSelector: null },
       }],
     });
-    mockScrapeBoard.mockResolvedValue({
-      board: '__preview__',
+    mockScrapeSource.mockResolvedValue({
+      source: '__preview__',
       jobs: [{ id: '1', title: 'Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', foundAt: new Date().toISOString() }],
     });
     mockPage.evaluate.mockResolvedValue('<div class="job-card"><a href="/job/1"><h2>Engineer</h2></a></div>');
@@ -137,7 +137,7 @@ describe('setup routes', () => {
         content: [{
           type: 'tool_use',
           name: 'report_selectors',
-          input: { name: 'Board', selectors: { jobCard: '', title: '', link: '' } },
+          input: { name: 'Source', selectors: { jobCard: '', title: '', link: '' } },
         }],
       });
 
@@ -181,8 +181,8 @@ describe('setup routes', () => {
       expect(res.status).toBe(400);
     });
 
-    it('422 — scrapeBoard throws', async () => {
-      mockScrapeBoard.mockRejectedValueOnce(new Error('Scrape failed'));
+    it('422 — scrapeSource throws', async () => {
+      mockScrapeSource.mockRejectedValueOnce(new Error('Scrape failed'));
 
       const res = await supertest(app)
         .post('/api/setup/preview')
@@ -196,7 +196,7 @@ describe('setup routes', () => {
         id: `j${i}`, title: `Job ${i}`, company: 'Co', location: 'Remote',
         url: `https://x.com/${i}`, foundAt: new Date().toISOString(),
       }));
-      mockScrapeBoard.mockResolvedValueOnce({ board: '__preview__', jobs });
+      mockScrapeSource.mockResolvedValueOnce({ source: '__preview__', jobs });
 
       const res = await supertest(app)
         .post('/api/setup/preview')

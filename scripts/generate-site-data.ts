@@ -1,33 +1,33 @@
 import fs from 'fs-extra';
 import path from 'path';
-import { scrapeBoard } from '../src/scraper';
-import { BoardConfig, Job } from '../src/types';
-import { loadBoards, openDb, upsertJobs } from '../src/storage/db';
+import { scrapeSource } from '../src/scraper';
+import { SourceConfig, Job } from '../src/types';
+import { loadSources, openDb, upsertJobs } from '../src/storage/db';
 
 const DEFAULT_DB = path.join(__dirname, '../data/jobscout.sqlite');
 const OUTPUT_DIR = path.join(__dirname, '../web/public/data');
 
 async function main() {
   const db = await openDb({ dbPath: DEFAULT_DB });
-  const boards: BoardConfig[] = await loadBoards(db);
+  const sources: SourceConfig[] = await loadSources(db);
 
-  if (boards.length === 0) {
-    console.error('No boards found in SQLite. Use --add-board to add one.');
+  if (sources.length === 0) {
+    console.error('No sources found in SQLite. Use --add-source to add one.');
     await db.close();
     process.exit(1);
   }
 
   const allJobs: Job[] = [];
 
-  for (const board of boards) {
-    const result = await scrapeBoard(board);
-    const newJobs = await upsertJobs(db, result.jobs, board.name);
+  for (const source of sources) {
+    const result = await scrapeSource(source);
+    const newJobs = await upsertJobs(db, result.jobs, source.name);
 
-    const withBoard = result.jobs.map((job) => ({ ...job, board: board.name }));
-    allJobs.push(...withBoard);
+    const withSource = result.jobs.map((job) => ({ ...job, source: source.name }));
+    allJobs.push(...withSource);
 
     if (newJobs.length > 0) {
-      console.log(`New jobs on ${board.name}: ${newJobs.length}`);
+      console.log(`New jobs on ${source.name}: ${newJobs.length}`);
     }
   }
 
@@ -47,10 +47,10 @@ async function main() {
   );
 
   await fs.writeJson(
-    path.join(OUTPUT_DIR, 'boards.json'),
+    path.join(OUTPUT_DIR, 'sources.json'),
     {
       generatedAt: new Date().toISOString(),
-      boards,
+      sources,
     },
     { spaces: 2 }
   );

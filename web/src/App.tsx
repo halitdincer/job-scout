@@ -2,15 +2,13 @@ import { Link, NavLink, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
-import BoardsPage from './pages/BoardsPage';
-import BoardDetailPage from './pages/BoardDetailPage';
+import SourcesPage from './pages/SourcesPage';
+import SourceDetailPage from './pages/SourceDetailPage';
 import JobsPage from './pages/JobsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import RunsPage from './pages/RunsPage';
 import RunDetailPage from './pages/RunDetailPage';
-import CompaniesPage from './pages/CompaniesPage';
-import LocationsPage from './pages/LocationsPage';
 
 function NavBar() {
   const { user, logout } = useAuth();
@@ -27,9 +25,7 @@ function NavBar() {
             <>
               <NavLink to="/" end>Home</NavLink>
               <NavLink to="/jobs">Jobs</NavLink>
-              <NavLink to="/boards">Boards</NavLink>
-              <NavLink to="/companies">Companies</NavLink>
-              <NavLink to="/locations">Locations</NavLink>
+              <NavLink to="/sources">Sources</NavLink>
               <NavLink to="/runs">Runs</NavLink>
               <button className="button button-secondary button-small" onClick={logout}>
                 Sign out
@@ -66,18 +62,18 @@ export default function App() {
               }
             />
             <Route
-              path="/boards"
+              path="/sources"
               element={
                 <ProtectedRoute>
-                  <BoardsPage />
+                  <SourcesPage />
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/boards/:id"
+              path="/sources/:id"
               element={
                 <ProtectedRoute>
-                  <BoardDetailPage />
+                  <SourceDetailPage />
                 </ProtectedRoute>
               }
             />
@@ -102,22 +98,6 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <RunDetailPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/companies"
-              element={
-                <ProtectedRoute>
-                  <CompaniesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/locations"
-              element={
-                <ProtectedRoute>
-                  <LocationsPage />
                 </ProtectedRoute>
               }
             />

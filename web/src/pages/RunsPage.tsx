@@ -69,7 +69,7 @@ export default function RunsPage() {
               <tr>
                 <th>Started</th>
                 <th>Triggered By</th>
-                <th>Boards</th>
+                <th>Sources</th>
                 <th>Found</th>
                 <th>New</th>
                 <th>Duration</th>
@@ -85,7 +85,7 @@ export default function RunsPage() {
                 >
                   <td>{formatDate(run.startedAt)}</td>
                   <td>{run.triggeredBy}</td>
-                  <td>{run.boardsDone}/{run.boardsTotal}</td>
+                  <td>{run.sourcesDone}/{run.sourcesTotal}</td>
                   <td>{run.jobsFound}</td>
                   <td>{run.jobsNew}</td>
                   <td>{duration(run.startedAt, run.finishedAt)}</td>

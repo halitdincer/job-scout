@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ApiBoard, Company, GeoResult, JobsResponse, ScrapeRun, ScrapeRunDetail, Tag } from './types';
+import { ApiSource, JobsResponse, ScrapeRun, ScrapeRunDetail, Tag } from './types';
 
 export interface JobsParams {
   q?: string;
-  board?: string;
-  boards?: string[];
-  companies?: string[];
+  source?: string;
+  sources?: string[];
   tags?: string[];
-  locationKey?: string;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -19,11 +17,9 @@ export interface JobsParams {
 export function useJobsData(params: JobsParams = {}) {
   const {
     q = '',
-    board = '',
-    boards = [],
-    companies = [],
+    source = '',
+    sources = [],
     tags = [],
-    locationKey = '',
     dateFrom = '',
     dateTo = '',
     page = 1,
@@ -36,19 +32,16 @@ export function useJobsData(params: JobsParams = {}) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const boardsKey = boards.join(',');
-  const companiesKey = companies.join(',');
+  const sourcesKey = sources.join(',');
   const tagsKey = tags.join(',');
 
   useEffect(() => {
     setLoading(true);
     const query = new URLSearchParams();
     if (q) query.set('q', q);
-    if (board) query.set('board', board);
-    if (boards.length > 0) query.set('boards', boards.join(','));
-    if (companies.length > 0) query.set('companies', companies.join(','));
+    if (source) query.set('source', source);
+    if (sources.length > 0) query.set('sources', sources.join(','));
     if (tags.length > 0) query.set('tags', tags.join(','));
-    if (locationKey) query.set('locationKey', locationKey);
     if (dateFrom) query.set('dateFrom', dateFrom);
     if (dateTo) query.set('dateTo', dateTo);
     if (sortBy && sortBy !== 'newest') query.set('sortBy', sortBy);
@@ -67,21 +60,21 @@ export function useJobsData(params: JobsParams = {}) {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, board, boardsKey, companiesKey, tagsKey, locationKey, dateFrom, dateTo, page, limit, sortBy, refreshKey]);
+  }, [q, source, sourcesKey, tagsKey, dateFrom, dateTo, page, limit, sortBy, refreshKey]);
 
   return { data, error, loading };
 }
 
-export function useBoardsData() {
-  const [data, setData] = useState<ApiBoard[] | null>(null);
+export function useSourcesData() {
+  const [data, setData] = useState<ApiSource[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/boards', { credentials: 'include' })
+    fetch('/api/sources', { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<ApiBoard[]>;
+        return res.json() as Promise<ApiSource[]>;
       })
       .then((payload) => {
         setData(payload);
@@ -93,10 +86,10 @@ export function useBoardsData() {
 
   function refresh() {
     setLoading(true);
-    fetch('/api/boards', { credentials: 'include' })
+    fetch('/api/sources', { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<ApiBoard[]>;
+        return res.json() as Promise<ApiSource[]>;
       })
       .then((payload) => {
         setData(payload);
@@ -194,58 +187,4 @@ export function useTagsData() {
   }, []);
 
   return { data, error, loading, refresh: load };
-}
-
-export function useCompaniesData(q?: string) {
-  const [data, setData] = useState<Company[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    const query = new URLSearchParams();
-    if (q) query.set('q', q);
-    fetch(`/api/companies?${query}`, { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<Company[]>;
-      })
-      .then((payload) => {
-        setData(payload);
-        setError(null);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [q]);
-
-  return { data, error, loading };
-}
-
-export function useGeoSearch(q: string) {
-  const [data, setData] = useState<GeoResult[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!q || q.trim().length < 2) {
-      setData([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const query = new URLSearchParams({ q: q.trim() });
-    fetch(`/api/geo/search?${query}`, { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<GeoResult[]>;
-      })
-      .then((payload) => {
-        setData(payload);
-        setError(null);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [q]);
-
-  return { data, error, loading };
 }

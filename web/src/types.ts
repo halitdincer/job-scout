@@ -7,30 +7,17 @@ export type Job = {
   firstSeenAt: string;
   lastSeenAt: string;
   postedDate?: string;
-  board: string;
+  source: string;
 };
 
 export type Tag = {
   id: string;
   name: string;
   color: string;
-  boardCount?: number;
+  sourceCount?: number;
 };
 
-export type Company = {
-  id: string;
-  name: string;
-  boardCount?: number;
-  jobCount?: number;
-};
-
-export type GeoResult = {
-  key: string;
-  label: string;
-  type: 'country' | 'state' | 'city';
-};
-
-export type ApiBoard = {
+export type ApiSource = {
   id: string;
   name: string;
   url: string;
@@ -38,10 +25,7 @@ export type ApiBoard = {
   deletedAt?: string | null;
   company?: string;
   location?: string;
-  companyId?: string;
   companyName?: string;
-  locationKey?: string;
-  locationLabel?: string;
   tags: Tag[];
   selectors: Record<string, string | null>;
   pagination?: Record<string, unknown>;
@@ -68,17 +52,17 @@ export type ScrapeRun = {
   startedAt: string;
   finishedAt: string | null;
   status: 'running' | 'success' | 'partial' | 'error';
-  boardsTotal: number;
-  boardsDone: number;
+  sourcesTotal: number;
+  sourcesDone: number;
   jobsFound: number;
   jobsNew: number;
 };
 
-export type ScrapeRunBoard = {
+export type ScrapeRunSource = {
   id: string;
   runId: string;
-  boardId: string;
-  boardName: string;
+  sourceId: string;
+  sourceName: string;
   startedAt: string;
   finishedAt: string | null;
   status: 'pending' | 'running' | 'success' | 'error';
@@ -87,7 +71,7 @@ export type ScrapeRunBoard = {
   errorMsg: string | null;
 };
 
-export type ScrapeRunDetail = ScrapeRun & { boards: ScrapeRunBoard[] };
+export type ScrapeRunDetail = ScrapeRun & { sources: ScrapeRunSource[] };
 
 export type AnalyzeResult = {
   url: string;

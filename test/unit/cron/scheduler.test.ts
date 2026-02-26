@@ -6,13 +6,13 @@ vi.mock('node-cron', () => ({
   },
 }));
 
-vi.mock('../../../server/cron/scrapeAllBoards', () => ({
-  scrapeAllBoards: vi.fn().mockResolvedValue(undefined),
+vi.mock('../../../server/cron/scrapeAllSources', () => ({
+  scrapeAllSources: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { startScheduler } from '../../../server/cron/scheduler';
 import cron from 'node-cron';
-import { scrapeAllBoards } from '../../../server/cron/scrapeAllBoards';
+import { scrapeAllSources } from '../../../server/cron/scrapeAllSources';
 
 describe('startScheduler', () => {
   beforeEach(() => {
@@ -26,7 +26,7 @@ describe('startScheduler', () => {
     expect(vi.mocked(cron.schedule).mock.calls[0][0]).toBe('0 */6 * * *');
   });
 
-  it('cron callback calls scrapeAllBoards with the db', async () => {
+  it('cron callback calls scrapeAllSources with the db', async () => {
     const db: any = { marker: 'test-db' };
     startScheduler(db);
 
@@ -34,11 +34,11 @@ describe('startScheduler', () => {
     const callback = vi.mocked(cron.schedule).mock.calls[0][1] as () => Promise<void>;
     await callback();
 
-    expect(scrapeAllBoards).toHaveBeenCalledWith(db);
+    expect(scrapeAllSources).toHaveBeenCalledWith(db);
   });
 
-  it('cron callback does not throw if scrapeAllBoards rejects', async () => {
-    vi.mocked(scrapeAllBoards).mockRejectedValueOnce(new Error('boom'));
+  it('cron callback does not throw if scrapeAllSources rejects', async () => {
+    vi.mocked(scrapeAllSources).mockRejectedValueOnce(new Error('boom'));
     const db: any = {};
     startScheduler(db);
 

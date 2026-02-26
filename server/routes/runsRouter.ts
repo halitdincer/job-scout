@@ -6,7 +6,7 @@ import {
   getScrapeRunDetail,
   createScrapeRun,
 } from '../../src/storage/db';
-import { scrapeForUser } from '../cron/scrapeAllBoards';
+import { scrapeForUser } from '../cron/scrapeAllSources';
 
 export function makeRunsRouter(db: Database): Router {
   const router = Router();

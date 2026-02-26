@@ -29,14 +29,14 @@ describe('tags routes', () => {
       expect(res.body).toEqual([]);
     });
 
-    it('returns created tags with boardCount', async () => {
+    it('returns created tags with sourceCount', async () => {
       await supertest(app).post('/api/tags').set('Cookie', cookie).send({ name: 'frontend', color: '#f00' });
       const res = await supertest(app).get('/api/tags').set('Cookie', cookie);
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
       expect(res.body[0].name).toBe('frontend');
       expect(res.body[0].color).toBe('#f00');
-      expect(res.body[0]).toHaveProperty('boardCount');
+      expect(res.body[0]).toHaveProperty('sourceCount');
     });
   });
 

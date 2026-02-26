@@ -1,5 +1,5 @@
 import { Page } from 'playwright';
-import { BoardConfig, Job } from '../types';
+import { SourceConfig, Job } from '../types';
 import { buildJobId } from '../utils/jobId';
 
 function normalizeLocation(jobLocation: any) {
@@ -19,7 +19,7 @@ function normalizeLocation(jobLocation: any) {
   return parts.length > 0 ? parts.join(' | ') : 'Unknown';
 }
 
-export async function extractJobsFromJsonLd(page: Page, config: BoardConfig): Promise<Job[]> {
+export async function extractJobsFromJsonLd(page: Page, config: SourceConfig): Promise<Job[]> {
   const ldScripts = await page.$$eval('script[type="application/ld+json"]', (scripts) =>
     scripts.map((s) => {
       try {

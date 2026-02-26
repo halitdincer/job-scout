@@ -1,19 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import BoardForm from './BoardForm';
+import SourceForm from './SourceForm';
 
 vi.mock('../hooks', () => ({
-  useCompaniesData: vi.fn(() => ({ data: [], error: null, loading: false })),
   useTagsData: vi.fn(() => ({ data: [], error: null, loading: false, refresh: vi.fn() })),
-}));
-
-vi.mock('./GeoCombobox', () => ({
-  default: ({ onChange }: any) => (
-    <input
-      placeholder="Type a country, state, or city…"
-      onChange={(e) => onChange('', e.target.value)}
-    />
-  ),
 }));
 
 const defaultProps = {
@@ -21,7 +11,7 @@ const defaultProps = {
   onCancel: vi.fn(),
 };
 
-function fillRequiredFields(name = 'My Board', url = 'https://example.com/jobs') {
+function fillRequiredFields(name = 'My Source', url = 'https://example.com/jobs') {
   // Name
   fireEvent.change(screen.getByDisplayValue(''), { target: { value: name } });
   // URL — find by type=url
@@ -38,11 +28,11 @@ function fillRequiredFields(name = 'My Board', url = 'https://example.com/jobs')
   });
 }
 
-describe('BoardForm', () => {
+describe('SourceForm', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('renders all selector fields', () => {
-    render(<BoardForm {...defaultProps} />);
+    render(<SourceForm {...defaultProps} />);
     expect(screen.getByText('Job Card Container')).toBeInTheDocument();
     expect(screen.getByText('Job Title')).toBeInTheDocument();
     expect(screen.getByText(/job link/i)).toBeInTheDocument();
@@ -52,9 +42,9 @@ describe('BoardForm', () => {
   });
 
   it('shows error when required selectors are missing on submit', async () => {
-    render(<BoardForm {...defaultProps} />);
+    render(<SourceForm {...defaultProps} />);
     // Submit the form directly to bypass browser native HTML5 validation
-    const form = document.querySelector('form.board-form') as HTMLFormElement;
+    const form = document.querySelector('form.source-form') as HTMLFormElement;
     fireEvent.submit(form);
 
     await waitFor(() => {
@@ -62,13 +52,13 @@ describe('BoardForm', () => {
     });
   });
 
-  it('calls onSubmit with board data when all required fields are filled', async () => {
+  it('calls onSubmit with source data when all required fields are filled', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<BoardForm {...defaultProps} onSubmit={onSubmit} />);
+    render(<SourceForm {...defaultProps} onSubmit={onSubmit} />);
 
     // Fill name
     const nameInput = document.querySelector('input.input:not([type])') as HTMLInputElement;
-    if (nameInput) fireEvent.change(nameInput, { target: { value: 'My Board' } });
+    if (nameInput) fireEvent.change(nameInput, { target: { value: 'My Source' } });
 
     // Fill URL
     const urlInput = document.querySelector('input[type="url"]') as HTMLInputElement;
@@ -91,7 +81,7 @@ describe('BoardForm', () => {
   });
 
   it('"Cancel" button calls onCancel', () => {
-    render(<BoardForm {...defaultProps} />);
+    render(<SourceForm {...defaultProps} />);
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(defaultProps.onCancel).toHaveBeenCalled();
   });

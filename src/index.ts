@@ -1,8 +1,8 @@
 import fs from 'fs-extra';
 import path from 'path';
-import { scrapeBoard } from './scraper';
-import { BoardConfig, Job } from './types';
-import { deleteBoard, listBoardNames, loadBoards, openDb, upsertBoard, upsertJobs } from './storage/db';
+import { scrapeSource } from './scraper';
+import { SourceConfig, Job } from './types';
+import { deleteSource, listSourceNames, loadSources, openDb, upsertSource, upsertJobs } from './storage/db';
 
 const DEFAULT_DB = path.join(__dirname, '../data/jobscout.sqlite');
 
@@ -10,9 +10,9 @@ type CliArgs = {
   dbPath: string;
   help: boolean;
   days?: number;
-  addBoardPath?: string;
-  listBoards?: boolean;
-  removeBoard?: string;
+  addSourcePath?: string;
+  listSources?: boolean;
+  removeSource?: string;
 };
 
 function parseArgs(argv: string[]): CliArgs {
@@ -21,9 +21,9 @@ function parseArgs(argv: string[]): CliArgs {
     dbPath: DEFAULT_DB,
     help: false,
     days: undefined,
-    addBoardPath: undefined,
-    listBoards: false,
-    removeBoard: undefined,
+    addSourcePath: undefined,
+    listSources: false,
+    removeSource: undefined,
   };
 
   for (let i = 0; i < args.length; i += 1) {
@@ -37,13 +37,13 @@ function parseArgs(argv: string[]): CliArgs {
         result.days = parsed;
       }
       i += 1;
-    } else if (arg === '--add-board' && args[i + 1]) {
-      result.addBoardPath = args[i + 1];
+    } else if (arg === '--add-source' && args[i + 1]) {
+      result.addSourcePath = args[i + 1];
       i += 1;
-    } else if (arg === '--list-boards') {
-      result.listBoards = true;
-    } else if (arg === '--remove-board' && args[i + 1]) {
-      result.removeBoard = args[i + 1];
+    } else if (arg === '--list-sources') {
+      result.listSources = true;
+    } else if (arg === '--remove-source' && args[i + 1]) {
+      result.removeSource = args[i + 1];
       i += 1;
     } else if (arg === '--help' || arg === '-h') {
       result.help = true;
@@ -62,16 +62,16 @@ function printHelp() {
   console.log('Options:');
   console.log('  --db <path>       Path to SQLite database');
   console.log('  --days <number>   Only show jobs posted within the last N days (if postedDate is available)');
-  console.log('  --add-board <path>  Add or update a board from a JSON file');
-  console.log('  --list-boards       List board names stored in SQLite');
-  console.log('  --remove-board <name>  Remove a board by name');
+  console.log('  --add-source <path>  Add or update a source from a JSON file');
+  console.log('  --list-sources       List source names stored in SQLite');
+  console.log('  --remove-source <name>  Remove a source by name');
   console.log('  -h, --help        Show this help');
 }
 
-function printNewJobs(jobs: Job[], board: string) {
+function printNewJobs(jobs: Job[], source: string) {
   for (const job of jobs) {
     const posted = job.postedDate ? ` | Posted: ${job.postedDate}` : '';
-    console.log(`[${board}] ${job.title} @ ${job.company} — ${job.location}`);
+    console.log(`[${source}] ${job.title} @ ${job.company} — ${job.location}`);
     console.log(`${job.url}${posted}`);
     console.log('');
   }
@@ -95,10 +95,10 @@ async function main() {
 
   const db = await openDb({ dbPath: args.dbPath });
 
-  if (args.listBoards) {
-    const names = await listBoardNames(db);
+  if (args.listSources) {
+    const names = await listSourceNames(db);
     if (names.length === 0) {
-      console.log('No boards stored in SQLite.');
+      console.log('No sources stored in SQLite.');
     } else {
       names.forEach((name) => console.log(name));
     }
@@ -106,29 +106,29 @@ async function main() {
     return;
   }
 
-  if (args.addBoardPath) {
-    const board = await fs.readJson(args.addBoardPath);
-    await upsertBoard(db, board);
-    console.log(`Saved board "${board.name}" to SQLite.`);
+  if (args.addSourcePath) {
+    const source = await fs.readJson(args.addSourcePath);
+    await upsertSource(db, source);
+    console.log(`Saved source "${source.name}" to SQLite.`);
     await db.close();
     return;
   }
 
-  if (args.removeBoard) {
-    const removed = await deleteBoard(db, args.removeBoard);
+  if (args.removeSource) {
+    const removed = await deleteSource(db, args.removeSource);
     if (removed > 0) {
-      console.log(`Removed board "${args.removeBoard}".`);
+      console.log(`Removed source "${args.removeSource}".`);
     } else {
-      console.log(`No board found named "${args.removeBoard}".`);
+      console.log(`No source found named "${args.removeSource}".`);
     }
     await db.close();
     return;
   }
-  const configs: BoardConfig[] = await loadBoards(db);
-  console.log(`Loaded ${configs.length} board configs from SQLite.`);
+  const configs: SourceConfig[] = await loadSources(db);
+  console.log(`Loaded ${configs.length} source configs from SQLite.`);
 
   if (configs.length === 0) {
-    console.error('No board configs found in SQLite.');
+    console.error('No source configs found in SQLite.');
     await db.close();
     return;
   }
@@ -136,7 +136,7 @@ async function main() {
 
   for (const config of configs) {
     console.log(`Processing ${config.name}...`);
-    const result = await scrapeBoard(config);
+    const result = await scrapeSource(config);
     console.log(`Scraped ${result.jobs.length} jobs from ${config.name}`);
 
     const filteredJobs =

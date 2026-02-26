@@ -34,11 +34,11 @@ vi.mock('playwright', () => {
   };
 });
 
-import { scrapeBoard } from '../../src/scraper';
-import { BoardConfig } from '../../src/types';
+import { scrapeSource } from '../../src/scraper';
+import { SourceConfig } from '../../src/types';
 
-const baseConfig: BoardConfig = {
-  name: 'TestBoard',
+const baseConfig: SourceConfig = {
+  name: 'TestSource',
   url: 'https://example.com/jobs',
   selectors: {
     jobCard: '.job-card',
@@ -48,7 +48,7 @@ const baseConfig: BoardConfig = {
   },
 };
 
-describe('scrapeBoard', () => {
+describe('scrapeSource', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPage.goto.mockResolvedValue(null);
@@ -63,15 +63,15 @@ describe('scrapeBoard', () => {
     mockPage.waitForTimeout.mockResolvedValue(null);
   });
 
-  it('returns a ScrapeResult with the board name', async () => {
-    const result = await scrapeBoard(baseConfig);
-    expect(result.board).toBe('TestBoard');
+  it('returns a ScrapeResult with the source name', async () => {
+    const result = await scrapeSource(baseConfig);
+    expect(result.source).toBe('TestSource');
     expect(Array.isArray(result.jobs)).toBe(true);
   });
 
   it('calls waitForSelector with the jobCard selector', async () => {
     // waitForSelector is driven by config.selectors.jobCard (commit 0d43f0d)
-    await scrapeBoard(baseConfig);
+    await scrapeSource(baseConfig);
     expect(mockPage.waitForSelector).toHaveBeenCalledWith(
       baseConfig.selectors.jobCard,
       expect.any(Object)
@@ -79,12 +79,12 @@ describe('scrapeBoard', () => {
   });
 
   it('stops at maxPages=1 by default (goto called once)', async () => {
-    await scrapeBoard(baseConfig);
+    await scrapeSource(baseConfig);
     expect(mockPage.goto).toHaveBeenCalledTimes(1);
   });
 
   it('url pagination: calls goto with url-template on second page', async () => {
-    const config: BoardConfig = {
+    const config: SourceConfig = {
       ...baseConfig,
       pagination: {
         type: 'url',
@@ -92,7 +92,7 @@ describe('scrapeBoard', () => {
         maxPages: 2,
       },
     };
-    await scrapeBoard(config);
+    await scrapeSource(config);
     // First call: original URL; second call: page 2
     expect(mockPage.goto).toHaveBeenCalledTimes(2);
     expect(mockPage.goto).toHaveBeenNthCalledWith(
@@ -106,7 +106,7 @@ describe('scrapeBoard', () => {
     // urlTemplate without {page} produces the same next-URL on every iteration.
     // seenUrls prevents a 3rd call: first nav = original URL (not tracked),
     // second nav = next-URL (added to seenUrls), third iteration detects duplicate.
-    const config: BoardConfig = {
+    const config: SourceConfig = {
       ...baseConfig,
       pagination: {
         type: 'url',
@@ -114,7 +114,7 @@ describe('scrapeBoard', () => {
         maxPages: 10,
       },
     };
-    await scrapeBoard(config);
+    await scrapeSource(config);
     // Two navigations: original URL + one duplicate before de-dup breaks the loop
     expect(mockPage.goto).toHaveBeenCalledTimes(2);
   });
@@ -128,26 +128,26 @@ describe('scrapeBoard', () => {
       click: vi.fn(),
     };
 
-    const config: BoardConfig = {
+    const config: SourceConfig = {
       ...baseConfig,
       selectors: { ...baseConfig.selectors, nextPage: '.next-btn' },
       pagination: { type: 'click', maxPages: 3 },
     };
 
     mockPage.$.mockResolvedValue(disabledButton);
-    await scrapeBoard(config);
+    await scrapeSource(config);
     expect(mockPage.goto).toHaveBeenCalledTimes(1);
   });
 
   it('click pagination: stops when no next button is found', async () => {
-    const config: BoardConfig = {
+    const config: SourceConfig = {
       ...baseConfig,
       selectors: { ...baseConfig.selectors, nextPage: '.no-next' },
       pagination: { type: 'click', maxPages: 3 },
     };
     mockPage.$.mockResolvedValue(null);
 
-    await scrapeBoard(config);
+    await scrapeSource(config);
     expect(mockPage.goto).toHaveBeenCalledTimes(1);
   });
 
@@ -164,19 +164,19 @@ describe('scrapeBoard', () => {
     // Return next button on first call; null on subsequent to stop loop
     mockPage.$.mockResolvedValueOnce(nextButton).mockResolvedValue(null);
 
-    const config: BoardConfig = {
+    const config: SourceConfig = {
       ...baseConfig,
       selectors: { ...baseConfig.selectors, nextPage: '.next' },
       pagination: { type: 'click', maxPages: 3, delayMs: 100 },
     };
-    await scrapeBoard(config);
+    await scrapeSource(config);
     expect(mockPage.waitForTimeout).toHaveBeenCalledWith(100);
   });
 
   it('does not throw when scraping fails (returns empty jobs)', async () => {
     mockPage.goto.mockRejectedValue(new Error('network error'));
-    const result = await scrapeBoard(baseConfig);
-    expect(result.board).toBe('TestBoard');
+    const result = await scrapeSource(baseConfig);
+    expect(result.source).toBe('TestSource');
     expect(result.jobs).toEqual([]);
   });
 });

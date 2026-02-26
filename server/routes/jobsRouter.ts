@@ -26,10 +26,8 @@ export function makeJobsRouter(db: Database): Router {
     );
 
     // Multi-value filters (comma-separated)
-    const boardIds = parseCommaSeparated(req.query.boards);
-    const companyIds = parseCommaSeparated(req.query.companies);
+    const sourceIds = parseCommaSeparated(req.query.sources);
     const tagIds = parseCommaSeparated(req.query.tags);
-    const locationKey = typeof req.query.locationKey === 'string' ? req.query.locationKey.trim() : '';
     const dateFrom = typeof req.query.dateFrom === 'string' ? req.query.dateFrom.trim() : '';
     const dateTo = typeof req.query.dateTo === 'string' ? req.query.dateTo.trim() : '';
     const sortByRaw = typeof req.query.sortBy === 'string' ? req.query.sortBy : '';
@@ -41,19 +39,19 @@ export function makeJobsRouter(db: Database): Router {
       sortBy === 'title'  ? 'title ASC, first_seen_at DESC' :
       'first_seen_at DESC';
 
-    // Legacy single-board filter (backward compat)
-    const boardName = typeof req.query.board === 'string' ? req.query.board.trim() : '';
+    // Legacy single-source filter (backward compat)
+    const sourceName = typeof req.query.source === 'string' ? req.query.source.trim() : '';
 
     try {
       let result;
 
-      if (boardName && boardIds.length === 0) {
-        // Legacy: filter by board name directly
+      if (sourceName && sourceIds.length === 0) {
+        // Legacy: filter by source name directly
         const conditions: string[] = ['user_id = ?'];
         const params: unknown[] = [userId];
 
-        conditions.push('board = ?');
-        params.push(boardName);
+        conditions.push('source = ?');
+        params.push(sourceName);
 
         if (q) {
           conditions.push(`(title LIKE ? OR company LIKE ? OR location LIKE ?)`);
@@ -70,7 +68,7 @@ export function makeJobsRouter(db: Database): Router {
         );
         const total = countRow?.total ?? 0;
         const jobs = await db.all(
-          `SELECT id, title, company, location, url, posted_date as postedDate, board,
+          `SELECT id, title, company, location, url, posted_date as postedDate, source,
                   first_seen_at as firstSeenAt, last_seen_at as lastSeenAt
            FROM jobs ${where}
            ORDER BY ${orderByLegacy}
@@ -81,10 +79,8 @@ export function makeJobsRouter(db: Database): Router {
       } else {
         result = await listJobsForUser(db, userId, {
           q,
-          boardIds,
-          companyIds,
+          sourceIds,
           tagIds,
-          locationKey,
           dateFrom,
           dateTo,
           page,

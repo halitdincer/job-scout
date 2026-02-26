@@ -20,16 +20,16 @@ const sampleRun: ScrapeRunDetail = {
   startedAt: now,
   finishedAt: later,
   status: 'success',
-  boardsTotal: 2,
-  boardsDone: 2,
+  sourcesTotal: 2,
+  sourcesDone: 2,
   jobsFound: 15,
   jobsNew: 5,
-  boards: [
+  sources: [
     {
       id: 'rb1',
       runId: 'r1',
-      boardId: 'b1',
-      boardName: 'Acme Jobs',
+      sourceId: 'b1',
+      sourceName: 'Acme Jobs',
       status: 'success',
       jobsFound: 10,
       jobsNew: 3,
@@ -40,8 +40,8 @@ const sampleRun: ScrapeRunDetail = {
     {
       id: 'rb2',
       runId: 'r1',
-      boardId: 'b2',
-      boardName: 'Fail Corp',
+      sourceId: 'b2',
+      sourceName: 'Fail Corp',
       status: 'error',
       jobsFound: 0,
       jobsNew: 0,
@@ -95,7 +95,7 @@ describe('RunDetailPage', () => {
       data: sampleRun, loading: false, error: null, refresh: vi.fn(),
     });
     renderPage();
-    // Multiple 'success' elements exist (run badge + board badge) — verify at least one
+    // Multiple 'success' elements exist (run badge + source badge) — verify at least one
     const successElements = screen.getAllByText('success');
     expect(successElements.length).toBeGreaterThanOrEqual(1);
   });
@@ -117,7 +117,7 @@ describe('RunDetailPage', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
   });
 
-  it('renders board names in table', () => {
+  it('renders source names in table', () => {
     vi.mocked(useRunDetail).mockReturnValue({
       data: sampleRun, loading: false, error: null, refresh: vi.fn(),
     });
@@ -126,17 +126,17 @@ describe('RunDetailPage', () => {
     expect(screen.getByText('Fail Corp')).toBeInTheDocument();
   });
 
-  it('renders board status badges', () => {
+  it('renders source status badges', () => {
     vi.mocked(useRunDetail).mockReturnValue({
       data: sampleRun, loading: false, error: null, refresh: vi.fn(),
     });
     renderPage();
     const successBadges = screen.getAllByText('success');
-    expect(successBadges.length).toBeGreaterThanOrEqual(2); // run badge + board badge
+    expect(successBadges.length).toBeGreaterThanOrEqual(2); // run badge + source badge
     expect(screen.getByText('error')).toBeInTheDocument();
   });
 
-  it('failed board shows details element with error message', () => {
+  it('failed source shows details element with error message', () => {
     vi.mocked(useRunDetail).mockReturnValue({
       data: sampleRun, loading: false, error: null, refresh: vi.fn(),
     });
@@ -147,9 +147,9 @@ describe('RunDetailPage', () => {
     expect(detailsEl).not.toBeNull();
   });
 
-  it('board with no error has no error text', () => {
+  it('source with no error has no error text', () => {
     vi.mocked(useRunDetail).mockReturnValue({
-      data: { ...sampleRun, boards: [sampleRun.boards[0]] },
+      data: { ...sampleRun, sources: [sampleRun.sources[0]] },
       loading: false,
       error: null,
       refresh: vi.fn(),
@@ -172,9 +172,9 @@ describe('RunDetailPage', () => {
     const partialRun: ScrapeRunDetail = {
       ...sampleRun,
       status: 'partial',
-      boards: [
-        { ...sampleRun.boards[0], status: 'success' },
-        { ...sampleRun.boards[1], status: 'error' },
+      sources: [
+        { ...sampleRun.sources[0], status: 'success' },
+        { ...sampleRun.sources[1], status: 'error' },
       ],
     };
     vi.mocked(useRunDetail).mockReturnValue({

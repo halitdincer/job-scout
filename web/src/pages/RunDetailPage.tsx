@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useRunDetail } from '../hooks';
-import { ScrapeRun, ScrapeRunBoard } from '../types';
+import { ScrapeRun, ScrapeRunSource } from '../types';
 
 function runStatusBadge(status: ScrapeRun['status']) {
   const cls: Record<ScrapeRun['status'], string> = {
@@ -12,8 +12,8 @@ function runStatusBadge(status: ScrapeRun['status']) {
   return <span className={cls[status]}>{status}</span>;
 }
 
-function boardStatusBadge(status: ScrapeRunBoard['status']) {
-  const cls: Record<ScrapeRunBoard['status'], string> = {
+function sourceStatusBadge(status: ScrapeRunSource['status']) {
+  const cls: Record<ScrapeRunSource['status'], string> = {
     success: 'badge badge-success',
     error: 'badge badge-error',
     running: 'badge badge-running',
@@ -82,20 +82,20 @@ export default function RunDetailPage() {
 
         <div style={{ display: 'flex', gap: 24, marginTop: 12, flexWrap: 'wrap' }}>
           <span><strong>Triggered by:</strong> {run.triggeredBy}</span>
-          <span><strong>Boards:</strong> {run.boardsDone}/{run.boardsTotal}</span>
+          <span><strong>Sources:</strong> {run.sourcesDone}/{run.sourcesTotal}</span>
           <span><strong>Jobs found:</strong> {run.jobsFound}</span>
           <span><strong>New jobs:</strong> {run.jobsNew}</span>
         </div>
       </div>
 
-      {run.boards.length === 0 ? (
-        <p className="muted">No boards scraped yet…</p>
+      {run.sources.length === 0 ? (
+        <p className="muted">No sources scraped yet…</p>
       ) : (
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th>Board</th>
+                <th>Source</th>
                 <th>Status</th>
                 <th>Found</th>
                 <th>New</th>
@@ -104,10 +104,10 @@ export default function RunDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {run.boards.map((b) => (
+              {run.sources.map((b) => (
                 <tr key={b.id}>
-                  <td>{b.boardName}</td>
-                  <td>{boardStatusBadge(b.status)}</td>
+                  <td>{b.sourceName}</td>
+                  <td>{sourceStatusBadge(b.status)}</td>
                   <td>{b.jobsFound}</td>
                   <td>{b.jobsNew}</td>
                   <td>{duration(b.startedAt, b.finishedAt)}</td>

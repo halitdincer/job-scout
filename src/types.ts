@@ -17,7 +17,7 @@ export interface PaginationConfig {
   delayMs?: number;
 }
 
-export interface BoardConfig {
+export interface SourceConfig {
   name: string;
   url: string;
   company?: string;
@@ -35,6 +35,6 @@ export interface BoardConfig {
 }
 
 export interface ScrapeResult {
-  board: string;
+  source: string;
   jobs: Job[];
 }

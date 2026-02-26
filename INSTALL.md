@@ -12,22 +12,22 @@ npm link
 jobscout --db data/jobscout.sqlite
 ```
 
-Add/update a board:
+Add/update a source:
 
 ```bash
-jobscout --db data/jobscout.sqlite --add-board boards.example.json
+jobscout --db data/jobscout.sqlite --add-source sources.example.json
 ```
 
-List boards:
+List sources:
 
 ```bash
-jobscout --db data/jobscout.sqlite --list-boards
+jobscout --db data/jobscout.sqlite --list-sources
 ```
 
-Remove a board:
+Remove a source:
 
 ```bash
-jobscout --db data/jobscout.sqlite --remove-board "Microsoft Toronto"
+jobscout --db data/jobscout.sqlite --remove-source "Microsoft Toronto"
 ```
 
 To unlink:

@@ -27,34 +27,34 @@ describe('upsertJobs', () => {
 
   it('returns only new jobs on first insert', async () => {
     const jobs = [createJob('1'), createJob('2')];
-    const result = await upsertJobs(db, jobs, 'BoardA');
+    const result = await upsertJobs(db, jobs, 'SourceA');
     expect(result).toHaveLength(2);
   });
 
   it('returns empty array when all jobs already exist', async () => {
     const jobs = [createJob('1'), createJob('2')];
-    await upsertJobs(db, jobs, 'BoardA');
-    const second = await upsertJobs(db, jobs, 'BoardA');
+    await upsertJobs(db, jobs, 'SourceA');
+    const second = await upsertJobs(db, jobs, 'SourceA');
     expect(second).toHaveLength(0);
   });
 
   it('persists all rows in the database', async () => {
     const jobs = [createJob('1'), createJob('2')];
-    await upsertJobs(db, jobs, 'BoardA');
+    await upsertJobs(db, jobs, 'SourceA');
     const rows = await db.all<{ id: string }[]>('SELECT id FROM jobs');
     expect(rows).toHaveLength(2);
   });
 
   it('returns empty array when called with empty list', async () => {
-    const result = await upsertJobs(db, [], 'BoardA');
+    const result = await upsertJobs(db, [], 'SourceA');
     expect(result).toHaveLength(0);
   });
 
   it('updates existing job fields on re-insert', async () => {
     const job = createJob('x');
-    await upsertJobs(db, [job], 'BoardA');
+    await upsertJobs(db, [job], 'SourceA');
     const updated = { ...job, title: 'Updated Title' };
-    await upsertJobs(db, [updated], 'BoardA');
+    await upsertJobs(db, [updated], 'SourceA');
     const row = await db.get<{ title: string }>('SELECT title FROM jobs WHERE id = ?', 'x');
     expect(row?.title).toBe('Updated Title');
   });

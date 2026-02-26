@@ -3,13 +3,13 @@ import supertest from 'supertest';
 import { Database } from 'sqlite';
 import { createTestApp, registerAndLogin } from '../helpers';
 import {
-  insertBoard,
+  insertSource,
   createScrapeRun,
-  createScrapeRunBoard,
+  createScrapeRunSource,
 } from '../../../src/storage/db';
 
 // Prevent actual Playwright scraping during POST /api/runs
-vi.mock('../../../server/cron/scrapeAllBoards', () => ({
+vi.mock('../../../server/cron/scrapeAllSources', () => ({
   scrapeForUser: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -42,8 +42,8 @@ describe('runs routes', () => {
       expect(res.body).toHaveLength(1);
       const run = res.body[0];
       expect(run).toHaveProperty('triggeredBy', 'manual');
-      expect(run).toHaveProperty('boardsTotal');
-      expect(run).toHaveProperty('boardsDone');
+      expect(run).toHaveProperty('sourcesTotal');
+      expect(run).toHaveProperty('sourcesDone');
       expect(run).toHaveProperty('jobsFound');
       expect(run).toHaveProperty('jobsNew');
       expect(run).toHaveProperty('status', 'running');
@@ -57,23 +57,23 @@ describe('runs routes', () => {
   });
 
   describe('GET /api/runs/:id', () => {
-    it('returns run detail with boards[]', async () => {
-      const boardId = await insertBoard(
+    it('returns run detail with sources[]', async () => {
+      const sourceId = await insertSource(
         db,
-        { name: 'TestBoard', url: 'https://example.com', selectors: {} },
+        { name: 'TestSource', url: 'https://example.com', selectors: {} },
         userId
       );
       const runId = await createScrapeRun(db, userId, 'cron');
-      await createScrapeRunBoard(db, runId, boardId, 'TestBoard');
+      await createScrapeRunSource(db, runId, sourceId, 'TestSource');
 
       const res = await supertest(app)
         .get(`/api/runs/${runId}`)
         .set('Cookie', cookie);
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(runId);
-      expect(Array.isArray(res.body.boards)).toBe(true);
-      expect(res.body.boards).toHaveLength(1);
-      expect(res.body.boards[0].boardName).toBe('TestBoard');
+      expect(Array.isArray(res.body.sources)).toBe(true);
+      expect(res.body.sources).toHaveLength(1);
+      expect(res.body.sources[0].sourceName).toBe('TestSource');
     });
 
     it('404 for unknown run id', async () => {

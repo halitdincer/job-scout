@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { chromium } from 'playwright';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../auth/middleware';
-import { scrapeBoard } from '../../src/scraper';
+import { scrapeSource } from '../../src/scraper';
 import type { PaginationConfig } from '../../src/types';
 
 export function makeSetupRouter(): Router {
@@ -141,7 +141,7 @@ export function makeSetupRouter(): Router {
         type: 'object' as const,
         required: ['name', 'selectors', 'paginationType'],
         properties: {
-          name: { type: 'string', description: 'Short human-readable name for this job board' },
+          name: { type: 'string', description: 'Short human-readable name for this job source' },
           selectors: {
             type: 'object' as const,
             required: ['jobCard', 'title', 'link', 'nextPage'],
@@ -182,7 +182,7 @@ export function makeSetupRouter(): Router {
         ? `\n⚠ PREVIOUS ATTEMPT FAILED: jobCard="${failedJobCard}" matched 0 job listings when tested with Playwright. That selector is wrong — try a completely different approach.\n`
         : '';
 
-      return `You are a web scraping expert. Analyze this simplified HTML from a job board page and identify CSS selectors to extract every job listing.
+      return `You are a web scraping expert. Analyze this simplified HTML from a job source page and identify CSS selectors to extract every job listing.
 
 URL: ${pageUrl}
 ${retryNote}
@@ -270,7 +270,7 @@ ${html}`;
           selectors: { ...input.selectors },
           // No pagination — only test page 1
         };
-        const result = await scrapeBoard(testConfig);
+        const result = await scrapeSource(testConfig);
         return result.jobs.length;
       } catch {
         return 0;
@@ -318,7 +318,7 @@ ${html}`;
       return;
     }
 
-    const boardConfig: any = {
+    const sourceConfig: any = {
       name: '__preview__',
       url,
       selectors,
@@ -326,7 +326,7 @@ ${html}`;
     };
 
     try {
-      const result = await scrapeBoard(boardConfig);
+      const result = await scrapeSource(sourceConfig);
       res.json({ jobs: result.jobs.slice(0, 10), total: result.jobs.length });
     } catch (err) {
       res.status(422).json({ error: `Preview scrape failed: ${String(err)}` });

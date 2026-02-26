@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import HomePage from './HomePage';
-import { ApiBoard, Job, ScrapeRun } from '../types';
+import { ApiSource, Job, ScrapeRun } from '../types';
 
 const mockNavigate = vi.fn();
 
@@ -12,7 +12,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 });
 
 vi.mock('../hooks', () => ({
-  useBoardsData: vi.fn(),
+  useSourcesData: vi.fn(),
   useJobsData: vi.fn(),
   useRunsData: vi.fn(),
 }));
@@ -21,13 +21,13 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
 
-import { useBoardsData, useJobsData, useRunsData } from '../hooks';
+import { useSourcesData, useJobsData, useRunsData } from '../hooks';
 import { useAuth } from '../context/AuthContext';
 
-const sampleBoards: ApiBoard[] = [
+const sampleSources: ApiSource[] = [
   {
     id: 'b1',
-    name: 'Stable Board',
+    name: 'Stable Source',
     url: 'https://stable.example.com',
     selectors: {},
     tags: [],
@@ -35,7 +35,7 @@ const sampleBoards: ApiBoard[] = [
   },
   {
     id: 'b2',
-    name: 'Broken Board',
+    name: 'Broken Source',
     url: 'https://broken.example.com',
     selectors: {},
     tags: [],
@@ -51,8 +51,8 @@ const sampleRuns: ScrapeRun[] = [
     startedAt: new Date(Date.now() - 120000).toISOString(),
     finishedAt: new Date(Date.now() - 30000).toISOString(),
     status: 'success',
-    boardsTotal: 4,
-    boardsDone: 4,
+    sourcesTotal: 4,
+    sourcesDone: 4,
     jobsFound: 18,
     jobsNew: 6,
   },
@@ -63,8 +63,8 @@ const sampleRuns: ScrapeRun[] = [
     startedAt: new Date(Date.now() - 3600000).toISOString(),
     finishedAt: new Date(Date.now() - 3500000).toISOString(),
     status: 'partial',
-    boardsTotal: 4,
-    boardsDone: 4,
+    sourcesTotal: 4,
+    sourcesDone: 4,
     jobsFound: 10,
     jobsNew: 2,
   },
@@ -79,16 +79,16 @@ const sampleJobs = [
     url: 'https://jobs.example.com/1',
     firstSeenAt: new Date().toISOString(),
     lastSeenAt: new Date().toISOString(),
-    board: 'Stable Board',
+    source: 'Stable Source',
   },
 ];
 
 function renderHomePage({
-  boards = sampleBoards,
+  sources = sampleSources,
   runs = sampleRuns,
   jobs = sampleJobs,
 }: {
-  boards?: ApiBoard[];
+  sources?: ApiSource[];
   runs?: ScrapeRun[];
   jobs?: Job[];
 } = {}) {
@@ -100,8 +100,8 @@ function renderHomePage({
     register: vi.fn(),
   });
 
-  vi.mocked(useBoardsData).mockReturnValue({
-    data: boards,
+  vi.mocked(useSourcesData).mockReturnValue({
+    data: sources,
     loading: false,
     error: null,
     refresh: vi.fn(),
@@ -142,18 +142,18 @@ describe('HomePage', () => {
     expect(screen.getByText(/fresh intake/i)).toBeInTheDocument();
   });
 
-  it('surfaces boards that need attention', () => {
+  it('surfaces sources that need attention', () => {
     renderHomePage();
-    expect(screen.getByText('Broken Board')).toBeInTheDocument();
+    expect(screen.getByText('Broken Source')).toBeInTheDocument();
     expect(screen.getByText(/failed on last run/i)).toBeInTheDocument();
   });
 
-  it('shows healthy message when no boards need attention', () => {
+  it('shows healthy message when no sources need attention', () => {
     renderHomePage({
-      boards: [
+      sources: [
         {
           id: 'b1',
-          name: 'Stable Board',
+          name: 'Stable Source',
           url: 'https://stable.example.com',
           selectors: {},
           tags: [],
@@ -162,7 +162,7 @@ describe('HomePage', () => {
       ],
     });
 
-    expect(screen.getByText(/all boards look healthy/i)).toBeInTheDocument();
+    expect(screen.getByText(/all sources look healthy/i)).toBeInTheDocument();
   });
 
   it('starts a run and navigates to run detail', async () => {

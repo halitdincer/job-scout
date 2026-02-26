@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ApiBoard, Job, JobsResponse } from '../types';
+import { ApiSource, Job, JobsResponse } from '../types';
 
-export default function BoardDetailPage() {
+export default function SourceDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [board, setBoard] = useState<ApiBoard | null>(null);
+  const [source, setSource] = useState<ApiSource | null>(null);
   const [jobs, setJobs] = useState<JobsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -17,20 +17,20 @@ export default function BoardDetailPage() {
       setLoading(true);
       setError('');
       try {
-        const [boardRes, jobsRes] = await Promise.all([
-          fetch(`/api/boards/${id}`, { credentials: 'include' }),
-          fetch(`/api/boards/${id}/jobs?page=1&limit=25`, { credentials: 'include' }),
+        const [sourceRes, jobsRes] = await Promise.all([
+          fetch(`/api/sources/${id}`, { credentials: 'include' }),
+          fetch(`/api/sources/${id}/jobs?page=1&limit=25`, { credentials: 'include' }),
         ]);
-        if (!boardRes.ok) throw new Error('Failed to load board');
+        if (!sourceRes.ok) throw new Error('Failed to load source');
         if (!jobsRes.ok) throw new Error('Failed to load jobs');
-        const boardJson = await boardRes.json() as ApiBoard;
+        const sourceJson = await sourceRes.json() as ApiSource;
         const jobsJson = await jobsRes.json() as JobsResponse;
         if (!active) return;
-        setBoard(boardJson);
+        setSource(sourceJson);
         setJobs(jobsJson);
       } catch (err: any) {
         if (!active) return;
-        setError(err.message ?? 'Failed to load board detail');
+        setError(err.message ?? 'Failed to load source detail');
       } finally {
         if (active) setLoading(false);
       }
@@ -50,18 +50,18 @@ export default function BoardDetailPage() {
     return <p className="error">{error}</p>;
   }
 
-  if (!board) {
-    return <p className="muted">Board not found.</p>;
+  if (!source) {
+    return <p className="muted">Source not found.</p>;
   }
 
   return (
     <div className="stack">
-      <Link to="/boards" className="muted">← Back to Boards</Link>
+      <Link to="/sources" className="muted">← Back to Sources</Link>
 
       <div className="card">
-        <h2 style={{ marginBottom: 6 }}>{board.name}</h2>
-        <p className="muted">{board.url}</p>
-        <p className="muted">State: {board.state ?? 'active'}</p>
+        <h2 style={{ marginBottom: 6 }}>{source.name}</h2>
+        <p className="muted">{source.url}</p>
+        <p className="muted">State: {source.state ?? 'active'}</p>
       </div>
 
       <div className="card">

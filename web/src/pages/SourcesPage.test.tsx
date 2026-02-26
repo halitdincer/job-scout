@@ -1,48 +1,44 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import BoardsPage from './BoardsPage';
+import SourcesPage from './SourcesPage';
+import { ApiSource } from '../types';
 
 vi.mock('../hooks', () => ({
-  useBoardsData: vi.fn(),
+  useSourcesData: vi.fn(),
   useJobsData: vi.fn(),
-  useCompaniesData: vi.fn(() => ({ data: [], error: null, loading: false })),
   useTagsData: vi.fn(() => ({ data: [], error: null, loading: false, refresh: vi.fn() })),
 }));
 
-vi.mock('../components/GeoCombobox', () => ({
-  default: () => <input placeholder="Type a country, state, or city…" />,
-}));
+import { useSourcesData, useJobsData } from '../hooks';
 
-import { useBoardsData, useJobsData } from '../hooks';
-
-const sampleBoards = [
-  { id: 'b1', name: 'Board Alpha', state: 'active', tags: [], url: 'https://alpha.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
-  { id: 'b2', name: 'Board Beta', state: 'inactive', tags: [], url: 'https://beta.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
+const sampleSources: ApiSource[] = [
+  { id: 'b1', name: 'Source Alpha', state: 'active', tags: [], url: 'https://alpha.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
+  { id: 'b2', name: 'Source Beta', state: 'inactive', tags: [], url: 'https://beta.com', selectors: { jobCard: '.j', title: '.t', link: 'a', location: '.l' } },
 ];
 
-const boardsWithLastRun = [
+const sourcesWithLastRun = [
   {
-    id: 'b1', name: 'Board Alpha', url: 'https://alpha.com',
+    id: 'b1', name: 'Source Alpha', url: 'https://alpha.com',
     selectors: { jobCard: '.j', title: '.t', link: 'a' },
     lastRun: { status: 'success', finishedAt: new Date().toISOString() },
   },
   {
-    id: 'b2', name: 'Board Beta', url: 'https://beta.com',
+    id: 'b2', name: 'Source Beta', url: 'https://beta.com',
     selectors: { jobCard: '.j', title: '.t', link: 'a' },
     lastRun: null,
   },
   {
-    id: 'b3', name: 'Board Gamma', url: 'https://gamma.com',
+    id: 'b3', name: 'Source Gamma', url: 'https://gamma.com',
     selectors: { jobCard: '.j', title: '.t', link: 'a' },
     lastRun: { status: 'error', finishedAt: new Date().toISOString() },
   },
 ];
 
-function renderBoardsPage(boards = sampleBoards, fetchImpl?: typeof fetch) {
+function renderSourcesPage(sources = sampleSources, fetchImpl?: typeof fetch) {
   const refresh = vi.fn();
-  vi.mocked(useBoardsData).mockReturnValue({
-    data: boards,
+  vi.mocked(useSourcesData).mockReturnValue({
+    data: sources,
     error: null,
     loading: false,
     refresh,
@@ -57,65 +53,65 @@ function renderBoardsPage(boards = sampleBoards, fetchImpl?: typeof fetch) {
 
   render(
     <MemoryRouter>
-      <BoardsPage />
+      <SourcesPage />
     </MemoryRouter>
   );
 
   return { refresh };
 }
 
-describe('BoardsPage', () => {
+describe('SourcesPage', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.unstubAllGlobals());
 
-  it('splits active and inactive boards', () => {
-    renderBoardsPage();
-    expect(screen.getByText('Active Boards')).toBeInTheDocument();
-    expect(screen.getByText('Inactive Boards')).toBeInTheDocument();
-    expect(screen.getByText('Board Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Board Beta')).toBeInTheDocument();
+  it('splits active and inactive sources', () => {
+    renderSourcesPage();
+    expect(screen.getByText('Active Sources')).toBeInTheDocument();
+    expect(screen.getByText('Inactive Sources')).toBeInTheDocument();
+    expect(screen.getByText('Source Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Source Beta')).toBeInTheDocument();
   });
 
-  it('loads deleted boards section from API', async () => {
+  it('loads deleted sources section from API', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([
-        { id: 'b9', name: 'Old Board', state: 'deleted', tags: [], url: 'https://old.example.com', selectors: {} },
+        { id: 'b9', name: 'Old Source', state: 'deleted', tags: [], url: 'https://old.example.com', selectors: {} },
       ]),
     });
-    renderBoardsPage(sampleBoards, fetchMock);
+    renderSourcesPage(sampleSources, fetchMock);
 
     await waitFor(() => {
-      expect(screen.getByText('Deleted Boards')).toBeInTheDocument();
-      expect(screen.getByText('Old Board')).toBeInTheDocument();
+      expect(screen.getByText('Deleted Sources')).toBeInTheDocument();
+      expect(screen.getByText('Old Source')).toBeInTheDocument();
     });
   });
 
-  it('"+ Add Board" opens the board form', async () => {
-    renderBoardsPage();
-    fireEvent.click(screen.getByRole('button', { name: /\+ add board/i }));
+  it('"+ Add Source" opens the source form', async () => {
+    renderSourcesPage();
+    fireEvent.click(screen.getByRole('button', { name: /\+ add source/i }));
     await waitFor(() => {
-      expect(screen.getByText('Add Board')).toBeInTheDocument();
+      expect(screen.getByText('Add Source')).toBeInTheDocument();
     });
   });
 
-  it('submission calls POST /api/boards', async () => {
+  it('submission calls POST /api/sources', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 'new', name: 'New Board', url: 'https://new.com', selectors: {} }),
+      json: () => Promise.resolve({ id: 'new', name: 'New Source', url: 'https://new.com', selectors: {} }),
     });
-    const { refresh } = renderBoardsPage(sampleBoards, fetchMock);
+    const { refresh } = renderSourcesPage(sampleSources, fetchMock);
 
-    fireEvent.click(screen.getByRole('button', { name: /\+ add board/i }));
+    fireEvent.click(screen.getByRole('button', { name: /\+ add source/i }));
 
     // Fill in required form fields
-    await waitFor(() => screen.getByText('Add Board'));
+    await waitFor(() => screen.getByText('Add Source'));
     const nameInput = screen.getAllByRole('textbox').find(
       (el) => (el as HTMLInputElement).placeholder === '' || el.getAttribute('type') === null
     );
     // Fill minimal required fields via label
     const inputs = screen.getAllByRole('textbox');
-    fireEvent.change(inputs[0], { target: { value: 'New Board' } }); // Name
+    fireEvent.change(inputs[0], { target: { value: 'New Source' } }); // Name
     const urlInputs = screen.getAllByDisplayValue('');
     const urlInput = urlInputs.find((el) => el.getAttribute('type') === 'url');
     if (urlInput) fireEvent.change(urlInput, { target: { value: 'https://new.com' } });
@@ -138,15 +134,15 @@ describe('BoardsPage', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        '/api/boards',
+        '/api/sources',
         expect.objectContaining({ method: 'POST' })
       );
     });
   });
 
-  it('shows "success" badge for board with lastRun.status=success', () => {
-    vi.mocked(useBoardsData).mockReturnValue({
-      data: boardsWithLastRun as any,
+  it('shows "success" badge for source with lastRun.status=success', () => {
+    vi.mocked(useSourcesData).mockReturnValue({
+      data: sourcesWithLastRun as any,
       error: null,
       loading: false,
       refresh: vi.fn(),
@@ -156,13 +152,13 @@ describe('BoardsPage', () => {
       error: null,
       loading: false,
     });
-    render(<MemoryRouter><BoardsPage /></MemoryRouter>);
+    render(<MemoryRouter><SourcesPage /></MemoryRouter>);
     expect(screen.getByText('success')).toBeInTheDocument();
   });
 
-  it('shows no badge for board with lastRun=null', () => {
-    vi.mocked(useBoardsData).mockReturnValue({
-      data: [boardsWithLastRun[1]] as any,
+  it('shows no badge for source with lastRun=null', () => {
+    vi.mocked(useSourcesData).mockReturnValue({
+      data: [sourcesWithLastRun[1]] as any,
       error: null,
       loading: false,
       refresh: vi.fn(),
@@ -172,14 +168,14 @@ describe('BoardsPage', () => {
       error: null,
       loading: false,
     });
-    render(<MemoryRouter><BoardsPage /></MemoryRouter>);
+    render(<MemoryRouter><SourcesPage /></MemoryRouter>);
     expect(screen.queryByText('success')).not.toBeInTheDocument();
     expect(screen.queryByText('error')).not.toBeInTheDocument();
   });
 
-  it('shows "error" badge for board with lastRun.status=error', () => {
-    vi.mocked(useBoardsData).mockReturnValue({
-      data: [boardsWithLastRun[2]] as any,
+  it('shows "error" badge for source with lastRun.status=error', () => {
+    vi.mocked(useSourcesData).mockReturnValue({
+      data: [sourcesWithLastRun[2]] as any,
       error: null,
       loading: false,
       refresh: vi.fn(),
@@ -189,71 +185,71 @@ describe('BoardsPage', () => {
       error: null,
       loading: false,
     });
-    render(<MemoryRouter><BoardsPage /></MemoryRouter>);
+    render(<MemoryRouter><SourcesPage /></MemoryRouter>);
     expect(screen.getByText('error')).toBeInTheDocument();
   });
 
-  it('delete button calls DELETE /api/boards/:id', async () => {
+  it('delete button calls DELETE /api/sources/:id', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ ok: true }),
     });
     // Mock window.confirm to return true
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    renderBoardsPage(sampleBoards, fetchMock);
+    renderSourcesPage(sampleSources, fetchMock);
 
     const deleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        '/api/boards/b1',
+        '/api/sources/b1',
         expect.objectContaining({ method: 'DELETE' })
       );
     });
   });
 
-  it('toggle button calls POST /api/boards/:id/toggle', async () => {
+  it('toggle button calls POST /api/sources/:id/toggle', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: 'b1', state: 'inactive' }) });
 
-    renderBoardsPage(sampleBoards, fetchMock);
+    renderSourcesPage(sampleSources, fetchMock);
     fireEvent.click(screen.getByRole('button', { name: /set inactive/i }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/boards/b1/toggle', expect.objectContaining({ method: 'POST' }));
+      expect(fetchMock).toHaveBeenCalledWith('/api/sources/b1/toggle', expect.objectContaining({ method: 'POST' }));
     });
   });
 
-  it('restore button calls POST /api/boards/:id/restore', async () => {
+  it('restore button calls POST /api/sources/:id/restore', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([{ id: 'd1', name: 'Discarded', state: 'deleted', tags: [], url: 'https://discarded', selectors: {} }]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: 'd1', state: 'inactive' }) });
 
-    renderBoardsPage(sampleBoards, fetchMock);
+    renderSourcesPage(sampleSources, fetchMock);
 
     await waitFor(() => screen.getByText('Discarded'));
     fireEvent.click(screen.getByRole('button', { name: /restore/i }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/boards/d1/restore', expect.objectContaining({ method: 'POST' }));
+      expect(fetchMock).toHaveBeenCalledWith('/api/sources/d1/restore', expect.objectContaining({ method: 'POST' }));
     });
   });
 
-  it('duplicate button calls POST /api/boards/:id/duplicate', async () => {
+  it('duplicate button calls POST /api/sources/:id/duplicate', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: 'b3' }) });
 
-    renderBoardsPage(sampleBoards, fetchMock);
+    renderSourcesPage(sampleSources, fetchMock);
     fireEvent.click(screen.getAllByRole('button', { name: /duplicate/i })[0]);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/boards/b1/duplicate', expect.objectContaining({ method: 'POST' }));
+      expect(fetchMock).toHaveBeenCalledWith('/api/sources/b1/duplicate', expect.objectContaining({ method: 'POST' }));
     });
   });
 });

@@ -5,7 +5,7 @@ import { createTestApp, registerAndLogin } from '../helpers';
 import { upsertJobsForUser } from '../../../src/storage/db';
 import { Job } from '../../../src/types';
 
-function makeJobs(count: number, board = 'BoardA', prefix = ''): Job[] {
+function makeJobs(count: number, source = 'SourceA', prefix = ''): Job[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `${prefix}job-${i}`,
     title: i % 2 === 0 ? `Engineer ${i}` : `Manager ${i}`,
@@ -13,7 +13,7 @@ function makeJobs(count: number, board = 'BoardA', prefix = ''): Job[] {
     location: 'Remote',
     url: `https://example.com/${prefix}${i}`,
     foundAt: new Date().toISOString(),
-    board,
+    source,
   }));
 }
 
@@ -39,7 +39,7 @@ describe('jobs routes', () => {
     });
 
     it('200 — returns paginated jobs for user', async () => {
-      await upsertJobsForUser(db, makeJobs(3), 'BoardA', userId);
+      await upsertJobsForUser(db, makeJobs(3), 'SourceA', userId);
       const res = await supertest(app).get('/api/jobs').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
@@ -49,7 +49,7 @@ describe('jobs routes', () => {
     });
 
     it('filters by title/company/location with ?q=', async () => {
-      await upsertJobsForUser(db, makeJobs(10), 'BoardA', userId);
+      await upsertJobsForUser(db, makeJobs(10), 'SourceA', userId);
       const res = await supertest(app).get('/api/jobs?q=Engineer').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
@@ -58,17 +58,17 @@ describe('jobs routes', () => {
       });
     });
 
-    it('filters by board name with ?board=', async () => {
-      await upsertJobsForUser(db, makeJobs(3, 'BoardA', 'a'), 'BoardA', userId);
-      await upsertJobsForUser(db, makeJobs(2, 'BoardB', 'b'), 'BoardB', userId);
+    it('filters by source name with ?source=', async () => {
+      await upsertJobsForUser(db, makeJobs(3, 'SourceA', 'a'), 'SourceA', userId);
+      await upsertJobsForUser(db, makeJobs(2, 'SourceB', 'b'), 'SourceB', userId);
 
-      const res = await supertest(app).get('/api/jobs?board=BoardA').set('Cookie', cookie);
+      const res = await supertest(app).get('/api/jobs?source=SourceA').set('Cookie', cookie);
       expect(res.status).toBe(200);
       expect(res.body.jobs).toHaveLength(3);
     });
 
     it('paginates correctly with ?limit=2&page=2', async () => {
-      await upsertJobsForUser(db, makeJobs(5), 'BoardA', userId);
+      await upsertJobsForUser(db, makeJobs(5), 'SourceA', userId);
       const res = await supertest(app).get('/api/jobs?limit=2&page=2').set('Cookie', cookie);
 
       expect(res.status).toBe(200);

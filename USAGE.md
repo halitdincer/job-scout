@@ -1,6 +1,6 @@
 # JobScout (Run-Once CLI)
 
-JobScout runs once, scrapes the configured boards, compares against SQLite history, and prints only new jobs to the console. It does not manage cron/scheduling.
+JobScout runs once, scrapes the configured sources, compares against SQLite history, and prints only new jobs to the console. It does not manage cron/scheduling.
 
 ## Quick Start
 
@@ -15,31 +15,31 @@ npx ts-node src/index.ts --db data/jobscout.sqlite
 
 - `--db <path>` Path to the SQLite database (default: `data/jobscout.sqlite`)
 - `--days <number>` Only show jobs posted within the last N days (when `postedDate` exists)
-- `--add-board <path>` Add or update a board from a JSON file
-- `--list-boards` List board names stored in SQLite
-- `--remove-board <name>` Remove a board by name
+- `--add-source <path>` Add or update a source from a JSON file
+- `--list-sources` List source names stored in SQLite
+- `--remove-source <name>` Remove a source by name
 - `-h, --help` Show help
 
-## Board Config Storage (SQLite Only)
+## Source Config Storage (SQLite Only)
 
-Boards are stored **only** in SQLite. You can insert or update them with SQL, or via the CLI.
+Sources are stored **only** in SQLite. You can insert or update them with SQL, or via the CLI.
 
-Add/update a board:
+Add/update a source:
 
 ```bash
-npx ts-node src/index.ts --db data/jobscout.sqlite --add-board boards.example.json
+npx ts-node src/index.ts --db data/jobscout.sqlite --add-source sources.example.json
 ```
 
-List boards:
+List sources:
 
 ```bash
-npx ts-node src/index.ts --db data/jobscout.sqlite --list-boards
+npx ts-node src/index.ts --db data/jobscout.sqlite --list-sources
 ```
 
-Remove a board:
+Remove a source:
 
 ```bash
-npx ts-node src/index.ts --db data/jobscout.sqlite --remove-board "Microsoft Toronto"
+npx ts-node src/index.ts --db data/jobscout.sqlite --remove-source "Microsoft Toronto"
 ```
 
 ## Static Web App (GitHub Pages)
@@ -47,7 +47,7 @@ npx ts-node src/index.ts --db data/jobscout.sqlite --remove-board "Microsoft Tor
 The static site lives in `web/` and is built with Vite + React. It reads data from:
 
 - `web/public/data/jobs.json`
-- `web/public/data/boards.json`
+- `web/public/data/sources.json`
 
 Generate the static JSON (runs the scraper):
 
@@ -73,13 +73,13 @@ The workflow `.github/workflows/pages.yml` runs on a schedule, regenerates `web/
 
 Before the first scheduled run:
 
-1. Add at least one board via `--add-board`.
+1. Add at least one source via `--add-source`.
 2. Commit `data/jobscout.sqlite` so the Action has state to read.
 
 Example SQL:
 
 ```sql
-INSERT INTO boards (name, url, config_json, updated_at)
+INSERT INTO sources (name, url, config_json, updated_at)
 VALUES (
   'Microsoft Toronto',
   'https://apply.careers.microsoft.com/careers?start=0&location=Toronto%2C++ON%2C++Canada&pid=1970393556649678&sort_by=distance&filter_distance=160&filter_include_remote=1&filter_career_discipline=Software+Engineering&filter_seniority=Entry%2CMid-Level',
@@ -114,7 +114,7 @@ VALUES (
 - Console only. Each new job prints as:
 
 ```
-[Board] Title @ Company — Location
+[Source] Title @ Company — Location
 https://job-url | Posted: 2025-01-01
 ```
 

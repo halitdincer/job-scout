@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { extractJobsFromJsonLd } from '../src/extractors/jsonLd';
 import { extractJobsFromSelectors } from '../src/extractors/selectors';
-import { BoardConfig } from '../src/types';
+import { SourceConfig } from '../src/types';
 
-const config: BoardConfig = {
-  name: 'Fixture Board',
+const config: SourceConfig = {
+  name: 'Fixture Source',
   url: 'https://example.com/jobs',
   selectors: {
     jobCard: '.job-card',
@@ -121,7 +121,7 @@ describe('extractJobsFromJsonLd', () => {
 
 describe('extractJobsFromSelectors', () => {
   it('extracts a job card with all fields', async () => {
-    // company and location are static board-level fields (not per-card selectors)
+    // company and location are static source-level fields (not per-card selectors)
     const cfgWithStatics = { ...config, company: 'Beta Co', location: 'Remote' };
     const page: any = {
       $$: vi.fn().mockResolvedValue([{

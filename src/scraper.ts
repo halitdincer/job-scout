@@ -1,5 +1,5 @@
 import { chromium, Page } from 'playwright';
-import { BoardConfig, Job, ScrapeResult } from './types';
+import { SourceConfig, Job, ScrapeResult } from './types';
 import { extractJobsFromJsonLd } from './extractors/jsonLd';
 import { extractJobsFromSelectors } from './extractors/selectors';
 
@@ -12,7 +12,7 @@ function shouldStopForMaxPages(pageIndex: number, maxPages?: number) {
 
 async function getNextPageAction(
   page: Page,
-  config: BoardConfig,
+  config: SourceConfig,
   pageIndex: number
 ): Promise<{ type: 'url'; url: string } | { type: 'clicked' } | null> {
   const pagination = config.pagination;
@@ -54,7 +54,7 @@ async function getNextPageAction(
   return { type: 'clicked' };
 }
 
-async function extractJobsOnPage(page: Page, config: BoardConfig): Promise<Job[]> {
+async function extractJobsOnPage(page: Page, config: SourceConfig): Promise<Job[]> {
   const jobs: Job[] = [];
 
   const jsonLdJobs = await extractJobsFromJsonLd(page, config);
@@ -71,7 +71,7 @@ async function extractJobsOnPage(page: Page, config: BoardConfig): Promise<Job[]
   return jobs;
 }
 
-export async function scrapeBoard(config: BoardConfig): Promise<ScrapeResult> {
+export async function scrapeSource(config: SourceConfig): Promise<ScrapeResult> {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent:
@@ -133,5 +133,5 @@ export async function scrapeBoard(config: BoardConfig): Promise<ScrapeResult> {
     await browser.close();
   }
 
-  return { board: config.name, jobs };
+  return { source: config.name, jobs };
 }

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { extractJobsFromSelectors } from '../../../src/extractors/selectors';
-import { BoardConfig } from '../../../src/types';
+import { SourceConfig } from '../../../src/types';
 
-const config: BoardConfig = {
-  name: 'Test Board',
+const config: SourceConfig = {
+  name: 'Test Source',
   url: 'https://example.com/jobs',
   selectors: {
     jobCard: '.job-card',
@@ -48,7 +48,7 @@ function makePage(cards: ReturnType<typeof makeCard>[]) {
 
 describe('extractJobsFromSelectors', () => {
   it('extracts all fields when all selectors are present', async () => {
-    // company and location are now static board-level fields, not per-card selectors
+    // company and location are now static source-level fields, not per-card selectors
     const cfgWithStatics = { ...config, company: 'Beta Co', location: 'Remote' };
     const page = makePage([makeCard({
       title: 'Frontend Engineer',
@@ -74,7 +74,7 @@ describe('extractJobsFromSelectors', () => {
 
     const jobs = await extractJobsFromSelectors(page, config);
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].company).toBe('Test Board'); // falls back to config.name
+    expect(jobs[0].company).toBe('Test Source'); // falls back to config.name
     expect(jobs[0].postedDate).toBeUndefined();
   });
 

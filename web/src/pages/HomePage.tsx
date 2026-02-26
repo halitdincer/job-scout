@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useBoardsData, useJobsData, useRunsData } from '../hooks';
+import { useSourcesData, useJobsData, useRunsData } from '../hooks';
 import { useAuth } from '../context/AuthContext';
-import { ApiBoard, ScrapeRun } from '../types';
+import { ApiSource, ScrapeRun } from '../types';
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -43,23 +43,23 @@ type AttentionItem = {
   severity: number;
 };
 
-function boardAttention(board: ApiBoard): AttentionItem | null {
-  if (!board.lastRun) {
-    return { id: board.id, name: board.name, reason: 'Never run yet', severity: 4 };
+function sourceAttention(source: ApiSource): AttentionItem | null {
+  if (!source.lastRun) {
+    return { id: source.id, name: source.name, reason: 'Never run yet', severity: 4 };
   }
 
-  if (board.lastRun.status === 'error') {
-    return { id: board.id, name: board.name, reason: 'Failed on last run', severity: 3 };
+  if (source.lastRun.status === 'error') {
+    return { id: source.id, name: source.name, reason: 'Failed on last run', severity: 3 };
   }
 
-  if (board.lastRun.status === 'partial') {
-    return { id: board.id, name: board.name, reason: 'Partial results last run', severity: 2 };
+  if (source.lastRun.status === 'partial') {
+    return { id: source.id, name: source.name, reason: 'Partial results last run', severity: 2 };
   }
 
-  if (board.lastRun.status === 'success' && board.lastRun.finishedAt) {
-    const ageMs = Date.now() - new Date(board.lastRun.finishedAt).getTime();
+  if (source.lastRun.status === 'success' && source.lastRun.finishedAt) {
+    const ageMs = Date.now() - new Date(source.lastRun.finishedAt).getTime();
     if (ageMs > 1000 * 60 * 60 * 72) {
-      return { id: board.id, name: board.name, reason: 'No successful run in 3+ days', severity: 1 };
+      return { id: source.id, name: source.name, reason: 'No successful run in 3+ days', severity: 1 };
     }
   }
 
@@ -69,7 +69,7 @@ function boardAttention(board: ApiBoard): AttentionItem | null {
 export default function HomePage() {
   const navigate = useNavigate();
   const jobs = useJobsData({ limit: 8 });
-  const boards = useBoardsData();
+  const sources = useSourcesData();
   const runs = useRunsData();
   const { user } = useAuth();
   const [runNowError, setRunNowError] = useState('');
@@ -84,13 +84,13 @@ export default function HomePage() {
     .filter((run) => run.status === 'success' && run.finishedAt)
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0] ?? null;
 
-  const attentionBoards = (boards.data ?? [])
-    .map(boardAttention)
+  const attentionSources = (sources.data ?? [])
+    .map(sourceAttention)
     .filter((item): item is AttentionItem => Boolean(item))
     .sort((a, b) => b.severity - a.severity || a.name.localeCompare(b.name));
 
   const jobCount = jobs.data?.total ?? 0;
-  const boardCount = (boards.data ?? []).length;
+  const sourceCount = (sources.data ?? []).length;
   const newInLatestRun = latestRun?.jobsNew ?? 0;
 
   const greeting = (() => {
@@ -131,7 +131,7 @@ export default function HomePage() {
             {startingRun ? 'Starting run...' : 'Run scraper now'}
           </button>
           <Link to="/runs" className="button button-secondary">View runs</Link>
-          <Link to="/boards" className="button button-secondary">Manage boards</Link>
+          <Link to="/sources" className="button button-secondary">Manage sources</Link>
         </div>
       </section>
 
@@ -152,9 +152,9 @@ export default function HomePage() {
           </div>
 
           <div className="home-stat-card">
-            <p className="stat-label">Boards covered</p>
+            <p className="stat-label">Sources covered</p>
             <p className="home-stat-value">
-              {latestRun ? `${latestRun.boardsDone}/${latestRun.boardsTotal}` : `${boardCount} boards`}
+              {latestRun ? `${latestRun.sourcesDone}/${latestRun.sourcesTotal}` : `${sourceCount} sources`}
             </p>
           </div>
 
@@ -176,24 +176,24 @@ export default function HomePage() {
         <section className="home-panel card">
           <div className="row-between">
             <h3 className="section-heading">Needs attention</h3>
-            <Link to="/boards" className="button button-secondary button-small">Open boards</Link>
+            <Link to="/sources" className="button button-secondary button-small">Open sources</Link>
           </div>
 
-          {boards.loading && <p className="muted">Checking board status...</p>}
+          {sources.loading && <p className="muted">Checking source status...</p>}
 
-          {!boards.loading && attentionBoards.length === 0 && (
-            <p className="muted">All boards look healthy. No immediate action needed.</p>
+          {!sources.loading && attentionSources.length === 0 && (
+            <p className="muted">All sources look healthy. No immediate action needed.</p>
           )}
 
-          {attentionBoards.length > 0 && (
+          {attentionSources.length > 0 && (
             <div className="home-attention-list">
-              {attentionBoards.slice(0, 6).map((item) => (
+              {attentionSources.slice(0, 6).map((item) => (
                 <div key={item.id} className="home-attention-row">
                   <div>
-                    <p className="home-attention-board">{item.name}</p>
+                    <p className="home-attention-source">{item.name}</p>
                     <p className="muted">{item.reason}</p>
                   </div>
-                  <Link to="/boards" className="button button-secondary button-small">Review</Link>
+                  <Link to="/sources" className="button button-secondary button-small">Review</Link>
                 </div>
               ))}
             </div>
@@ -244,7 +244,7 @@ export default function HomePage() {
         {!jobs.loading && (jobs.data?.jobs ?? []).length === 0 && (
           <div className="home-empty">
             <p className="muted">No jobs indexed yet.</p>
-            <p className="muted">Add boards and run a scrape to start your intake.</p>
+            <p className="muted">Add sources and run a scrape to start your intake.</p>
           </div>
         )}
 
@@ -263,7 +263,7 @@ export default function HomePage() {
                       </>
                     )}
                     <span className="job-meta-sep">·</span>
-                    <span className="tag">{job.board}</span>
+                    <span className="tag">{job.source}</span>
                   </div>
                 </div>
                 <div className="home-fresh-side">

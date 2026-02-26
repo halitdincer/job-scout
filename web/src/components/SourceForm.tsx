@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { ApiBoard, AnalyzeResult, PreviewResult } from '../types';
-import Combobox from './Combobox';
-import GeoCombobox from './GeoCombobox';
+import { ApiSource, AnalyzeResult, PreviewResult } from '../types';
 import TagSelect from './TagSelect';
-import { useCompaniesData, useTagsData } from '../hooks';
+import { useTagsData } from '../hooks';
 
-interface BoardFormProps {
-  initial?: Partial<ApiBoard>;
-  onSubmit: (board: Omit<ApiBoard, 'id'>) => Promise<void>;
+interface SourceFormProps {
+  initial?: Partial<ApiSource>;
+  onSubmit: (source: Omit<ApiSource, 'id'>) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -38,20 +36,15 @@ function fromInitialSelectors(sel?: Record<string, string | null>): Record<SKey,
   };
 }
 
-export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProps) {
+export default function SourceForm({ initial, onSubmit, onCancel }: SourceFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [company, setCompany] = useState(initial?.company ?? '');
-  const [companyId, setCompanyId] = useState(initial?.companyId ?? '');
-  const [companyQuery, setCompanyQuery] = useState('');
   const [location, setLocation] = useState(initial?.location ?? '');
-  const [locationKey, setLocationKey] = useState(initial?.locationKey ?? '');
-  const [locationLabel, setLocationLabel] = useState(initial?.locationLabel ?? '');
   const [selectedTags, setSelectedTags] = useState<string[]>(
     (initial?.tags ?? []).map((t) => t.id)
   );
   const [url, setUrl] = useState(initial?.url ?? '');
 
-  const { data: companies } = useCompaniesData(companyQuery);
   const { data: allTags } = useTagsData();
   const [selectors, setSelectors] = useState<Record<SKey, string>>(
     fromInitialSelectors(initial?.selectors)
@@ -194,23 +187,21 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
         name,
         url,
         ...(company.trim() ? { company: company.trim() } : {}),
-        ...(companyId ? { companyId } : {}),
         ...(location.trim() ? { location: location.trim() } : {}),
-        ...(locationKey ? { locationKey, locationLabel } : {}),
         tags: (allTags ?? []).filter((t) => selectedTags.includes(t.id)),
         tagIds: selectedTags,
         selectors: toSelectorRecord(selectors),
         ...(pagination ? { pagination } : {}),
       } as any);
     } catch (err: any) {
-      setError(err.message ?? 'Failed to save board');
+      setError(err.message ?? 'Failed to save source');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form className="board-form" onSubmit={handleSubmit}>
+    <form className="source-form" onSubmit={handleSubmit}>
       {error && <p className="error">{error}</p>}
 
       <label className="form-label">
@@ -236,45 +227,21 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
 
       <label className="form-label">
         Company
-        <Combobox
+        <input
+          className="input"
           value={company}
-          onChange={(val, id) => {
-            setCompany(val);
-            setCompanyId(id ?? '');
-          }}
-          suggestions={(companies ?? []).map((c) => ({ id: c.id, label: c.name }))}
-          onCreateNew={async (label) => {
-            try {
-              const res = await fetch('/api/companies', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ name: label }),
-              });
-              if (res.ok) {
-                const created = await res.json();
-                setCompany(created.name);
-                setCompanyId(created.id);
-              }
-            } catch {
-              // ignore
-            }
-          }}
+          onChange={(e) => setCompany(e.target.value)}
           placeholder="Uber"
-          onQueryChange={setCompanyQuery}
         />
       </label>
 
       <label className="form-label">
         Location
-        <GeoCombobox
-          locationKey={locationKey}
-          locationLabel={locationLabel}
-          onChange={(key, label) => {
-            setLocationKey(key);
-            setLocationLabel(label);
-            setLocation(label);
-          }}
+        <input
+          className="input"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Toronto, ON"
         />
       </label>
 
@@ -344,10 +311,10 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
                 </div>
               );
             })}
-            {aiSuggestions.pagination?.type && (
+            {Boolean(aiSuggestions.pagination?.type) && (
               <div className="ai-suggestion-row">
                 <span className="ai-suggestion-label">Pagination type</span>
-                <code className="ai-suggestion-value">{String(aiSuggestions.pagination.type)}</code>
+                <code className="ai-suggestion-value">{String(aiSuggestions.pagination?.type ?? '')}</code>
                 <button
                   type="button"
                   className="button button-secondary button-small"
@@ -357,7 +324,7 @@ export default function BoardForm({ initial, onSubmit, onCancel }: BoardFormProp
                 </button>
               </div>
             )}
-            {aiSuggestions.pagination?.type === 'url' && aiSuggestions.pagination.urlTemplate && (
+            {aiSuggestions.pagination?.type === 'url' && Boolean(aiSuggestions.pagination.urlTemplate) && (
               <div className="ai-suggestion-row">
                 <span className="ai-suggestion-label">URL template</span>
                 <code className="ai-suggestion-value">{String(aiSuggestions.pagination.urlTemplate)}</code>

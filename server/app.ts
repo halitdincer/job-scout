@@ -2,13 +2,11 @@ import express, { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import { Database } from 'sqlite';
 import { makeAuthRouter } from './routes/authRouter';
-import { makeBoardsRouter } from './routes/boardsRouter';
+import { makeSourcesRouter } from './routes/sourcesRouter';
 import { makeJobsRouter } from './routes/jobsRouter';
 import { makeRunsRouter } from './routes/runsRouter';
 import { makeSetupRouter } from './routes/setupRouter';
 import { makeTagsRouter } from './routes/tagsRouter';
-import { makeCompaniesRouter } from './routes/companiesRouter';
-import { makeGeoRouter } from './routes/geoRouter';
 import { serveStatic } from './static';
 
 export function createApp(db: Database): express.Express {
@@ -24,13 +22,11 @@ export function createApp(db: Database): express.Express {
 
   // API routes
   app.use('/api/auth', makeAuthRouter(db));
-  app.use('/api/boards', makeBoardsRouter(db));
+  app.use('/api/sources', makeSourcesRouter(db));
   app.use('/api/jobs', makeJobsRouter(db));
   app.use('/api/runs', makeRunsRouter(db));
   app.use('/api/setup', makeSetupRouter());
   app.use('/api/tags', makeTagsRouter(db));
-  app.use('/api/companies', makeCompaniesRouter(db));
-  app.use('/api/geo', makeGeoRouter());
 
   // Serve React SPA + static assets
   serveStatic(app);

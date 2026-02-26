@@ -2,7 +2,7 @@
 
 ## What this project is
 
-Job board tracker/scraper. TypeScript/Express backend + React/Vite frontend, SQLite DB, Playwright for scraping. Deployed at https://jobs.halitdincer.com on a home K3s cluster.
+Job source tracker/scraper. TypeScript/Express backend + React/Vite frontend, SQLite DB, Playwright for scraping. Deployed at https://jobs.halitdincer.com on a home K3s cluster.
 
 ## Deployment pipeline — READ THIS BEFORE TOUCHING ANYTHING
 

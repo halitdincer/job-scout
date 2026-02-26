@@ -5,20 +5,14 @@ import JobsPage from './JobsPage';
 
 vi.mock('../hooks', () => ({
   useJobsData: vi.fn(),
-  useBoardsData: vi.fn(),
+  useSourcesData: vi.fn(),
   useTagsData: vi.fn(),
-  useCompaniesData: vi.fn(),
 }));
-
-vi.mock('../components/GeoCombobox', () => ({
-  default: () => <input placeholder="Filter by country, state, city…" />,
-}));
-
-import { useJobsData, useBoardsData, useTagsData, useCompaniesData } from '../hooks';
+import { useJobsData, useSourcesData, useTagsData } from '../hooks';
 
 const sampleJobs = [
-  { id: 'j1', title: 'Software Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString(), board: 'BoardA' },
-  { id: 'j2', title: 'Product Manager', company: 'Beta', location: 'NYC', url: 'https://x.com/2', firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString(), board: 'BoardB' },
+  { id: 'j1', title: 'Software Engineer', company: 'Acme', location: 'Remote', url: 'https://x.com/1', firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString(), source: 'SourceA' },
+  { id: 'j2', title: 'Product Manager', company: 'Beta', location: 'NYC', url: 'https://x.com/2', firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString(), source: 'SourceB' },
 ];
 
 function renderJobsPage(jobs = sampleJobs) {
@@ -27,10 +21,10 @@ function renderJobsPage(jobs = sampleJobs) {
     error: null,
     loading: false,
   });
-  vi.mocked(useBoardsData).mockReturnValue({
+  vi.mocked(useSourcesData).mockReturnValue({
     data: [
-      { id: 'b1', name: 'BoardA', url: 'https://a.com', selectors: {}, tags: [] },
-      { id: 'b2', name: 'BoardB', url: 'https://b.com', selectors: {}, tags: [] },
+      { id: 'b1', name: 'SourceA', url: 'https://a.com', selectors: {}, tags: [] },
+      { id: 'b2', name: 'SourceB', url: 'https://b.com', selectors: {}, tags: [] },
     ],
     error: null,
     loading: false,
@@ -42,12 +36,6 @@ function renderJobsPage(jobs = sampleJobs) {
     loading: false,
     refresh: vi.fn(),
   });
-  vi.mocked(useCompaniesData).mockReturnValue({
-    data: [],
-    error: null,
-    loading: false,
-  });
-
   render(
     <MemoryRouter>
       <JobsPage />
@@ -70,17 +58,17 @@ describe('JobsPage', () => {
     expect(searchInput).toBeInTheDocument();
   });
 
-  it('boards dropdown button is present', () => {
+  it('sources dropdown button is present', () => {
     renderJobsPage();
-    expect(screen.getByRole('button', { name: /Boards/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sources/i })).toBeInTheDocument();
   });
 
-  it('clicking the boards dropdown reveals board option buttons', () => {
+  it('clicking the sources dropdown reveals source option buttons', () => {
     renderJobsPage();
-    fireEvent.click(screen.getByRole('button', { name: /Boards/i }));
-    // Board options appear as buttons inside the dropdown
-    const boardBtns = screen.getAllByRole('button', { name: /^BoardA$|^BoardB$/ });
-    expect(boardBtns.length).toBeGreaterThanOrEqual(2);
+    fireEvent.click(screen.getByRole('button', { name: /Sources/i }));
+    // Source options appear as buttons inside the dropdown
+    const sourceBtns = screen.getAllByRole('button', { name: /^SourceA$|^SourceB$/ });
+    expect(sourceBtns.length).toBeGreaterThanOrEqual(2);
   });
 
   it('each job row has a checkbox', () => {

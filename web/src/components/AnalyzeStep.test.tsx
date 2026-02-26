@@ -20,7 +20,7 @@ describe('AnalyzeStep', () => {
   it('calls POST /api/setup/analyze on submit and displays returned selectors', async () => {
     const analyzeResult = {
       url: 'https://example.com/jobs',
-      name: 'Test Board',
+      name: 'Test Source',
       selectors: { jobCard: '.job', title: '.title', link: 'a' },
       waitForSelector: null,
     };

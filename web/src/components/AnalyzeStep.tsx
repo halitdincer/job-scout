@@ -43,7 +43,7 @@ export default function AnalyzeStep({ onAnalyzed, onSkip, onCancel }: AnalyzeSte
       <div className="stack">
         <h3>AI Analysis Result</h3>
         <p>
-          <strong>Board name:</strong> {result.name}
+          <strong>Source name:</strong> {result.name}
         </p>
         <p>
           <strong>URL:</strong> {result.url}
@@ -71,14 +71,14 @@ export default function AnalyzeStep({ onAnalyzed, onSkip, onCancel }: AnalyzeSte
 
   return (
     <div className="stack">
-      <h3>AI-Assisted Board Setup</h3>
+      <h3>AI-Assisted Source Setup</h3>
       <p className="muted">
-        Paste the URL of a job board and the AI will detect the CSS selectors automatically.
+        Paste the URL of a job source and the AI will detect the CSS selectors automatically.
       </p>
       <form onSubmit={handleAnalyze} className="stack">
         {error && <p className="error">{error}</p>}
         <label className="form-label">
-          Job board URL
+          Job source URL
           <input
             className="input"
             type="url"

@@ -44,7 +44,7 @@ The Vite frontend hot-reloads on changes to `web/src/`.
 | `DB_PATH` | `./data/jobscout.sqlite` | SQLite file path |
 | `PORT` | `3000` | API server port |
 | `SESSION_SECRET` | — | Secret for signing session cookies |
-| `ANTHROPIC_API_KEY` | — | Required for AI board setup feature |
+| `ANTHROPIC_API_KEY` | — | Required for AI source setup feature |
 
 Copy `.env.example` to `.env` and fill in your values. The `.env` file is git-ignored.
 

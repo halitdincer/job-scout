@@ -1,8 +1,8 @@
 import { Page } from 'playwright';
-import { BoardConfig, Job } from '../types';
+import { SourceConfig, Job } from '../types';
 import { buildJobId } from '../utils/jobId';
 
-export async function extractJobsFromSelectors(page: Page, config: BoardConfig): Promise<Job[]> {
+export async function extractJobsFromSelectors(page: Page, config: SourceConfig): Promise<Job[]> {
   const jobs: Job[] = [];
 
   if (!config.selectors?.jobCard) return jobs;

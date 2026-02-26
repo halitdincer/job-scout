@@ -1,11 +1,11 @@
 # Testing & Validation Guide
 
-This project is designed to be **AI-verifiable** and **offline-testable**. The strategy combines deterministic unit tests, optional browser tests using fixtures, and a config validator that prevents bad board definitions from slipping in.
+This project is designed to be **AI-verifiable** and **offline-testable**. The strategy combines deterministic unit tests, optional browser tests using fixtures, and a config validator that prevents bad source definitions from slipping in.
 
 ## Goals
 
 - Detect regressions early when scraper logic changes.
-- Validate board configs before running real scrapes.
+- Validate source configs before running real scrapes.
 - Make it simple for automated agents to run checks without a network.
 
 ## Test Matrix

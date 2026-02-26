@@ -10,7 +10,7 @@ export interface DbOptions {
 
 export interface RunRow {
   id: string;
-  boardId: string;
+  sourceId: string;
   userId: string;
   startedAt: string;
   finishedAt: string | null;
@@ -27,17 +27,17 @@ export interface ScrapeRunRow {
   startedAt: string;
   finishedAt: string | null;
   status: 'running' | 'success' | 'partial' | 'error';
-  boardsTotal: number;
-  boardsDone: number;
+  sourcesTotal: number;
+  sourcesDone: number;
   jobsFound: number;
   jobsNew: number;
 }
 
-export interface ScrapeRunBoardRow {
+export interface ScrapeRunSourceRow {
   id: string;
   runId: string;
-  boardId: string;
-  boardName: string;
+  sourceId: string;
+  sourceName: string;
   startedAt: string;
   finishedAt: string | null;
   status: 'pending' | 'running' | 'success' | 'error';
@@ -55,6 +55,35 @@ export async function openDb({ dbPath }: DbOptions): Promise<Database> {
   });
 
   await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sources (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      url TEXT NOT NULL,
+      config_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      user_id TEXT,
+      company TEXT,
+      location TEXT,
+      sel_job_card TEXT,
+      sel_title TEXT,
+      sel_link TEXT,
+      sel_next_page TEXT,
+      pag_type TEXT,
+      pag_url_template TEXT,
+      pag_max_pages INTEGER,
+      pag_delay_ms INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      state TEXT NOT NULL DEFAULT 'active',
+      deleted_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS jobs (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -62,312 +91,75 @@ export async function openDb({ dbPath }: DbOptions): Promise<Database> {
       location TEXT NOT NULL,
       url TEXT NOT NULL,
       posted_date TEXT,
-      board TEXT NOT NULL,
+      source TEXT NOT NULL,
       first_seen_at TEXT NOT NULL,
-      last_seen_at TEXT NOT NULL
+      last_seen_at TEXT NOT NULL,
+      user_id TEXT,
+      found_in_run_id TEXT,
+      source_id TEXT
     );
-  `);
 
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS boards (
-      name TEXT PRIMARY KEY,
-      url TEXT NOT NULL,
-      config_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+    CREATE TABLE IF NOT EXISTS runs (
+      id TEXT PRIMARY KEY,
+      source_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      jobs_found INTEGER NOT NULL DEFAULT 0,
+      jobs_new INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'running',
+      error_msg TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS scrape_runs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      triggered_by TEXT NOT NULL DEFAULT 'cron',
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      status TEXT NOT NULL DEFAULT 'running',
+      sources_total INTEGER NOT NULL DEFAULT 0,
+      sources_done INTEGER NOT NULL DEFAULT 0,
+      jobs_found INTEGER NOT NULL DEFAULT 0,
+      jobs_new INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS scrape_run_sources (
+      id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      source_name TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      jobs_found INTEGER NOT NULL DEFAULT 0,
+      jobs_new INTEGER NOT NULL DEFAULT 0,
+      error_msg TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS tags (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(name, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS source_tags (
+      source_id TEXT NOT NULL,
+      tag_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      PRIMARY KEY (source_id, tag_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sources_user_id ON sources(user_id);
+    CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_jobs_source_id ON jobs(source_id);
+    CREATE INDEX IF NOT EXISTS idx_scrape_runs_user_id ON scrape_runs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_scrape_run_sources_run_id ON scrape_run_sources(run_id);
+    CREATE INDEX IF NOT EXISTS idx_source_tags_source_id ON source_tags(source_id);
   `);
-
-  // Schema migration
-  await db.exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);`);
-
-  const versionRow = await db.get<{ version: number } | undefined>(
-    'SELECT version FROM schema_version ORDER BY version DESC LIMIT 1'
-  );
-  const currentVersion = versionRow?.version ?? 0;
-
-  if (currentVersion < 1) {
-    await db.exec('BEGIN');
-    try {
-      // Add id column to boards if missing
-      const boardCols = await db.all<{ name: string }[]>('PRAGMA table_info(boards)');
-      const boardColNames = boardCols.map((c) => c.name);
-      if (!boardColNames.includes('id')) {
-        await db.exec(`ALTER TABLE boards ADD COLUMN id TEXT`);
-      }
-      if (!boardColNames.includes('user_id')) {
-        await db.exec(`ALTER TABLE boards ADD COLUMN user_id TEXT`);
-      }
-
-      // Add user_id column to jobs if missing
-      const jobCols = await db.all<{ name: string }[]>('PRAGMA table_info(jobs)');
-      const jobColNames = jobCols.map((c) => c.name);
-      if (!jobColNames.includes('user_id')) {
-        await db.exec(`ALTER TABLE jobs ADD COLUMN user_id TEXT`);
-      }
-
-      // Populate id for boards that don't have one
-      await db.exec(`UPDATE boards SET id = lower(hex(randomblob(16))) WHERE id IS NULL`);
-
-      // Create users table
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS users (
-          id   TEXT PRIMARY KEY,
-          email TEXT NOT NULL UNIQUE,
-          password_hash TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        );
-      `);
-
-      await db.exec(`INSERT OR IGNORE INTO schema_version (version) VALUES (1)`);
-      await db.exec('COMMIT');
-    } catch (err) {
-      await db.exec('ROLLBACK');
-      throw err;
-    }
-  }
-
-  if (currentVersion < 2) {
-    await db.exec('BEGIN');
-    try {
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS runs (
-          id TEXT PRIMARY KEY,
-          board_id TEXT NOT NULL,
-          user_id TEXT NOT NULL,
-          started_at TEXT NOT NULL,
-          finished_at TEXT,
-          jobs_found INTEGER NOT NULL DEFAULT 0,
-          jobs_new INTEGER NOT NULL DEFAULT 0,
-          status TEXT NOT NULL DEFAULT 'running',
-          error_msg TEXT
-        );
-      `);
-
-      const jobCols2 = await db.all<{ name: string }[]>('PRAGMA table_info(jobs)');
-      const jobColNames2 = jobCols2.map((c) => c.name);
-      if (!jobColNames2.includes('found_in_run_id')) {
-        await db.exec(`ALTER TABLE jobs ADD COLUMN found_in_run_id TEXT`);
-      }
-
-      await db.exec(`INSERT OR IGNORE INTO schema_version (version) VALUES (2)`);
-      await db.exec('COMMIT');
-    } catch (err) {
-      await db.exec('ROLLBACK');
-      throw err;
-    }
-  }
-
-  if (currentVersion < 3) {
-    await db.exec('BEGIN');
-    try {
-      // Add flat columns to boards
-      const boardCols3 = await db.all<{ name: string }[]>('PRAGMA table_info(boards)');
-      const boardColNames3 = boardCols3.map((c) => c.name);
-
-      const newBoardCols: [string, string][] = [
-        ['company', 'TEXT'],
-        ['location', 'TEXT'],
-        ['sel_job_card', 'TEXT'],
-        ['sel_title', 'TEXT'],
-        ['sel_link', 'TEXT'],
-        ['sel_next_page', 'TEXT'],
-        ['pag_type', 'TEXT'],
-        ['pag_url_template', 'TEXT'],
-        ['pag_max_pages', 'INTEGER'],
-        ['pag_delay_ms', 'INTEGER'],
-        ['created_at', 'TEXT'],
-      ];
-
-      for (const [col, type] of newBoardCols) {
-        if (!boardColNames3.includes(col)) {
-          await db.exec(`ALTER TABLE boards ADD COLUMN ${col} ${type}`);
-        }
-      }
-
-      // Migrate data from config_json into flat columns using SQLite's json_extract
-      await db.exec(`
-        UPDATE boards SET
-          company          = json_extract(config_json, '$.company'),
-          location         = json_extract(config_json, '$.location'),
-          sel_job_card     = json_extract(config_json, '$.selectors.jobCard'),
-          sel_title        = json_extract(config_json, '$.selectors.title'),
-          sel_link         = json_extract(config_json, '$.selectors.link'),
-          sel_next_page    = json_extract(config_json, '$.selectors.nextPage'),
-          pag_type         = json_extract(config_json, '$.pagination.type'),
-          pag_url_template = json_extract(config_json, '$.pagination.urlTemplate'),
-          pag_max_pages    = CAST(json_extract(config_json, '$.pagination.maxPages') AS INTEGER),
-          pag_delay_ms     = CAST(json_extract(config_json, '$.pagination.delayMs') AS INTEGER),
-          created_at       = COALESCE(created_at, updated_at)
-        WHERE sel_job_card IS NULL
-      `);
-
-      // Create scrape_runs table
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS scrape_runs (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          triggered_by TEXT NOT NULL DEFAULT 'cron',
-          started_at TEXT NOT NULL,
-          finished_at TEXT,
-          status TEXT NOT NULL DEFAULT 'running',
-          boards_total INTEGER NOT NULL DEFAULT 0,
-          boards_done INTEGER NOT NULL DEFAULT 0,
-          jobs_found INTEGER NOT NULL DEFAULT 0,
-          jobs_new INTEGER NOT NULL DEFAULT 0
-        );
-      `);
-
-      // Create scrape_run_boards table
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS scrape_run_boards (
-          id TEXT PRIMARY KEY,
-          run_id TEXT NOT NULL,
-          board_id TEXT NOT NULL,
-          board_name TEXT NOT NULL,
-          started_at TEXT NOT NULL,
-          finished_at TEXT,
-          status TEXT NOT NULL DEFAULT 'pending',
-          jobs_found INTEGER NOT NULL DEFAULT 0,
-          jobs_new INTEGER NOT NULL DEFAULT 0,
-          error_msg TEXT
-        );
-      `);
-
-      await db.exec(`INSERT OR IGNORE INTO schema_version (version) VALUES (3)`);
-      await db.exec('COMMIT');
-    } catch (err) {
-      await db.exec('ROLLBACK');
-      throw err;
-    }
-  }
-
-  if (currentVersion < 4) {
-    await db.exec('BEGIN');
-    try {
-      // Create companies table
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS companies (
-          id         TEXT PRIMARY KEY,
-          name       TEXT NOT NULL,
-          user_id    TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          UNIQUE(name, user_id)
-        );
-      `);
-
-      // Create tags table
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS tags (
-          id         TEXT PRIMARY KEY,
-          name       TEXT NOT NULL,
-          color      TEXT NOT NULL DEFAULT '#6366f1',
-          user_id    TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          UNIQUE(name, user_id)
-        );
-      `);
-
-      // Create board_tags junction table
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS board_tags (
-          board_id TEXT NOT NULL,
-          tag_id   TEXT NOT NULL,
-          user_id  TEXT NOT NULL,
-          PRIMARY KEY (board_id, tag_id)
-        );
-      `);
-
-      // Add new columns to boards
-      const boardCols4 = await db.all<{ name: string }[]>('PRAGMA table_info(boards)');
-      const boardColNames4 = boardCols4.map((c) => c.name);
-
-      const v4BoardCols: [string, string][] = [
-        ['company_id', 'TEXT'],
-        ['location_key', 'TEXT'],
-        ['location_label', 'TEXT'],
-      ];
-
-      for (const [col, type] of v4BoardCols) {
-        if (!boardColNames4.includes(col)) {
-          await db.exec(`ALTER TABLE boards ADD COLUMN ${col} ${type}`);
-        }
-      }
-
-      // Seed companies from existing boards.company text values
-      await db.exec(`
-        INSERT OR IGNORE INTO companies (id, name, user_id, created_at)
-        SELECT lower(hex(randomblob(16))), company, user_id, datetime('now')
-        FROM boards WHERE company IS NOT NULL AND company != '' AND user_id IS NOT NULL
-      `);
-
-      // Link boards to newly created company rows
-      await db.exec(`
-        UPDATE boards SET company_id = (
-          SELECT id FROM companies WHERE name = boards.company AND user_id = boards.user_id
-        ) WHERE company IS NOT NULL AND company != '' AND company_id IS NULL
-      `);
-
-      await db.exec(`INSERT OR IGNORE INTO schema_version (version) VALUES (4)`);
-      await db.exec('COMMIT');
-    } catch (err) {
-      await db.exec('ROLLBACK');
-      throw err;
-    }
-  }
-
-  if (currentVersion < 5) {
-    await db.exec('BEGIN');
-    try {
-      const boardCols5 = await db.all<{ name: string }[]>('PRAGMA table_info(boards)');
-      const boardColNames5 = boardCols5.map((c) => c.name);
-
-      if (!boardColNames5.includes('state')) {
-        await db.exec(`ALTER TABLE boards ADD COLUMN state TEXT NOT NULL DEFAULT 'active'`);
-      }
-      if (!boardColNames5.includes('deleted_at')) {
-        await db.exec(`ALTER TABLE boards ADD COLUMN deleted_at TEXT`);
-      }
-
-      const jobCols5 = await db.all<{ name: string }[]>('PRAGMA table_info(jobs)');
-      const jobColNames5 = jobCols5.map((c) => c.name);
-
-      if (!jobColNames5.includes('board_id')) {
-        await db.exec(`ALTER TABLE jobs ADD COLUMN board_id TEXT`);
-      }
-      if (!jobColNames5.includes('company_id')) {
-        await db.exec(`ALTER TABLE jobs ADD COLUMN company_id TEXT`);
-      }
-
-      await db.exec(`
-        UPDATE jobs
-        SET board_id = (
-          SELECT b.id
-          FROM boards b
-          WHERE b.user_id = jobs.user_id AND b.name = jobs.board
-          ORDER BY b.updated_at DESC
-          LIMIT 1
-        )
-        WHERE board_id IS NULL
-      `);
-
-      await db.exec(`
-        UPDATE jobs
-        SET company_id = (
-          SELECT b.company_id
-          FROM boards b
-          WHERE b.id = jobs.board_id
-          LIMIT 1
-        )
-        WHERE company_id IS NULL
-      `);
-
-      await db.exec(`INSERT OR IGNORE INTO schema_version (version) VALUES (5)`);
-      await db.exec('COMMIT');
-    } catch (err) {
-      await db.exec('ROLLBACK');
-      throw err;
-    }
-  }
 
   return db;
 }
@@ -382,14 +174,14 @@ function chunkArray<T>(items: T[], size: number) {
 
 // ── Legacy run functions (kept for historical data) ───────────────────────────
 
-export async function createRun(db: Database, boardId: string, userId: string): Promise<string> {
+export async function createRun(db: Database, sourceId: string, userId: string): Promise<string> {
   const id = generateUuid();
   const now = new Date().toISOString();
   await db.run(
-    `INSERT INTO runs (id, board_id, user_id, started_at, jobs_found, jobs_new, status)
+    `INSERT INTO runs (id, source_id, user_id, started_at, jobs_found, jobs_new, status)
      VALUES (?, ?, ?, ?, 0, 0, 'running')`,
     id,
-    boardId,
+    sourceId,
     userId,
     now
   );
@@ -420,20 +212,20 @@ export async function finishRun(
 export async function listRunsForUser(
   db: Database,
   userId: string,
-  boardId?: string
+  sourceId?: string
 ): Promise<RunRow[]> {
   const conditions = ['user_id = ?'];
   const params: unknown[] = [userId];
 
-  if (boardId) {
-    conditions.push('board_id = ?');
-    params.push(boardId);
+  if (sourceId) {
+    conditions.push('source_id = ?');
+    params.push(sourceId);
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = await db.all<{
     id: string;
-    board_id: string;
+    source_id: string;
     user_id: string;
     started_at: string;
     finished_at: string | null;
@@ -442,7 +234,7 @@ export async function listRunsForUser(
     status: string;
     error_msg: string | null;
   }[]>(
-    `SELECT id, board_id, user_id, started_at, finished_at, jobs_found, jobs_new, status, error_msg
+    `SELECT id, source_id, user_id, started_at, finished_at, jobs_found, jobs_new, status, error_msg
      FROM runs ${where}
      ORDER BY started_at DESC
      LIMIT 100`,
@@ -451,7 +243,7 @@ export async function listRunsForUser(
 
   return rows.map((r) => ({
     id: r.id,
-    boardId: r.board_id,
+    sourceId: r.source_id,
     userId: r.user_id,
     startedAt: r.started_at,
     finishedAt: r.finished_at,
@@ -472,7 +264,7 @@ export async function createScrapeRun(
   const id = generateUuid();
   const now = new Date().toISOString();
   await db.run(
-    `INSERT INTO scrape_runs (id, user_id, triggered_by, started_at, status, boards_total, boards_done, jobs_found, jobs_new)
+    `INSERT INTO scrape_runs (id, user_id, triggered_by, started_at, status, sources_total, sources_done, jobs_found, jobs_new)
      VALUES (?, ?, ?, ?, 'running', 0, 0, 0, 0)`,
     id,
     userId,
@@ -485,13 +277,13 @@ export async function createScrapeRun(
 export async function updateScrapeRunProgress(
   db: Database,
   runId: string,
-  boardsDone: number,
+  sourcesDone: number,
   jobsFound: number,
   jobsNew: number
 ): Promise<void> {
   await db.run(
-    `UPDATE scrape_runs SET boards_done = ?, jobs_found = ?, jobs_new = ? WHERE id = ?`,
-    boardsDone,
+    `UPDATE scrape_runs SET sources_done = ?, jobs_found = ?, jobs_new = ? WHERE id = ?`,
+    sourcesDone,
     jobsFound,
     jobsNew,
     runId
@@ -512,29 +304,29 @@ export async function finishScrapeRun(
   );
 }
 
-export async function createScrapeRunBoard(
+export async function createScrapeRunSource(
   db: Database,
   runId: string,
-  boardId: string,
-  boardName: string
+  sourceId: string,
+  sourceName: string
 ): Promise<string> {
   const id = generateUuid();
   const now = new Date().toISOString();
   await db.run(
-    `INSERT INTO scrape_run_boards (id, run_id, board_id, board_name, started_at, status, jobs_found, jobs_new)
+    `INSERT INTO scrape_run_sources (id, run_id, source_id, source_name, started_at, status, jobs_found, jobs_new)
      VALUES (?, ?, ?, ?, ?, 'running', 0, 0)`,
     id,
     runId,
-    boardId,
-    boardName,
+    sourceId,
+    sourceName,
     now
   );
   return id;
 }
 
-export async function finishScrapeRunBoard(
+export async function finishScrapeRunSource(
   db: Database,
-  runBoardId: string,
+  runSourceId: string,
   status: 'success' | 'error',
   jobsFound: number,
   jobsNew: number,
@@ -542,14 +334,14 @@ export async function finishScrapeRunBoard(
 ): Promise<void> {
   const now = new Date().toISOString();
   await db.run(
-    `UPDATE scrape_run_boards SET finished_at = ?, status = ?, jobs_found = ?, jobs_new = ?, error_msg = ?
+    `UPDATE scrape_run_sources SET finished_at = ?, status = ?, jobs_found = ?, jobs_new = ?, error_msg = ?
      WHERE id = ?`,
     now,
     status,
     jobsFound,
     jobsNew,
     errorMsg ?? null,
-    runBoardId
+    runSourceId
   );
 }
 
@@ -565,13 +357,13 @@ export async function listScrapeRunsForUser(
     started_at: string;
     finished_at: string | null;
     status: string;
-    boards_total: number;
-    boards_done: number;
+    sources_total: number;
+    sources_done: number;
     jobs_found: number;
     jobs_new: number;
   }[]>(
     `SELECT id, user_id, triggered_by, started_at, finished_at, status,
-            boards_total, boards_done, jobs_found, jobs_new
+            sources_total, sources_done, jobs_found, jobs_new
      FROM scrape_runs
      WHERE user_id = ?
      ORDER BY started_at DESC
@@ -587,8 +379,8 @@ export async function listScrapeRunsForUser(
     startedAt: r.started_at,
     finishedAt: r.finished_at,
     status: r.status as ScrapeRunRow['status'],
-    boardsTotal: r.boards_total,
-    boardsDone: r.boards_done,
+    sourcesTotal: r.sources_total,
+    sourcesDone: r.sources_done,
     jobsFound: r.jobs_found,
     jobsNew: r.jobs_new,
   }));
@@ -598,7 +390,7 @@ export async function getScrapeRunDetail(
   db: Database,
   runId: string,
   userId: string
-): Promise<(ScrapeRunRow & { boards: ScrapeRunBoardRow[] }) | null> {
+): Promise<(ScrapeRunRow & { sources: ScrapeRunSourceRow[] }) | null> {
   const run = await db.get<{
     id: string;
     user_id: string;
@@ -606,13 +398,13 @@ export async function getScrapeRunDetail(
     started_at: string;
     finished_at: string | null;
     status: string;
-    boards_total: number;
-    boards_done: number;
+    sources_total: number;
+    sources_done: number;
     jobs_found: number;
     jobs_new: number;
   } | undefined>(
     `SELECT id, user_id, triggered_by, started_at, finished_at, status,
-            boards_total, boards_done, jobs_found, jobs_new
+            sources_total, sources_done, jobs_found, jobs_new
      FROM scrape_runs
      WHERE id = ? AND user_id = ?`,
     runId,
@@ -621,11 +413,11 @@ export async function getScrapeRunDetail(
 
   if (!run) return null;
 
-  const boardRows = await db.all<{
+  const sourceRows = await db.all<{
     id: string;
     run_id: string;
-    board_id: string;
-    board_name: string;
+    source_id: string;
+    source_name: string;
     started_at: string;
     finished_at: string | null;
     status: string;
@@ -633,9 +425,9 @@ export async function getScrapeRunDetail(
     jobs_new: number;
     error_msg: string | null;
   }[]>(
-    `SELECT id, run_id, board_id, board_name, started_at, finished_at,
+    `SELECT id, run_id, source_id, source_name, started_at, finished_at,
             status, jobs_found, jobs_new, error_msg
-     FROM scrape_run_boards
+     FROM scrape_run_sources
      WHERE run_id = ?
      ORDER BY started_at ASC`,
     runId
@@ -648,18 +440,18 @@ export async function getScrapeRunDetail(
     startedAt: run.started_at,
     finishedAt: run.finished_at,
     status: run.status as ScrapeRunRow['status'],
-    boardsTotal: run.boards_total,
-    boardsDone: run.boards_done,
+    sourcesTotal: run.sources_total,
+    sourcesDone: run.sources_done,
     jobsFound: run.jobs_found,
     jobsNew: run.jobs_new,
-    boards: boardRows.map((b) => ({
+    sources: sourceRows.map((b) => ({
       id: b.id,
       runId: b.run_id,
-      boardId: b.board_id,
-      boardName: b.board_name,
+      sourceId: b.source_id,
+      sourceName: b.source_name,
       startedAt: b.started_at,
       finishedAt: b.finished_at,
-      status: b.status as ScrapeRunBoardRow['status'],
+      status: b.status as ScrapeRunSourceRow['status'],
       jobsFound: b.jobs_found,
       jobsNew: b.jobs_new,
       errorMsg: b.error_msg,
@@ -667,9 +459,9 @@ export async function getScrapeRunDetail(
   };
 }
 
-// ── Board CRUD ────────────────────────────────────────────────────────────────
+// ── Source CRUD ────────────────────────────────────────────────────────────────
 
-function rowToBoard(row: {
+function rowToSource(row: {
   id: string;
   name: string;
   url: string;
@@ -683,10 +475,6 @@ function rowToBoard(row: {
   pag_url_template: string | null;
   pag_max_pages: number | null;
   pag_delay_ms: number | null;
-  company_id?: string | null;
-  company_name?: string | null;
-  location_key?: string | null;
-  location_label?: string | null;
   state?: string | null;
   deleted_at?: string | null;
 }): any {
@@ -705,10 +493,6 @@ function rowToBoard(row: {
     url: row.url,
     ...(row.company ? { company: row.company } : {}),
     ...(row.location ? { location: row.location } : {}),
-    ...(row.company_id ? { companyId: row.company_id } : {}),
-    ...(row.company_name ? { companyName: row.company_name } : {}),
-    ...(row.location_key ? { locationKey: row.location_key } : {}),
-    ...(row.location_label ? { locationLabel: row.location_label } : {}),
     state: row.state ?? 'active',
     deletedAt: row.deleted_at ?? null,
     selectors: {
@@ -721,7 +505,7 @@ function rowToBoard(row: {
   };
 }
 
-export async function loadBoardsForUser(db: Database, userId: string): Promise<any[]> {
+export async function loadSourcesForUser(db: Database, userId: string): Promise<any[]> {
   const rows = await db.all<{
     id: string;
     name: string;
@@ -736,10 +520,6 @@ export async function loadBoardsForUser(db: Database, userId: string): Promise<a
     pag_url_template: string | null;
     pag_max_pages: number | null;
     pag_delay_ms: number | null;
-    company_id: string | null;
-    company_name: string | null;
-    location_key: string | null;
-    location_label: string | null;
     state: string | null;
     deleted_at: string | null;
     last_run_status: string | null;
@@ -748,18 +528,15 @@ export async function loadBoardsForUser(db: Database, userId: string): Promise<a
     `SELECT b.id, b.name, b.url, b.company, b.location,
             b.sel_job_card, b.sel_title, b.sel_link, b.sel_next_page,
             b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
-            b.company_id, c.name AS company_name,
-            b.location_key, b.location_label,
             b.state, b.deleted_at,
             srb.status AS last_run_status,
             srb.finished_at AS last_run_finished_at
-     FROM boards b
-     LEFT JOIN companies c ON c.id = b.company_id
-     LEFT JOIN scrape_run_boards srb ON srb.id = (
+     FROM sources b
+     LEFT JOIN scrape_run_sources srb ON srb.id = (
        SELECT srb2.id
-       FROM scrape_run_boards srb2
+       FROM scrape_run_sources srb2
        JOIN scrape_runs sr ON sr.id = srb2.run_id
-       WHERE srb2.board_id = b.id AND sr.user_id = ?
+       WHERE srb2.source_id = b.id AND sr.user_id = ?
        ORDER BY srb2.started_at DESC
        LIMIT 1
      )
@@ -769,41 +546,41 @@ export async function loadBoardsForUser(db: Database, userId: string): Promise<a
     userId
   );
 
-  // Load tags for all boards in one query
-  const boardIds = rows.map((r) => r.id);
-  const tagsByBoard = new Map<string, { id: string; name: string; color: string }[]>();
+  // Load tags for all sources in one query
+  const sourceIds = rows.map((r) => r.id);
+  const tagsBySource = new Map<string, { id: string; name: string; color: string }[]>();
 
-  if (boardIds.length > 0) {
-    const placeholders = boardIds.map(() => '?').join(',');
+  if (sourceIds.length > 0) {
+    const placeholders = sourceIds.map(() => '?').join(',');
     const tagRows = await db.all<{
-      board_id: string;
+      source_id: string;
       tag_id: string;
       tag_name: string;
       tag_color: string;
     }[]>(
-      `SELECT bt.board_id, t.id AS tag_id, t.name AS tag_name, t.color AS tag_color
-       FROM board_tags bt
+      `SELECT bt.source_id, t.id AS tag_id, t.name AS tag_name, t.color AS tag_color
+       FROM source_tags bt
        JOIN tags t ON t.id = bt.tag_id
-       WHERE bt.board_id IN (${placeholders})
+       WHERE bt.source_id IN (${placeholders})
        ORDER BY t.name`,
-      boardIds
+      sourceIds
     );
     for (const tr of tagRows) {
-      if (!tagsByBoard.has(tr.board_id)) tagsByBoard.set(tr.board_id, []);
-      tagsByBoard.get(tr.board_id)!.push({ id: tr.tag_id, name: tr.tag_name, color: tr.tag_color });
+      if (!tagsBySource.has(tr.source_id)) tagsBySource.set(tr.source_id, []);
+      tagsBySource.get(tr.source_id)!.push({ id: tr.tag_id, name: tr.tag_name, color: tr.tag_color });
     }
   }
 
   return rows.map((row) => ({
-    ...rowToBoard(row),
-    tags: tagsByBoard.get(row.id) ?? [],
+    ...rowToSource(row),
+    tags: tagsBySource.get(row.id) ?? [],
     lastRun: row.last_run_status
       ? { status: row.last_run_status, finishedAt: row.last_run_finished_at }
       : null,
   }));
 }
 
-export async function loadDeletedBoardsForUser(db: Database, userId: string): Promise<any[]> {
+export async function loadDeletedSourcesForUser(db: Database, userId: string): Promise<any[]> {
   const rows = await db.all<{
     id: string;
     name: string;
@@ -818,47 +595,40 @@ export async function loadDeletedBoardsForUser(db: Database, userId: string): Pr
     pag_url_template: string | null;
     pag_max_pages: number | null;
     pag_delay_ms: number | null;
-    company_id: string | null;
-    company_name: string | null;
-    location_key: string | null;
-    location_label: string | null;
     state: string | null;
     deleted_at: string | null;
   }[]>(
     `SELECT b.id, b.name, b.url, b.company, b.location,
             b.sel_job_card, b.sel_title, b.sel_link, b.sel_next_page,
             b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
-            b.company_id, c.name AS company_name,
-            b.location_key, b.location_label,
             b.state, b.deleted_at
-     FROM boards b
-     LEFT JOIN companies c ON c.id = b.company_id
+     FROM sources b
      WHERE b.user_id = ? AND COALESCE(b.state, 'active') = 'deleted'
      ORDER BY b.deleted_at DESC, b.name`,
     userId
   );
 
-  return rows.map((row) => ({ ...rowToBoard(row), tags: [], lastRun: null }));
+  return rows.map((row) => ({ ...rowToSource(row), tags: [], lastRun: null }));
 }
 
-export async function loadRunnableBoardsForUser(db: Database, userId: string): Promise<any[]> {
-  const boards = await loadBoardsForUser(db, userId);
-  return boards.filter((b) => b.state === 'active');
+export async function loadRunnableSourcesForUser(db: Database, userId: string): Promise<any[]> {
+  const sources = await loadSourcesForUser(db, userId);
+  return sources.filter((b) => b.state === 'active');
 }
 
-export async function listBoardNames(db: Database): Promise<string[]> {
-  const rows = await db.all<{ name: string }[]>('SELECT name FROM boards ORDER BY name');
+export async function listSourceNames(db: Database): Promise<string[]> {
+  const rows = await db.all<{ name: string }[]>('SELECT name FROM sources ORDER BY name');
   return rows.map((row) => row.name);
 }
 
-export async function upsertBoard(db: Database, board: any): Promise<void> {
+export async function upsertSource(db: Database, source: any): Promise<void> {
   const now = new Date().toISOString();
-  const name = board?.name ?? '';
-  const url = board?.url ?? '';
+  const name = source?.name ?? '';
+  const url = source?.url ?? '';
 
   await db.run(
     `
-    INSERT INTO boards (name, url, config_json, updated_at)
+    INSERT INTO sources (name, url, config_json, updated_at)
     VALUES (?, ?, ?, ?)
     ON CONFLICT(name) DO UPDATE SET
       url = excluded.url,
@@ -867,14 +637,14 @@ export async function upsertBoard(db: Database, board: any): Promise<void> {
     `,
     name,
     url,
-    JSON.stringify(board),
+    JSON.stringify(source),
     now
   );
 }
 
-export async function insertBoard(
+export async function insertSource(
   db: Database,
-  board: any,
+  source: any,
   userId: string,
   tagIds?: string[]
 ): Promise<string> {
@@ -882,95 +652,88 @@ export async function insertBoard(
   const id = generateUuid();
 
   await db.run(
-    `INSERT INTO boards (id, name, url, config_json, updated_at, user_id,
+     `INSERT INTO sources (id, name, url, config_json, updated_at, user_id,
        company, location, sel_job_card, sel_title, sel_link, sel_next_page,
        pag_type, pag_url_template, pag_max_pages, pag_delay_ms, created_at,
-       company_id, location_key, location_label, state, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       state, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
-    board?.name ?? '',
-    board?.url ?? '',
-    JSON.stringify(board),
+    source?.name ?? '',
+    source?.url ?? '',
+    JSON.stringify(source),
     now,
     userId,
-    board?.company ?? null,
-    board?.location ?? null,
-    board?.selectors?.jobCard ?? null,
-    board?.selectors?.title ?? null,
-    board?.selectors?.link ?? null,
-    board?.selectors?.nextPage ?? null,
-    board?.pagination?.type ?? null,
-    board?.pagination?.urlTemplate ?? null,
-    board?.pagination?.maxPages ?? null,
-    board?.pagination?.delayMs ?? null,
+    source?.company ?? null,
+    source?.location ?? null,
+    source?.selectors?.jobCard ?? null,
+    source?.selectors?.title ?? null,
+    source?.selectors?.link ?? null,
+    source?.selectors?.nextPage ?? null,
+    source?.pagination?.type ?? null,
+    source?.pagination?.urlTemplate ?? null,
+    source?.pagination?.maxPages ?? null,
+    source?.pagination?.delayMs ?? null,
     now,
-    board?.companyId ?? null,
-    board?.locationKey ?? null,
-    board?.locationLabel ?? null,
-    board?.state ?? 'active',
+    source?.state ?? 'active',
     null
   );
 
   if (tagIds && tagIds.length > 0) {
-    await setBoardTags(db, id, userId, tagIds);
+    await setSourceTags(db, id, userId, tagIds);
   }
 
   return id;
 }
 
-export async function updateBoardById(
+export async function updateSourceById(
   db: Database,
   id: string,
-  board: any,
+  source: any,
   userId: string,
   tagIds?: string[]
 ): Promise<boolean> {
   const now = new Date().toISOString();
 
   const result = await db.run(
-    `UPDATE boards SET
+    `UPDATE sources SET
        name = ?, url = ?, config_json = ?, updated_at = ?,
        company = ?, location = ?,
        sel_job_card = ?, sel_title = ?, sel_link = ?, sel_next_page = ?,
-       pag_type = ?, pag_url_template = ?, pag_max_pages = ?, pag_delay_ms = ?,
-       company_id = ?, location_key = ?, location_label = ?
+       pag_type = ?, pag_url_template = ?, pag_max_pages = ?, pag_delay_ms = ?
      WHERE id = ? AND user_id = ?`,
-    board?.name ?? '',
-    board?.url ?? '',
-    JSON.stringify(board),
+    source?.name ?? '',
+    source?.url ?? '',
+    JSON.stringify(source),
     now,
-    board?.company ?? null,
-    board?.location ?? null,
-    board?.selectors?.jobCard ?? null,
-    board?.selectors?.title ?? null,
-    board?.selectors?.link ?? null,
-    board?.selectors?.nextPage ?? null,
-    board?.pagination?.type ?? null,
-    board?.pagination?.urlTemplate ?? null,
-    board?.pagination?.maxPages ?? null,
-    board?.pagination?.delayMs ?? null,
-    board?.companyId ?? null,
-    board?.locationKey ?? null,
-    board?.locationLabel ?? null,
+    source?.company ?? null,
+    source?.location ?? null,
+    source?.selectors?.jobCard ?? null,
+    source?.selectors?.title ?? null,
+    source?.selectors?.link ?? null,
+    source?.selectors?.nextPage ?? null,
+    source?.pagination?.type ?? null,
+    source?.pagination?.urlTemplate ?? null,
+    source?.pagination?.maxPages ?? null,
+    source?.pagination?.delayMs ?? null,
     id,
     userId
   );
 
   if ((result.changes ?? 0) > 0 && tagIds !== undefined) {
-    await setBoardTags(db, id, userId, tagIds);
+    await setSourceTags(db, id, userId, tagIds);
   }
 
   return (result.changes ?? 0) > 0;
 }
 
-export async function deleteBoardById(
+export async function deleteSourceById(
   db: Database,
   id: string,
   userId: string
 ): Promise<boolean> {
   const now = new Date().toISOString();
   const result = await db.run(
-    `UPDATE boards
+    `UPDATE sources
      SET state = 'deleted', deleted_at = ?
      WHERE id = ? AND user_id = ? AND COALESCE(state, 'active') != 'deleted'`,
     now,
@@ -980,13 +743,13 @@ export async function deleteBoardById(
   return (result.changes ?? 0) > 0;
 }
 
-export async function toggleBoardStateById(
+export async function toggleSourceStateById(
   db: Database,
   id: string,
   userId: string
 ): Promise<boolean> {
   const row = await db.get<{ state: string | null }>(
-    'SELECT state FROM boards WHERE id = ? AND user_id = ?',
+    'SELECT state FROM sources WHERE id = ? AND user_id = ?',
     id,
     userId
   );
@@ -995,7 +758,7 @@ export async function toggleBoardStateById(
   if (current === 'deleted') return false;
   const next = current === 'active' ? 'inactive' : 'active';
   const result = await db.run(
-    `UPDATE boards SET state = ?, deleted_at = NULL WHERE id = ? AND user_id = ?`,
+    `UPDATE sources SET state = ?, deleted_at = NULL WHERE id = ? AND user_id = ?`,
     next,
     id,
     userId
@@ -1003,13 +766,13 @@ export async function toggleBoardStateById(
   return (result.changes ?? 0) > 0;
 }
 
-export async function restoreBoardById(
+export async function restoreSourceById(
   db: Database,
   id: string,
   userId: string
 ): Promise<boolean> {
   const result = await db.run(
-    `UPDATE boards SET state = 'inactive', deleted_at = NULL
+    `UPDATE sources SET state = 'inactive', deleted_at = NULL
      WHERE id = ? AND user_id = ? AND COALESCE(state, 'active') = 'deleted'`,
     id,
     userId
@@ -1017,7 +780,7 @@ export async function restoreBoardById(
   return (result.changes ?? 0) > 0;
 }
 
-export async function getBoardById(
+export async function getSourceById(
   db: Database,
   id: string,
   userId: string
@@ -1036,20 +799,14 @@ export async function getBoardById(
     pag_url_template: string | null;
     pag_max_pages: number | null;
     pag_delay_ms: number | null;
-    company_id: string | null;
-    company_name: string | null;
-    location_key: string | null;
-    location_label: string | null;
     state: string | null;
     deleted_at: string | null;
   } | undefined>(
     `SELECT b.id, b.name, b.url, b.company, b.location,
             b.sel_job_card, b.sel_title, b.sel_link, b.sel_next_page,
             b.pag_type, b.pag_url_template, b.pag_max_pages, b.pag_delay_ms,
-            b.company_id, c.name AS company_name, b.location_key, b.location_label,
             b.state, b.deleted_at
-     FROM boards b
-     LEFT JOIN companies c ON c.id = b.company_id
+     FROM sources b
      WHERE b.id = ? AND b.user_id = ?`,
     id,
     userId
@@ -1058,20 +815,20 @@ export async function getBoardById(
 
   const tagRows = await db.all<{ id: string; name: string; color: string }[]>(
     `SELECT t.id, t.name, t.color
-     FROM board_tags bt
+     FROM source_tags bt
      JOIN tags t ON t.id = bt.tag_id
-     WHERE bt.board_id = ?
+     WHERE bt.source_id = ?
      ORDER BY t.name`,
     id
   );
 
-  return { ...rowToBoard(row), tags: tagRows };
+  return { ...rowToSource(row), tags: tagRows };
 }
 
 async function nextCopyName(db: Database, userId: string, baseName: string): Promise<string> {
   const first = `${baseName} (Copy)`;
   const firstExists = await db.get<{ count: number }>(
-    'SELECT COUNT(*) as count FROM boards WHERE user_id = ? AND name = ?',
+    'SELECT COUNT(*) as count FROM sources WHERE user_id = ? AND name = ?',
     userId,
     first
   );
@@ -1081,7 +838,7 @@ async function nextCopyName(db: Database, userId: string, baseName: string): Pro
   while (i < 5000) {
     const candidate = `${baseName} (Copy ${i})`;
     const exists = await db.get<{ count: number }>(
-      'SELECT COUNT(*) as count FROM boards WHERE user_id = ? AND name = ?',
+      'SELECT COUNT(*) as count FROM sources WHERE user_id = ? AND name = ?',
       userId,
       candidate
     );
@@ -1091,61 +848,61 @@ async function nextCopyName(db: Database, userId: string, baseName: string): Pro
   return `${baseName} (Copy ${Date.now()})`;
 }
 
-export async function duplicateBoardById(
+export async function duplicateSourceById(
   db: Database,
   id: string,
   userId: string
 ): Promise<string | null> {
-  const board = await getBoardById(db, id, userId);
-  if (!board) return null;
+  const source = await getSourceById(db, id, userId);
+  if (!source) return null;
 
-  const name = await nextCopyName(db, userId, board.name);
-  const tagIds = (board.tags ?? []).map((t: { id: string }) => t.id);
+  const name = await nextCopyName(db, userId, source.name);
+  const tagIds = (source.tags ?? []).map((t: { id: string }) => t.id);
   const cloned = {
-    ...board,
+    ...source,
     name,
     state: 'inactive',
   };
   delete cloned.id;
 
-  return insertBoard(db, cloned, userId, tagIds);
+  return insertSource(db, cloned, userId, tagIds);
 }
 
-export async function listJobsForBoardIdForUser(
+export async function listJobsForSourceIdForUser(
   db: Database,
-  boardId: string,
+  sourceId: string,
   userId: string,
   page = 1,
   limit = 25
 ): Promise<{ jobs: any[]; total: number }> {
-  const board = await db.get<{ id: string; name: string }>(
-    'SELECT id, name FROM boards WHERE id = ? AND user_id = ?',
-    boardId,
+  const source = await db.get<{ id: string; name: string }>(
+    'SELECT id, name FROM sources WHERE id = ? AND user_id = ?',
+    sourceId,
     userId
   );
-  if (!board) return { jobs: [], total: 0 };
+  if (!source) return { jobs: [], total: 0 };
 
   const offset = (Math.max(1, page) - 1) * limit;
   const count = await db.get<{ total: number }>(
     `SELECT COUNT(*) as total
      FROM jobs
-     WHERE user_id = ? AND (board_id = ? OR (board_id IS NULL AND board = ?))`,
+     WHERE user_id = ? AND (source_id = ? OR (source_id IS NULL AND source = ?))`,
     userId,
-    boardId,
-    board.name
+    sourceId,
+    source.name
   );
 
   const jobs = await db.all(
     `SELECT id, title, company, location, url,
-            posted_date AS postedDate, board,
+            posted_date AS postedDate, source,
             first_seen_at AS firstSeenAt, last_seen_at AS lastSeenAt
      FROM jobs
-     WHERE user_id = ? AND (board_id = ? OR (board_id IS NULL AND board = ?))
+     WHERE user_id = ? AND (source_id = ? OR (source_id IS NULL AND source = ?))
      ORDER BY first_seen_at DESC
      LIMIT ? OFFSET ?`,
     userId,
-    boardId,
-    board.name,
+    sourceId,
+    source.name,
     limit,
     offset
   );
@@ -1153,19 +910,19 @@ export async function listJobsForBoardIdForUser(
   return { jobs, total: count?.total ?? 0 };
 }
 
-export async function deleteBoard(db: Database, name: string): Promise<number> {
-  const result = await db.run('DELETE FROM boards WHERE name = ?', name);
+export async function deleteSource(db: Database, name: string): Promise<number> {
+  const result = await db.run('DELETE FROM sources WHERE name = ?', name);
   return result.changes ?? 0;
 }
 
-export async function loadBoards(db: Database): Promise<any[]> {
-  const rows = await db.all<{ config_json: string }[]>('SELECT config_json FROM boards ORDER BY name');
+export async function loadSources(db: Database): Promise<any[]> {
+  const rows = await db.all<{ config_json: string }[]>('SELECT config_json FROM sources ORDER BY name');
   return rows.map((row) => JSON.parse(row.config_json));
 }
 
 // ── Job upsert ────────────────────────────────────────────────────────────────
 
-export async function upsertJobs(db: Database, jobs: Job[], board: string): Promise<Job[]> {
+export async function upsertJobs(db: Database, jobs: Job[], source: string): Promise<Job[]> {
   if (jobs.length === 0) return [];
 
   const now = new Date().toISOString();
@@ -1190,13 +947,13 @@ export async function upsertJobs(db: Database, jobs: Job[], board: string): Prom
   try {
     const insertStmt = await db.prepare(`
       INSERT INTO jobs (
-        id, title, company, location, url, posted_date, board, first_seen_at, last_seen_at
+        id, title, company, location, url, posted_date, source, first_seen_at, last_seen_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const updateStmt = await db.prepare(`
       UPDATE jobs
-      SET title = ?, company = ?, location = ?, url = ?, posted_date = ?, board = ?, last_seen_at = ?
+      SET title = ?, company = ?, location = ?, url = ?, posted_date = ?, source = ?, last_seen_at = ?
       WHERE id = ?
     `);
 
@@ -1209,7 +966,7 @@ export async function upsertJobs(db: Database, jobs: Job[], board: string): Prom
           job.location,
           job.url,
           job.postedDate ?? null,
-          board,
+          source,
           now,
           now
         );
@@ -1221,7 +978,7 @@ export async function upsertJobs(db: Database, jobs: Job[], board: string): Prom
           job.location,
           job.url,
           job.postedDate ?? null,
-          board,
+          source,
           now,
           job.id
         );
@@ -1242,28 +999,23 @@ export async function upsertJobs(db: Database, jobs: Job[], board: string): Prom
 export async function upsertJobsForUser(
   db: Database,
   jobs: Job[],
-  board: string,
+  source: string,
   userId: string,
   runId?: string,
-  boardId?: string,
-  companyId?: string | null
+  sourceId?: string
 ): Promise<Job[]> {
   if (jobs.length === 0) return [];
 
   const now = new Date().toISOString();
-  let resolvedBoardId = boardId;
-  let resolvedCompanyId = companyId;
+  let resolvedSourceId = sourceId;
 
-  if (!resolvedBoardId) {
-    const boardRow = await db.get<{ id: string; company_id: string | null }>(
-      `SELECT id, company_id FROM boards WHERE user_id = ? AND name = ? ORDER BY updated_at DESC LIMIT 1`,
+  if (!resolvedSourceId) {
+    const sourceRow = await db.get<{ id: string }>(
+      `SELECT id FROM sources WHERE user_id = ? AND name = ? ORDER BY updated_at DESC LIMIT 1`,
       userId,
-      board
+      source
     );
-    resolvedBoardId = boardRow?.id;
-    if (resolvedCompanyId === undefined) {
-      resolvedCompanyId = boardRow?.company_id ?? null;
-    }
+    resolvedSourceId = sourceRow?.id;
   }
   const ids = jobs.map((job) => job.id);
   const existing = new Set<string>();
@@ -1286,13 +1038,13 @@ export async function upsertJobsForUser(
   try {
     const insertStmt = await db.prepare(`
       INSERT INTO jobs (
-        id, title, company, location, url, posted_date, board, first_seen_at, last_seen_at, user_id, found_in_run_id, board_id, company_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, title, company, location, url, posted_date, source, first_seen_at, last_seen_at, user_id, found_in_run_id, source_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const updateStmt = await db.prepare(`
       UPDATE jobs
-      SET title = ?, company = ?, location = ?, url = ?, posted_date = ?, board = ?, last_seen_at = ?, board_id = COALESCE(?, board_id), company_id = COALESCE(?, company_id)
+      SET title = ?, company = ?, location = ?, url = ?, posted_date = ?, source = ?, last_seen_at = ?, source_id = COALESCE(?, source_id)
       WHERE id = ? AND user_id = ?
     `);
 
@@ -1305,13 +1057,12 @@ export async function upsertJobsForUser(
           job.location,
           job.url,
           job.postedDate ?? null,
-          board,
+          source,
           now,
           now,
           userId,
           runId ?? null,
-          resolvedBoardId ?? null,
-          resolvedCompanyId ?? null
+          resolvedSourceId ?? null
         );
         newJobs.push(job);
       } else {
@@ -1321,10 +1072,9 @@ export async function upsertJobsForUser(
           job.location,
           job.url,
           job.postedDate ?? null,
-          board,
+          source,
           now,
-          resolvedBoardId ?? null,
-          resolvedCompanyId ?? null,
+          resolvedSourceId ?? null,
           job.id,
           userId
         );
@@ -1342,115 +1092,21 @@ export async function upsertJobsForUser(
   return newJobs;
 }
 
-// ── Companies ─────────────────────────────────────────────────────────────────
-
-export async function listCompaniesForUser(
-  db: Database,
-  userId: string
-): Promise<{ id: string; name: string; boardCount: number; jobCount: number }[]> {
-  const rows = await db.all<{
-    id: string;
-    name: string;
-    board_count: number;
-    job_count: number;
-  }[]>(
-    `SELECT c.id, c.name,
-            COUNT(DISTINCT b.id) AS board_count,
-            COUNT(DISTINCT j.id) AS job_count
-     FROM companies c
-      LEFT JOIN boards b ON b.company_id = c.id AND b.user_id = c.user_id
-      LEFT JOIN jobs j ON j.user_id = c.user_id AND (
-        j.company_id = c.id OR (j.company_id IS NULL AND j.board = b.name)
-      )
-      WHERE c.user_id = ?
-     GROUP BY c.id, c.name
-     ORDER BY c.name`,
-    userId
-  );
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    boardCount: r.board_count,
-    jobCount: r.job_count,
-  }));
-}
-
-export async function upsertCompany(
-  db: Database,
-  userId: string,
-  name: string
-): Promise<string> {
-  const existing = await db.get<{ id: string } | undefined>(
-    'SELECT id FROM companies WHERE name = ? AND user_id = ?',
-    name,
-    userId
-  );
-  if (existing) return existing.id;
-
-  const id = generateUuid();
-  const now = new Date().toISOString();
-  await db.run(
-    'INSERT INTO companies (id, name, user_id, created_at) VALUES (?, ?, ?, ?)',
-    id,
-    name,
-    userId,
-    now
-  );
-  return id;
-}
-
-export async function deleteCompany(
-  db: Database,
-  userId: string,
-  companyId: string
-): Promise<void> {
-  await db.run(
-    `UPDATE boards
-     SET company_id = NULL
-     WHERE user_id = ? AND company_id = ?`,
-    userId,
-    companyId
-  );
-  await db.run(
-    `UPDATE jobs
-     SET company_id = NULL
-     WHERE user_id = ? AND company_id = ?`,
-    userId,
-    companyId
-  );
-  await db.run('DELETE FROM companies WHERE id = ? AND user_id = ?', companyId, userId);
-}
-
-export async function searchCompanies(
-  db: Database,
-  userId: string,
-  q: string,
-  limit = 10
-): Promise<{ id: string; name: string }[]> {
-  const rows = await db.all<{ id: string; name: string }[]>(
-    `SELECT id, name FROM companies WHERE user_id = ? AND name LIKE ? ORDER BY name LIMIT ?`,
-    userId,
-    `%${q}%`,
-    limit
-  );
-  return rows;
-}
-
 // ── Tags ──────────────────────────────────────────────────────────────────────
 
 export async function listTagsForUser(
   db: Database,
   userId: string
-): Promise<{ id: string; name: string; color: string; boardCount: number }[]> {
+): Promise<{ id: string; name: string; color: string; sourceCount: number }[]> {
   const rows = await db.all<{
     id: string;
     name: string;
     color: string;
-    board_count: number;
+    source_count: number;
   }[]>(
-    `SELECT t.id, t.name, t.color, COUNT(bt.board_id) AS board_count
+    `SELECT t.id, t.name, t.color, COUNT(bt.source_id) AS source_count
      FROM tags t
-     LEFT JOIN board_tags bt ON bt.tag_id = t.id AND bt.user_id = t.user_id
+     LEFT JOIN source_tags bt ON bt.tag_id = t.id AND bt.user_id = t.user_id
      WHERE t.user_id = ?
      GROUP BY t.id, t.name, t.color
      ORDER BY t.name`,
@@ -1460,7 +1116,7 @@ export async function listTagsForUser(
     id: r.id,
     name: r.name,
     color: r.color,
-    boardCount: r.board_count,
+    sourceCount: r.source_count,
   }));
 }
 
@@ -1507,17 +1163,17 @@ export async function deleteTag(
   await db.run('DELETE FROM tags WHERE id = ? AND user_id = ?', tagId, userId);
 }
 
-export async function setBoardTags(
+export async function setSourceTags(
   db: Database,
-  boardId: string,
+  sourceId: string,
   userId: string,
   tagIds: string[]
 ): Promise<void> {
-  await db.run('DELETE FROM board_tags WHERE board_id = ? AND user_id = ?', boardId, userId);
+  await db.run('DELETE FROM source_tags WHERE source_id = ? AND user_id = ?', sourceId, userId);
   for (const tagId of tagIds) {
     await db.run(
-      'INSERT OR IGNORE INTO board_tags (board_id, tag_id, user_id) VALUES (?, ?, ?)',
-      boardId,
+      'INSERT OR IGNORE INTO source_tags (source_id, tag_id, user_id) VALUES (?, ?, ?)',
+      sourceId,
       tagId,
       userId
     );
@@ -1528,10 +1184,8 @@ export async function setBoardTags(
 
 export interface ListJobsParams {
   q?: string;
-  boardIds?: string[];
-  companyIds?: string[];
+  sourceIds?: string[];
   tagIds?: string[];
-  locationKey?: string;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -1546,10 +1200,8 @@ export async function listJobsForUser(
 ): Promise<{ jobs: any[]; total: number }> {
   const {
     q = '',
-    boardIds = [],
-    companyIds = [],
+    sourceIds = [],
     tagIds = [],
-    locationKey = '',
     dateFrom = '',
     dateTo = '',
     page = 1,
@@ -1565,43 +1217,32 @@ export async function listJobsForUser(
   const conditions: string[] = ['j.user_id = ?'];
   const countParams: unknown[] = [userId];
 
-  const needsBoardJoin = companyIds.length > 0 || tagIds.length > 0 || locationKey;
+  const needsSourceJoin = tagIds.length > 0;
   let joinClause = '';
 
-  if (needsBoardJoin) {
-    joinClause = `JOIN boards b
+  if (needsSourceJoin) {
+    joinClause = `JOIN sources b
       ON b.user_id = j.user_id
-     AND (b.id = j.board_id OR (j.board_id IS NULL AND b.name = j.board))`;
+     AND (b.id = j.source_id OR (j.source_id IS NULL AND b.name = j.source))`;
   }
 
-  if (boardIds.length > 0) {
-    if (!needsBoardJoin) {
-      joinClause = `JOIN boards b
+  if (sourceIds.length > 0) {
+    if (!needsSourceJoin) {
+      joinClause = `JOIN sources b
         ON b.user_id = j.user_id
-       AND (b.id = j.board_id OR (j.board_id IS NULL AND b.name = j.board))`;
+       AND (b.id = j.source_id OR (j.source_id IS NULL AND b.name = j.source))`;
     }
-    const ph = boardIds.map(() => '?').join(',');
+    const ph = sourceIds.map(() => '?').join(',');
     conditions.push(`b.id IN (${ph})`);
-    countParams.push(...boardIds);
-  }
-
-  if (companyIds.length > 0) {
-    const ph = companyIds.map(() => '?').join(',');
-    conditions.push(`b.company_id IN (${ph})`);
-    countParams.push(...companyIds);
+    countParams.push(...sourceIds);
   }
 
   if (tagIds.length > 0) {
     const ph = tagIds.map(() => '?').join(',');
     conditions.push(
-      `EXISTS (SELECT 1 FROM board_tags bt WHERE bt.board_id = b.id AND bt.tag_id IN (${ph}))`
+      `EXISTS (SELECT 1 FROM source_tags bt WHERE bt.source_id = b.id AND bt.tag_id IN (${ph}))`
     );
     countParams.push(...tagIds);
-  }
-
-  if (locationKey) {
-    conditions.push(`b.location_key LIKE ?`);
-    countParams.push(`${locationKey}%`);
   }
 
   if (q) {
@@ -1632,7 +1273,7 @@ export async function listJobsForUser(
   const selectParams = [...countParams, limit, offset];
   const jobs = await db.all(
     `SELECT j.id, j.title, j.company, j.location, j.url,
-            j.posted_date AS postedDate, j.board,
+            j.posted_date AS postedDate, j.source,
             j.first_seen_at AS firstSeenAt, j.last_seen_at AS lastSeenAt
      FROM jobs j ${joinClause} ${where}
      ORDER BY ${orderBy}

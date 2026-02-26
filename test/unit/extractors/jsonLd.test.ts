@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { extractJobsFromJsonLd } from '../../../src/extractors/jsonLd';
-import { BoardConfig } from '../../../src/types';
+import { SourceConfig } from '../../../src/types';
 
-const config: BoardConfig = {
-  name: 'Test Board',
+const config: SourceConfig = {
+  name: 'Test Source',
   url: 'https://example.com/jobs',
   selectors: { jobCard: '.job', title: '.title', link: 'a', location: '.loc' },
 };
