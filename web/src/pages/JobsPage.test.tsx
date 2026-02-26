@@ -83,6 +83,40 @@ describe('JobsPage', () => {
     expect(boardBtns.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('each job row has a checkbox', () => {
+    renderJobsPage();
+    const checkboxes = screen.getAllByRole('checkbox');
+    // one per job row + one select-all in the header = 3 total
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('clicking a job row shows the bulk action bar', () => {
+    renderJobsPage();
+    // click the first job row checkbox
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]); // [0] is select-all header
+    expect(screen.getByText(/selected/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+  });
+
+  it('select-all checkbox selects all jobs on the page', () => {
+    renderJobsPage();
+    const allCheckbox = screen.getAllByRole('checkbox')[0];
+    fireEvent.click(allCheckbox);
+    // bulk bar should show 2 selected
+    expect(screen.getByText(/2 of 2 selected/i)).toBeInTheDocument();
+  });
+
+  it('Clear button deselects all', () => {
+    renderJobsPage();
+    // select all
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    expect(screen.getByText(/2 of 2 selected/i)).toBeInTheDocument();
+    // clear
+    fireEvent.click(screen.getByRole('button', { name: /clear/i }));
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+  });
+
   it('sort select has Newest/Oldest/Title options', () => {
     renderJobsPage();
     const allSelects = document.querySelectorAll('.filter-select') as NodeListOf<HTMLSelectElement>;
