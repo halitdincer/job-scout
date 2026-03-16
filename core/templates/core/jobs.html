@@ -1,0 +1,52 @@
+{% extends "core/base.html" %}
+
+{% block title %}Jobs — Job Scout{% endblock %}
+
+{% block content %}
+<h1>Job Listings</h1>
+
+<form class="toolbar" method="get" action="/">
+  <input type="text" name="q" value="{{ query }}" placeholder="Search by title...">
+  <select name="status">
+    <option value="">All statuses</option>
+    <option value="active"{% if status_filter == "active" %} selected{% endif %}>Active</option>
+    <option value="expired"{% if status_filter == "expired" %} selected{% endif %}>Expired</option>
+  </select>
+  <select name="source">
+    <option value="">All sources</option>
+    {% for s in sources %}
+    <option value="{{ s.id }}"{% if source_filter == s.id|stringformat:"d" %} selected{% endif %}>{{ s.name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filter</button>
+</form>
+
+{% if listings %}
+<table>
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Company</th>
+      <th>Department</th>
+      <th>Location</th>
+      <th>Status</th>
+      <th>First Seen</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for job in listings %}
+    <tr>
+      <td><a href="{{ job.url }}" target="_blank" rel="noopener">{{ job.title }}</a></td>
+      <td>{{ job.source.name }}</td>
+      <td>{{ job.department|default:"—" }}</td>
+      <td>{{ job.location|default:"—" }}</td>
+      <td><span class="badge badge-{{ job.status }}">{{ job.status }}</span></td>
+      <td>{{ job.first_seen_at|date:"M d, Y" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No job listings found.</p>
+{% endif %}
+{% endblock %}

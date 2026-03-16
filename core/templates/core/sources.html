@@ -1,0 +1,32 @@
+{% extends "core/base.html" %}
+
+{% block title %}Sources — Job Scout{% endblock %}
+
+{% block content %}
+<h1>Sources</h1>
+
+{% if sources %}
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Platform</th>
+      <th>Board ID</th>
+      <th>Active</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for source in sources %}
+    <tr>
+      <td>{{ source.name }}</td>
+      <td>{{ source.platform }}</td>
+      <td>{{ source.board_id }}</td>
+      <td><span class="badge badge-{% if source.is_active %}yes{% else %}no{% endif %}">{% if source.is_active %}Yes{% else %}No{% endif %}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No sources configured.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "core/base.html" %}
+
+{% block title %}Runs — Job Scout{% endblock %}
+
+{% block content %}
+<h1>Ingestion Runs</h1>
+
+{% if runs %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Status</th>
+      <th>Started</th>
+      <th>Finished</th>
+      <th>Sources</th>
+      <th>Created</th>
+      <th>Expired</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for run in runs %}
+    <tr>
+      <td>#{{ run.id }}</td>
+      <td><span class="badge badge-{{ run.status }}">{{ run.status }}</span></td>
+      <td>{{ run.started_at|date:"M d, Y H:i"|default:"—" }}</td>
+      <td>{{ run.finished_at|date:"M d, Y H:i"|default:"—" }}</td>
+      <td>{{ run.sources_processed }}</td>
+      <td>{{ run.listings_created }}</td>
+      <td>{{ run.listings_expired }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No ingestion runs yet.</p>
+{% endif %}
+{% endblock %}

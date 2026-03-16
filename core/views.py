@@ -2,12 +2,49 @@ import json
 
 from django.conf import settings
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from core.ingestion import ingest_sources
 from core.models import JobListing, Run, Source
+
+
+def jobs_page(request):
+    qs = JobListing.objects.select_related("source").order_by("-last_seen_at")
+
+    query = request.GET.get("q", "")
+    if query:
+        qs = qs.filter(title__icontains=query)
+
+    status_filter = request.GET.get("status", "")
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    source_filter = request.GET.get("source", "")
+    if source_filter:
+        qs = qs.filter(source_id=source_filter)
+
+    return render(request, "core/jobs.html", {
+        "listings": qs,
+        "sources": Source.objects.all(),
+        "query": query,
+        "status_filter": status_filter,
+        "source_filter": source_filter,
+    })
+
+
+def sources_page(request):
+    return render(request, "core/sources.html", {
+        "sources": Source.objects.all(),
+    })
+
+
+def runs_page(request):
+    return render(request, "core/runs.html", {
+        "runs": Run.objects.order_by("-created_at"),
+    })
 
 
 def health(request):

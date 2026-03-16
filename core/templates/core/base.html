@@ -1,0 +1,26 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Job Scout{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'core/style.css' %}">
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="/" class="brand">Job Scout</a>
+      <ul>
+        <li><a href="/"{% if request.path == "/" %} class="active"{% endif %}>Jobs</a></li>
+        <li><a href="/sources/"{% if request.path == "/sources/" %} class="active"{% endif %}>Sources</a></li>
+        <li><a href="/runs/"{% if request.path == "/runs/" %} class="active"{% endif %}>Runs</a></li>
+        <li><a href="/admin/">Admin</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
