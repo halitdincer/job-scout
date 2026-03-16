@@ -16,3 +16,8 @@ def test_installed_apps_includes_core():
 
 def test_secret_key_is_set():
     assert settings.SECRET_KEY
+
+
+def test_csrf_trusted_origins_derived_from_allowed_hosts():
+    assert "https://localhost" in settings.CSRF_TRUSTED_ORIGINS
+    assert "https://127.0.0.1" in settings.CSRF_TRUSTED_ORIGINS
