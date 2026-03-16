@@ -46,3 +46,10 @@ The Vault path `secret/job-scout/config` SHALL contain `SECRET_KEY`, `DATABASE_U
 #### Scenario: External secret resolves
 - **WHEN** the external-secret syncs from Vault
 - **THEN** the Kubernetes secret contains `SECRET_KEY`, `DATABASE_URL`, and `ALLOWED_HOSTS`
+
+### Requirement: INGEST_API_KEY environment variable
+The K8s Deployment SHALL inject the `INGEST_API_KEY` environment variable from the `job-scout-secret` K8s secret into the main application container.
+
+#### Scenario: INGEST_API_KEY available in pod
+- **WHEN** the job-scout pod starts
+- **THEN** the `INGEST_API_KEY` environment variable is set from the `job-scout-secret` secret
