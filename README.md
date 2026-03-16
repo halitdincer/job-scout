@@ -22,6 +22,13 @@ The app runs at http://localhost:8000. Health check: http://localhost:8000/api/h
 
 Deployed to K3s homeserver at `jobs.halitdincer.com` via ArgoCD.
 
+### Deployment Flow
+
+1. Code merges to `main`
+2. GitHub Actions (`ci.yml`) builds the Docker image and pushes to `ghcr.io/halitdincer/job-scout` with `latest` and SHA tags
+3. ArgoCD Image Updater detects the new image digest
+4. ArgoCD auto-syncs and redeploys the job-scout pods on K3s
+
 ### Required Vault Secrets
 
 Set these at `secret/job-scout/config` in Vault:
