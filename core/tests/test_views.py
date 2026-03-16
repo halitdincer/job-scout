@@ -1,5 +1,9 @@
+from unittest.mock import patch
+
 import pytest
-from django.test import Client
+from django.test import Client, override_settings
+
+from core.models import JobListing, Run, Source
 
 
 @pytest.mark.django_db
@@ -8,3 +12,161 @@ def test_health_returns_200_with_status_ok():
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+@pytest.mark.django_db
+class TestSourcesAPI:
+    def test_list_sources(self):
+        Source.objects.create(name="Airbnb", platform="greenhouse", board_id="airbnb")
+        Source.objects.create(name="Stripe", platform="lever", board_id="stripe")
+        client = Client()
+        response = client.get("/api/sources/")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert data[0]["name"] == "Airbnb"
+        assert data[0]["platform"] == "greenhouse"
+        assert data[0]["board_id"] == "airbnb"
+        assert data[0]["is_active"] is True
+        assert "id" in data[0]
+
+
+@pytest.mark.django_db
+class TestJobsAPI:
+    def _create_source_with_listings(self):
+        source = Source.objects.create(
+            name="Airbnb", platform="greenhouse", board_id="airbnb"
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="1",
+            title="Engineer",
+            department="Eng",
+            location="SF",
+            url="https://example.com/1",
+            status="active",
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="2",
+            title="Designer",
+            url="https://example.com/2",
+            status="expired",
+        )
+        return source
+
+    def test_list_all_jobs(self):
+        self._create_source_with_listings()
+        client = Client()
+        response = client.get("/api/jobs/")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert "source_name" in data[0]
+        assert "source_id" in data[0]
+        assert "external_id" in data[0]
+
+    def test_filter_by_source_id(self):
+        source = self._create_source_with_listings()
+        other = Source.objects.create(
+            name="Other", platform="lever", board_id="other"
+        )
+        JobListing.objects.create(
+            source=other,
+            external_id="99",
+            title="Other Job",
+            url="https://example.com/99",
+        )
+        client = Client()
+        response = client.get(f"/api/jobs/?source_id={source.pk}")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert all(j["source_id"] == source.pk for j in data)
+
+    def test_filter_by_status(self):
+        self._create_source_with_listings()
+        client = Client()
+        response = client.get("/api/jobs/?status=active")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["status"] == "active"
+
+
+@pytest.mark.django_db
+class TestRunsAPI:
+    def test_list_runs_ordered_by_created_at_desc(self):
+        Run.objects.create(status="completed")
+        Run.objects.create(status="pending")
+        client = Client()
+        response = client.get("/api/runs/")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert data[0]["id"] > data[1]["id"]
+
+    def test_list_runs_no_auth_required(self):
+        client = Client()
+        response = client.get("/api/runs/")
+        assert response.status_code == 200
+
+    @override_settings(INGEST_API_KEY="test-secret-key")
+    @patch("core.views.ingest_sources")
+    def test_post_triggers_ingestion(self, mock_ingest):
+        Source.objects.create(name="Airbnb", platform="greenhouse", board_id="airbnb")
+        mock_ingest.return_value = {
+            "sources_processed": 1,
+            "listings_created": 5,
+            "listings_updated": 0,
+            "listings_expired": 0,
+            "errors": [],
+        }
+        client = Client()
+        response = client.post(
+            "/api/runs/",
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer test-secret-key",
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "completed"
+        assert data["listings_created"] == 5
+        mock_ingest.assert_called_once()
+
+    @override_settings(INGEST_API_KEY="test-secret-key")
+    @patch("core.views.ingest_sources")
+    def test_post_failed_run(self, mock_ingest):
+        mock_ingest.return_value = {
+            "sources_processed": 0,
+            "listings_created": 0,
+            "listings_updated": 0,
+            "listings_expired": 0,
+            "errors": ["Source1: Connection error"],
+        }
+        client = Client()
+        response = client.post(
+            "/api/runs/",
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer test-secret-key",
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "failed"
+        assert "Source1" in data["error_message"]
+
+    @override_settings(INGEST_API_KEY="test-secret-key")
+    def test_post_missing_api_key(self):
+        client = Client()
+        response = client.post("/api/runs/", content_type="application/json")
+        assert response.status_code == 401
+
+    @override_settings(INGEST_API_KEY="test-secret-key")
+    def test_post_invalid_api_key(self):
+        client = Client()
+        response = client.post(
+            "/api/runs/",
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer wrong-key",
+        )
+        assert response.status_code == 401
