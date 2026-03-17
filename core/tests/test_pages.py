@@ -17,10 +17,15 @@ class TestJobsPage:
         response = client.get("/")
         assert b'id="jobs-grid"' in response.content
 
-    def test_contains_ag_grid_script(self):
+    def test_contains_tabulator_script(self):
         client = Client()
         response = client.get("/")
-        assert b"agGrid.createGrid" in response.content
+        assert b"new Tabulator" in response.content
+
+    def test_base_includes_tabulator_cdn(self):
+        client = Client()
+        response = client.get("/")
+        assert b"tabulator-tables" in response.content
 
     def test_full_bleed_layout(self):
         client = Client()

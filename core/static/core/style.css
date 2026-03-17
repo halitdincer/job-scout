@@ -278,10 +278,26 @@ td a:hover {
   background: var(--bg-elevated);
 }
 
-/* AG Grid container */
+/* Tabulator container */
 #jobs-grid {
   width: 100%;
   height: calc(100% - 41px);
+}
+
+/* Tabulator theme overrides */
+#jobs-grid .tabulator {
+  border: none;
+  font-size: 0.875rem;
+}
+
+#jobs-grid .tabulator-cell a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+#jobs-grid .tabulator-cell a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
 }
 
 @media (max-width: 768px) {

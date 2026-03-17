@@ -32,7 +32,7 @@
   };
 
   function formatDateTime(iso) {
-    if (!iso) return "—";
+    if (!iso) return "";
     var d = new Date(iso);
     return d.toLocaleString("en-US", {
       month: "short", day: "numeric", year: "numeric",
@@ -41,7 +41,7 @@
   }
 
   function timeAgo(iso) {
-    if (!iso) return "—";
+    if (!iso) return "";
     var now = Date.now();
     var then = new Date(iso).getTime();
     var diff = Math.floor((now - then) / 1000);
@@ -59,169 +59,125 @@
     return years + "y ago";
   }
 
-  function timeAgoCellRenderer(params) {
-    if (!params.value) return "—";
-    var span = document.createElement("span");
-    span.textContent = timeAgo(params.value);
-    span.title = formatDateTime(params.value);
-    return span;
+  function timeAgoFormatter(cell) {
+    var val = cell.getValue();
+    if (!val) return "";
+    return timeAgo(val);
   }
 
-  var theme = agGrid.themeQuartz.withPart(agGrid.colorSchemeDarkBlue);
+  function timeAgoTooltip(e, cell) {
+    return formatDateTime(cell.getValue());
+  }
 
-  var gridOptions = {
-    theme: theme,
-    columnDefs: [
+  function titleFormatter(cell) {
+    var val = cell.getValue();
+    if (!val) return "";
+    var row = cell.getRow().getData();
+    return '<a href="' + row.url + '" target="_blank" rel="noopener">' + val.replace(/</g, "&lt;") + '</a>';
+  }
+
+  var listFilterParams = { valuesLookup: true, clearable: true, sort: "asc" };
+
+  var table = new Tabulator("#jobs-grid", {
+    height: "100%",
+    layout: "fitColumns",
+    pagination: true,
+    paginationSize: 50,
+    paginationSizeSelector: [25, 50, 100],
+    placeholder: "No jobs found",
+    columns: [
       {
-        field: "title",
-        headerName: "Title",
-        filter: "agTextColumnFilter",
-        cellRenderer: function(params) {
-          if (!params.value) return "";
-          var a = document.createElement("a");
-          a.href = params.data.url;
-          a.target = "_blank";
-          a.rel = "noopener";
-          a.textContent = params.value;
-          return a;
-        },
-        minWidth: 250,
-        flex: 2
+        title: "Title", field: "title",
+        headerFilter: "input", headerFilterPlaceholder: "Search...",
+        formatter: titleFormatter, formatterParams: { allowHtml: true },
+        minWidth: 250, widthGrow: 3
       },
       {
-        field: "source_name",
-        headerName: "Company",
-        filter: "agSetColumnFilter",
-        minWidth: 120,
-        flex: 1
+        title: "Company", field: "source_name",
+        headerFilter: "list", headerFilterParams: listFilterParams,
+        minWidth: 120, widthGrow: 1
       },
       {
-        field: "department",
-        headerName: "Department",
-        filter: "agTextColumnFilter",
-        minWidth: 120,
-        flex: 1
+        title: "Location", field: "locations_display",
+        headerFilter: "input", headerFilterPlaceholder: "Search...",
+        minWidth: 150, widthGrow: 1
       },
       {
-        field: "locations_display",
-        headerName: "Locations",
-        filter: "agTextColumnFilter",
-        minWidth: 150,
-        flex: 1
-      },
-      {
-        field: "employment_type_label",
-        headerName: "Type",
-        filter: "agSetColumnFilter",
-        filterValueGetter: function(params) {
-          return params.data.employment_type_label;
-        },
+        title: "Type", field: "employment_type_label",
+        headerFilter: "list", headerFilterParams: listFilterParams,
         minWidth: 100
       },
       {
-        field: "workplace_type_label",
-        headerName: "Workplace",
-        filter: "agSetColumnFilter",
-        filterValueGetter: function(params) {
-          return params.data.workplace_type_label;
-        },
-        minWidth: 100
-      },
-      {
-        field: "country",
-        headerName: "Country",
-        filter: "agSetColumnFilter",
-        minWidth: 80
-      },
-      {
-        field: "status",
-        headerName: "Status",
-        filter: "agSetColumnFilter",
-        minWidth: 90
-      },
-      {
-        field: "first_seen_at",
-        headerName: "First Seen",
-        filter: "agDateColumnFilter",
-        cellRenderer: timeAgoCellRenderer,
-        sort: "desc",
+        title: "Published At", field: "published_at",
+        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
+        sorter: "datetime", sorterParams: { format: "iso" },
         minWidth: 120
       },
       {
-        field: "last_seen_at",
-        headerName: "Last Seen",
-        filter: "agDateColumnFilter",
-        cellRenderer: timeAgoCellRenderer,
+        title: "First Seen", field: "first_seen_at",
+        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
+        sorter: "datetime", sorterParams: { format: "iso" },
         minWidth: 120
       },
       {
-        field: "team",
-        headerName: "Team",
-        filter: "agTextColumnFilter",
-        minWidth: 120,
-        hide: true
+        title: "Department", field: "department",
+        headerFilter: "input", headerFilterPlaceholder: "Search...",
+        minWidth: 120, visible: false
       },
       {
-        field: "published_at",
-        headerName: "Published At",
-        filter: "agDateColumnFilter",
-        valueFormatter: function(params) { return formatDateTime(params.value); },
-        minWidth: 160,
-        hide: true
+        title: "Workplace", field: "workplace_type_label",
+        headerFilter: "list", headerFilterParams: listFilterParams,
+        minWidth: 100, visible: false
       },
       {
-        field: "updated_at_source",
-        headerName: "Updated At Source",
-        filter: "agDateColumnFilter",
-        valueFormatter: function(params) { return formatDateTime(params.value); },
-        minWidth: 160,
-        hide: true
+        title: "Country", field: "country",
+        headerFilter: "list", headerFilterParams: listFilterParams,
+        minWidth: 80, visible: false
       },
       {
-        field: "expired_at",
-        headerName: "Expired At",
-        filter: "agDateColumnFilter",
-        valueFormatter: function(params) { return formatDateTime(params.value); },
-        minWidth: 160,
-        hide: true
+        title: "Status", field: "status",
+        headerFilter: "list", headerFilterParams: listFilterParams,
+        minWidth: 90, visible: false
       },
       {
-        field: "external_id",
-        headerName: "External ID",
-        filter: "agTextColumnFilter",
-        minWidth: 120,
-        hide: true
+        title: "Last Seen", field: "last_seen_at",
+        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
+        sorter: "datetime", sorterParams: { format: "iso" },
+        minWidth: 120, visible: false
       },
       {
-        field: "source_id",
-        headerName: "Source ID",
-        filter: "agNumberColumnFilter",
-        minWidth: 100,
-        hide: true
+        title: "Team", field: "team",
+        headerFilter: "input", headerFilterPlaceholder: "Search...",
+        minWidth: 120, visible: false
       },
       {
-        field: "id",
-        headerName: "ID",
-        filter: "agNumberColumnFilter",
-        minWidth: 80,
-        hide: true
+        title: "Updated At Source", field: "updated_at_source",
+        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
+        sorter: "datetime", sorterParams: { format: "iso" },
+        minWidth: 120, visible: false
+      },
+      {
+        title: "Expired At", field: "expired_at",
+        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
+        sorter: "datetime", sorterParams: { format: "iso" },
+        minWidth: 120, visible: false
+      },
+      {
+        title: "External ID", field: "external_id",
+        headerFilter: "input",
+        minWidth: 120, visible: false
+      },
+      {
+        title: "Source ID", field: "source_id",
+        minWidth: 100, visible: false
+      },
+      {
+        title: "ID", field: "id",
+        minWidth: 80, visible: false
       }
     ],
-    defaultColDef: {
-      sortable: true,
-      resizable: true,
-      filterParams: { buttons: ["reset"] }
-    },
-    pagination: true,
-    paginationPageSize: 50,
-    paginationPageSizeSelector: [25, 50, 100],
-    rowData: [],
-    autoSizeStrategy: { type: "fitGridWidth" },
-    suppressCellFocus: true
-  };
-
-  var gridDiv = document.getElementById("jobs-grid");
-  var gridApi = agGrid.createGrid(gridDiv, gridOptions);
+    initialSort: [{ column: "first_seen_at", dir: "desc" }]
+  });
 
   // Column chooser
   var chooserBtn = document.getElementById("col-chooser-btn");
@@ -229,17 +185,17 @@
 
   function buildChooser() {
     chooserPanel.innerHTML = "";
-    gridApi.getColumns().forEach(function(col) {
-      var colDef = col.getColDef();
+    table.getColumns().forEach(function(col) {
+      var def = col.getDefinition();
       var label = document.createElement("label");
       var cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = col.isVisible();
       cb.addEventListener("change", function() {
-        gridApi.setColumnsVisible([col.getColId()], cb.checked);
+        col.toggle();
       });
       label.appendChild(cb);
-      label.appendChild(document.createTextNode(colDef.headerName || col.getColId()));
+      label.appendChild(document.createTextNode(def.title || def.field));
       chooserPanel.appendChild(label);
     });
   }
@@ -261,15 +217,15 @@
     .then(function(data) {
       var rows = data.map(function(item) {
         var locs = item.locations || [];
-        item.locations_display = locs.map(function(l) { return l.name; }).join(", ") || "—";
-        item.employment_type_label = EMPLOYMENT_LABELS[item.employment_type] || item.employment_type || "—";
-        item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "—";
-        item.department = item.department || "—";
-        item.country = item.country || "—";
-        item.team = item.team || "—";
+        item.locations_display = locs.map(function(l) { return l.name; }).join(", ") || "";
+        item.employment_type_label = EMPLOYMENT_LABELS[item.employment_type] || item.employment_type || "";
+        item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "";
+        item.department = item.department || "";
+        item.country = item.country || "";
+        item.team = item.team || "";
         return item;
       });
-      gridApi.setGridOption("rowData", rows);
+      table.setData(rows);
     });
 })();
 </script>
