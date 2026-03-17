@@ -1,17 +1,60 @@
 {% extends "core/base.html" %}
 
-{% block title %}Jobs — Job Scout{% endblock %}
+{% block title %}Jobs - Job Scout{% endblock %}
 
 {% block main_attrs %} class="full-bleed"{% endblock %}
 
 {% block content %}
 <div class="jobs-toolbar">
-  <div class="col-chooser-wrap">
-    <button class="col-chooser-btn" id="col-chooser-btn">Columns</button>
-    <div class="col-chooser-panel" id="col-chooser-panel"></div>
+  <div class="jobs-toolbar-left">
+    <div class="col-chooser-wrap">
+      <button class="col-chooser-btn" id="col-chooser-btn">Columns</button>
+      <div class="col-chooser-panel" id="col-chooser-panel"></div>
+    </div>
+    <button class="col-chooser-btn" id="open-columns-panel">Columns Panel</button>
+    <button class="col-chooser-btn" id="open-filters-panel">Filters Panel</button>
   </div>
+  <div id="advanced-filter-summary" class="filter-summary">No advanced filters applied</div>
 </div>
+
 <div id="jobs-grid"></div>
+
+<div id="panel-backdrop" class="panel-backdrop"></div>
+
+<aside id="columns-side-panel" class="side-panel" aria-hidden="true">
+  <div class="side-panel-header">
+    <h2>Columns</h2>
+    <button type="button" class="panel-close" data-close-panel="columns-side-panel">x</button>
+  </div>
+  <p class="side-panel-subtitle">Toggle visible columns, like AG Grid's columns tool panel.</p>
+  <div id="columns-panel-list" class="columns-panel-list"></div>
+</aside>
+
+<aside id="filters-panel" class="side-panel" aria-hidden="true">
+  <div class="side-panel-header">
+    <h2>Filters</h2>
+    <button type="button" class="panel-close" data-close-panel="filters-panel">x</button>
+  </div>
+  <p class="side-panel-subtitle">Build nested AND/OR/NOT logic. Existing quick header filters still work.</p>
+
+  <div class="filter-builder-controls">
+    <label for="root-group-op">Match</label>
+    <select id="root-group-op">
+      <option value="and">All conditions (AND)</option>
+      <option value="or">Any condition (OR)</option>
+      <option value="not">NOT (invert single child)</option>
+    </select>
+  </div>
+
+  <div id="filter-builder-root" class="filter-builder-root"></div>
+
+  <div class="filter-panel-actions">
+    <button type="button" id="add-root-rule" class="col-chooser-btn">Add Rule</button>
+    <button type="button" id="add-root-group" class="col-chooser-btn">Add Group</button>
+    <button type="button" id="clear-advanced-filter" class="col-chooser-btn">Clear</button>
+    <button type="button" id="apply-advanced-filter" class="panel-primary-btn">Apply</button>
+  </div>
+</aside>
 
 <script>
 (function() {
@@ -29,6 +72,39 @@
     remote: "Remote",
     hybrid: "Hybrid",
     unknown: "Unknown"
+  };
+
+  var FILTER_FIELD_DEFS = {
+    title: { label: "Title", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"] },
+    source_name: { label: "Company", type: "text", operators: ["contains", "eq", "neq", "is_empty", "is_not_empty"] },
+    status: { label: "Status", type: "enum", operators: ["eq", "neq", "in", "not_in"] },
+    department: { label: "Department", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"] },
+    team: { label: "Team", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"] },
+    employment_type: { label: "Type", type: "enum", operators: ["eq", "neq", "in", "not_in"] },
+    workplace_type: { label: "Workplace", type: "enum", operators: ["eq", "neq", "in", "not_in"] },
+    country: { label: "Country", type: "array", operators: ["eq", "neq", "in", "not_in", "is_empty", "is_not_empty"] },
+    region: { label: "Region", type: "array", operators: ["eq", "neq", "in", "not_in", "is_empty", "is_not_empty"] },
+    city: { label: "City", type: "array", operators: ["contains", "not_contains", "eq", "neq", "in", "not_in", "is_empty", "is_not_empty"] },
+    published_at: { label: "Published At", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] },
+    first_seen_at: { label: "First Seen", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] },
+    last_seen_at: { label: "Last Seen", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] },
+    updated_at_source: { label: "Updated At Source", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] },
+    expired_at: { label: "Expired At", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] }
+  };
+
+  var FIELD_ORDER = Object.keys(FILTER_FIELD_DEFS);
+  var OPERATOR_LABELS = {
+    contains: "contains",
+    not_contains: "does not contain",
+    eq: "equals",
+    neq: "does not equal",
+    in: "is any of",
+    not_in: "is none of",
+    is_empty: "is empty",
+    is_not_empty: "is not empty",
+    before: "before",
+    after: "after",
+    in_last_days: "in last N days"
   };
 
   function formatDateTime(iso) {
@@ -73,7 +149,7 @@
     var val = cell.getValue();
     if (!val) return "";
     var row = cell.getRow().getData();
-    return '<a href="' + row.url + '" target="_blank" rel="noopener">' + val.replace(/</g, "&lt;") + '</a>';
+    return '<a href="' + row.url + '" target="_blank" rel="noopener">' + val.replace(/</g, "&lt;") + "</a>";
   }
 
   function isoDateSorter(a, b) {
@@ -108,7 +184,6 @@
   }
 
   var dateFilterParams = { values: DATE_RANGE_PRESETS, clearable: true };
-
   var listFilterParams = { valuesLookup: true, clearable: true, sort: "asc" };
 
   function arrayJoinFormatter(cell) {
@@ -152,134 +227,394 @@
     paginationSizeSelector: [25, 50, 100],
     placeholder: "No jobs found",
     columns: [
-      {
-        title: "Title", field: "title",
-        headerFilter: "input", headerFilterPlaceholder: "Search...",
-        formatter: titleFormatter, formatterParams: { allowHtml: true },
-        minWidth: 250, widthGrow: 3
-      },
-      {
-        title: "Company", field: "source_name",
-        headerFilter: "list", headerFilterParams: listFilterParams,
-        minWidth: 120, widthGrow: 1
-      },
-      {
-        title: "Location (Raw)", field: "locations_display",
-        headerFilter: "input", headerFilterPlaceholder: "Search...",
-        minWidth: 150, widthGrow: 1, visible: false
-      },
-      {
-        title: "Type", field: "employment_type_label",
-        headerFilter: "list", headerFilterParams: listFilterParams,
-        minWidth: 100, visible: false
-      },
-      {
-        title: "Published At", field: "published_at",
-        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: isoDateSorter,
-        headerFilter: "list", headerFilterParams: dateFilterParams,
-        headerFilterFunc: dateRangeFilter,
-        minWidth: 120
-      },
-      {
-        title: "First Seen", field: "first_seen_at",
-        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: isoDateSorter,
-        headerFilter: "list", headerFilterParams: dateFilterParams,
-        headerFilterFunc: dateRangeFilter,
-        minWidth: 120
-      },
-      {
-        title: "Department", field: "department",
-        headerFilter: "input", headerFilterPlaceholder: "Search...",
-        minWidth: 120, visible: false
-      },
-      {
-        title: "Workplace", field: "workplace_type_label",
-        headerFilter: "list", headerFilterParams: listFilterParams,
-        minWidth: 100, visible: false
-      },
-      {
-        title: "Country", field: "country",
-        formatter: arrayJoinFormatter,
-        headerFilter: "list", headerFilterParams: arrayFilterParams,
-        headerFilterFunc: arrayContainsFilter,
-        minWidth: 80
-      },
-      {
-        title: "Region", field: "region",
-        formatter: arrayJoinFormatter,
-        headerFilter: "list", headerFilterParams: arrayFilterParams,
-        headerFilterFunc: arrayContainsFilter,
-        minWidth: 100, visible: false
-      },
-      {
-        title: "City", field: "city",
-        formatter: arrayJoinFormatter,
-        headerFilter: "list", headerFilterParams: arrayFilterParams,
-        headerFilterFunc: arrayContainsFilter,
-        minWidth: 100
-      },
-      {
-        title: "Status", field: "status",
-        headerFilter: "list", headerFilterParams: listFilterParams,
-        minWidth: 90, visible: false
-      },
-      {
-        title: "Last Seen", field: "last_seen_at",
-        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: isoDateSorter,
-        headerFilter: "list", headerFilterParams: dateFilterParams,
-        headerFilterFunc: dateRangeFilter,
-        minWidth: 120, visible: false
-      },
-      {
-        title: "Team", field: "team",
-        headerFilter: "input", headerFilterPlaceholder: "Search...",
-        minWidth: 120, visible: false
-      },
-      {
-        title: "Updated At Source", field: "updated_at_source",
-        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: isoDateSorter,
-        headerFilter: "list", headerFilterParams: dateFilterParams,
-        headerFilterFunc: dateRangeFilter,
-        minWidth: 120, visible: false
-      },
-      {
-        title: "Expired At", field: "expired_at",
-        formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: isoDateSorter,
-        headerFilter: "list", headerFilterParams: dateFilterParams,
-        headerFilterFunc: dateRangeFilter,
-        minWidth: 120, visible: false
-      },
-      {
-        title: "External ID", field: "external_id",
-        headerFilter: "input",
-        minWidth: 120, visible: false
-      },
-      {
-        title: "Source ID", field: "source_id",
-        minWidth: 100, visible: false
-      },
-      {
-        title: "ID", field: "id",
-        minWidth: 80, visible: false
-      }
+      { title: "Title", field: "title", headerFilter: "input", headerFilterPlaceholder: "Search...", formatter: titleFormatter, formatterParams: { allowHtml: true }, minWidth: 250, widthGrow: 3 },
+      { title: "Company", field: "source_name", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 120, widthGrow: 1 },
+      { title: "Location (Raw)", field: "locations_display", headerFilter: "input", headerFilterPlaceholder: "Search...", minWidth: 150, widthGrow: 1, visible: false },
+      { title: "Type", field: "employment_type_label", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 100, visible: false },
+      { title: "Published At", field: "published_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120 },
+      { title: "First Seen", field: "first_seen_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120 },
+      { title: "Department", field: "department", headerFilter: "input", headerFilterPlaceholder: "Search...", minWidth: 120, visible: false },
+      { title: "Workplace", field: "workplace_type_label", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 100, visible: false },
+      { title: "Country", field: "country", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 80 },
+      { title: "Region", field: "region", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 100, visible: false },
+      { title: "City", field: "city", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 100 },
+      { title: "Status", field: "status", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 90, visible: false },
+      { title: "Last Seen", field: "last_seen_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false },
+      { title: "Team", field: "team", headerFilter: "input", headerFilterPlaceholder: "Search...", minWidth: 120, visible: false },
+      { title: "Updated At Source", field: "updated_at_source", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false },
+      { title: "Expired At", field: "expired_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false },
+      { title: "External ID", field: "external_id", headerFilter: "input", minWidth: 120, visible: false },
+      { title: "Source ID", field: "source_id", minWidth: 100, visible: false },
+      { title: "ID", field: "id", minWidth: 80, visible: false }
     ],
     initialSort: [{ column: "first_seen_at", dir: "desc" }]
   });
 
-  // Column chooser
-  var chooserBtn = document.getElementById("col-chooser-btn");
-  var chooserPanel = document.getElementById("col-chooser-panel");
+  var quickSummaryNode = document.getElementById("advanced-filter-summary");
+  var colChooserBtn = document.getElementById("col-chooser-btn");
+  var colChooserPanel = document.getElementById("col-chooser-panel");
+  var columnsPanelList = document.getElementById("columns-panel-list");
+  var panelBackdrop = document.getElementById("panel-backdrop");
+  var openColumnsPanelBtn = document.getElementById("open-columns-panel");
+  var openFiltersPanelBtn = document.getElementById("open-filters-panel");
+  var columnsSidePanel = document.getElementById("columns-side-panel");
+  var filtersPanel = document.getElementById("filters-panel");
+  var rootGroupOp = document.getElementById("root-group-op");
+  var filterBuilderRoot = document.getElementById("filter-builder-root");
 
-  function buildChooser() {
-    chooserPanel.innerHTML = "";
+  var advancedState = {
+    op: "and",
+    children: []
+  };
+  var activeExpression = null;
+
+  function mapApiRows(data) {
+    return data.map(function(item) {
+      var locs = item.locations || [];
+      item.locations_display = locs.map(function(l) { return l.name; }).join(", ") || "";
+      item.employment_type_label = EMPLOYMENT_LABELS[item.employment_type] || item.employment_type || "";
+      item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "";
+      item.department = item.department || "";
+      item.country = item.country || [];
+      item.region = item.region || [];
+      item.city = item.city || [];
+      item.team = item.team || "";
+      return item;
+    });
+  }
+
+  function fetchJobs(expression) {
+    var params = new URLSearchParams();
+    if (expression) {
+      params.set("filter", JSON.stringify(expression));
+    }
+    var url = "/api/jobs/";
+    if (params.toString()) {
+      url += "?" + params.toString();
+    }
+    return fetch(url)
+      .then(function(r) {
+        if (!r.ok) {
+          return r.json().then(function(payload) {
+            throw new Error(payload.error || "Failed to load jobs");
+          });
+        }
+        return r.json();
+      })
+      .then(function(data) {
+        table.setData(mapApiRows(data));
+      });
+  }
+
+  function openPanel(panelId) {
+    closePanels();
+    var panel = document.getElementById(panelId);
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+    panelBackdrop.classList.add("open");
+  }
+
+  function closePanels() {
+    [columnsSidePanel, filtersPanel].forEach(function(panel) {
+      panel.classList.remove("open");
+      panel.setAttribute("aria-hidden", "true");
+    });
+    panelBackdrop.classList.remove("open");
+  }
+
+  function createRuleNode() {
+    return { field: "title", operator: "contains", value: "" };
+  }
+
+  function createGroupNode() {
+    return { op: "and", children: [] };
+  }
+
+  function normalizeGroupChildren(groupNode) {
+    if (groupNode.op === "not") {
+      if (!groupNode.children.length) {
+        groupNode.children = [createRuleNode()];
+      } else {
+        groupNode.children = [groupNode.children[0]];
+      }
+    }
+  }
+
+  function renderFilterBuilder() {
+    filterBuilderRoot.innerHTML = "";
+    renderGroup(filterBuilderRoot, advancedState, null, null);
+    rootGroupOp.value = advancedState.op;
+  }
+
+  function renderGroup(parentEl, groupNode, parentNode, childIndex) {
+    normalizeGroupChildren(groupNode);
+
+    var groupEl = document.createElement("div");
+    groupEl.className = "filter-group";
+
+    var header = document.createElement("div");
+    header.className = "filter-group-header";
+
+    var opSelect = document.createElement("select");
+    ["and", "or", "not"].forEach(function(op) {
+      var option = document.createElement("option");
+      option.value = op;
+      option.textContent = op.toUpperCase();
+      opSelect.appendChild(option);
+    });
+    opSelect.value = groupNode.op;
+    opSelect.addEventListener("change", function() {
+      groupNode.op = opSelect.value;
+      normalizeGroupChildren(groupNode);
+      renderFilterBuilder();
+    });
+    header.appendChild(opSelect);
+
+    var addRuleBtn = document.createElement("button");
+    addRuleBtn.type = "button";
+    addRuleBtn.className = "chip-btn";
+    addRuleBtn.textContent = "+ Rule";
+    addRuleBtn.addEventListener("click", function() {
+      if (groupNode.op === "not") {
+        groupNode.children = [createRuleNode()];
+      } else {
+        groupNode.children.push(createRuleNode());
+      }
+      renderFilterBuilder();
+    });
+    header.appendChild(addRuleBtn);
+
+    var addGroupBtn = document.createElement("button");
+    addGroupBtn.type = "button";
+    addGroupBtn.className = "chip-btn";
+    addGroupBtn.textContent = "+ Group";
+    addGroupBtn.addEventListener("click", function() {
+      if (groupNode.op === "not") {
+        groupNode.children = [createGroupNode()];
+      } else {
+        groupNode.children.push(createGroupNode());
+      }
+      renderFilterBuilder();
+    });
+    header.appendChild(addGroupBtn);
+
+    if (parentNode) {
+      var removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "chip-btn danger";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", function() {
+        parentNode.children.splice(childIndex, 1);
+        renderFilterBuilder();
+      });
+      header.appendChild(removeBtn);
+    }
+
+    groupEl.appendChild(header);
+
+    var body = document.createElement("div");
+    body.className = "filter-group-body";
+    if (!groupNode.children.length) {
+      var empty = document.createElement("p");
+      empty.className = "filter-empty";
+      empty.textContent = "No rules yet";
+      body.appendChild(empty);
+    } else {
+      groupNode.children.forEach(function(node, index) {
+        if (node.op) {
+          renderGroup(body, node, groupNode, index);
+          return;
+        }
+        renderRule(body, node, groupNode, index);
+      });
+    }
+    groupEl.appendChild(body);
+    parentEl.appendChild(groupEl);
+  }
+
+  function renderRule(parentEl, ruleNode, parentNode, childIndex) {
+    var row = document.createElement("div");
+    row.className = "filter-rule-row";
+
+    var fieldSelect = document.createElement("select");
+    FIELD_ORDER.forEach(function(fieldName) {
+      var option = document.createElement("option");
+      option.value = fieldName;
+      option.textContent = FILTER_FIELD_DEFS[fieldName].label;
+      fieldSelect.appendChild(option);
+    });
+    fieldSelect.value = ruleNode.field;
+    row.appendChild(fieldSelect);
+
+    var opSelect = document.createElement("select");
+    row.appendChild(opSelect);
+
+    function rebuildOperatorSelect() {
+      opSelect.innerHTML = "";
+      FILTER_FIELD_DEFS[ruleNode.field].operators.forEach(function(operator) {
+        var option = document.createElement("option");
+        option.value = operator;
+        option.textContent = OPERATOR_LABELS[operator] || operator;
+        opSelect.appendChild(option);
+      });
+      if (FILTER_FIELD_DEFS[ruleNode.field].operators.indexOf(ruleNode.operator) === -1) {
+        ruleNode.operator = FILTER_FIELD_DEFS[ruleNode.field].operators[0];
+      }
+      opSelect.value = ruleNode.operator;
+      rebuildValueInput();
+    }
+
+    var valueWrap = document.createElement("div");
+    valueWrap.className = "value-wrap";
+    row.appendChild(valueWrap);
+
+    function rebuildValueInput() {
+      valueWrap.innerHTML = "";
+      if (ruleNode.operator === "is_empty" || ruleNode.operator === "is_not_empty") {
+        var hint = document.createElement("span");
+        hint.className = "filter-value-hint";
+        hint.textContent = "No value";
+        valueWrap.appendChild(hint);
+        return;
+      }
+      var input = document.createElement("input");
+      input.type = FILTER_FIELD_DEFS[ruleNode.field].type === "date" && ruleNode.operator !== "in_last_days" ? "datetime-local" : "text";
+      if (ruleNode.operator === "in_last_days") {
+        input.type = "number";
+        input.min = "0";
+        input.step = "1";
+        input.placeholder = "7";
+      } else if (ruleNode.operator === "in" || ruleNode.operator === "not_in") {
+        input.placeholder = "value1, value2";
+      }
+      input.value = ruleNode.value || "";
+      input.addEventListener("input", function() {
+        ruleNode.value = input.value;
+      });
+      valueWrap.appendChild(input);
+    }
+
+    fieldSelect.addEventListener("change", function() {
+      ruleNode.field = fieldSelect.value;
+      rebuildOperatorSelect();
+    });
+
+    opSelect.addEventListener("change", function() {
+      ruleNode.operator = opSelect.value;
+      rebuildValueInput();
+    });
+
+    rebuildOperatorSelect();
+
+    var removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "chip-btn danger";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", function() {
+      parentNode.children.splice(childIndex, 1);
+      renderFilterBuilder();
+    });
+    row.appendChild(removeBtn);
+
+    parentEl.appendChild(row);
+  }
+
+  function serializeNode(node) {
+    if (node.op) {
+      if (!node.children.length) {
+        return null;
+      }
+      if (node.op === "not") {
+        var notChild = serializeNode(node.children[0]);
+        if (!notChild) return null;
+        return { op: "not", child: notChild };
+      }
+      var children = node.children.map(serializeNode).filter(Boolean);
+      if (!children.length) {
+        return null;
+      }
+      return { op: node.op, children: children };
+    }
+
+    var operator = node.operator;
+    var payload = {
+      field: node.field,
+      operator: operator
+    };
+
+    if (operator === "is_empty" || operator === "is_not_empty") {
+      return payload;
+    }
+
+    var rawValue = (node.value || "").trim();
+    if (!rawValue) {
+      return null;
+    }
+
+    if (operator === "in" || operator === "not_in") {
+      payload.value = rawValue.split(",").map(function(part) { return part.trim(); }).filter(Boolean);
+      if (!payload.value.length) return null;
+      return payload;
+    }
+    if (operator === "in_last_days") {
+      var parsed = parseInt(rawValue, 10);
+      if (isNaN(parsed) || parsed < 0) return null;
+      payload.value = parsed;
+      return payload;
+    }
+
+    payload.value = rawValue;
+    return payload;
+  }
+
+  function expressionToText(node) {
+    if (!node) {
+      return "No advanced filters applied";
+    }
+    if (node.op) {
+      if (node.op === "not") {
+        return "NOT (" + expressionToText(node.child) + ")";
+      }
+      var joiner = node.op.toUpperCase();
+      return node.children.map(function(child) {
+        return "(" + expressionToText(child) + ")";
+      }).join(" " + joiner + " ");
+    }
+
+    var fieldLabel = FILTER_FIELD_DEFS[node.field] ? FILTER_FIELD_DEFS[node.field].label : node.field;
+    var operatorLabel = OPERATOR_LABELS[node.operator] || node.operator;
+    var value = node.value;
+    if (Array.isArray(value)) {
+      value = value.join(", ");
+    }
+    if (typeof value === "undefined") {
+      return fieldLabel + " " + operatorLabel;
+    }
+    return fieldLabel + " " + operatorLabel + " " + value;
+  }
+
+  function updateFilterSummary() {
+    var parts = [];
+    if (activeExpression) {
+      parts.push(expressionToText(activeExpression));
+    }
+
+    var quick = table.getHeaderFilters().map(function(filter) {
+      return filter.field + ": " + filter.value;
+    }).filter(Boolean);
+    if (quick.length) {
+      parts.push("Quick: " + quick.join(" | "));
+    }
+
+    quickSummaryNode.textContent = parts.length ? parts.join("  |  ") : "No advanced filters applied";
+  }
+
+  function buildChooser(targetNode, usePanelLayout) {
+    targetNode.innerHTML = "";
     table.getColumns().forEach(function(col) {
       var def = col.getDefinition();
       var label = document.createElement("label");
+      label.className = usePanelLayout ? "columns-panel-item" : "";
       var cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = col.isVisible();
@@ -288,39 +623,98 @@
       });
       label.appendChild(cb);
       label.appendChild(document.createTextNode(def.title || def.field));
-      chooserPanel.appendChild(label);
+      targetNode.appendChild(label);
     });
   }
 
-  chooserBtn.addEventListener("click", function(e) {
+  colChooserBtn.addEventListener("click", function(e) {
     e.stopPropagation();
-    var isOpen = chooserPanel.classList.toggle("open");
-    if (isOpen) buildChooser();
+    var isOpen = colChooserPanel.classList.toggle("open");
+    if (isOpen) buildChooser(colChooserPanel, false);
   });
 
   document.addEventListener("click", function(e) {
-    if (!chooserPanel.contains(e.target) && e.target !== chooserBtn) {
-      chooserPanel.classList.remove("open");
+    if (!colChooserPanel.contains(e.target) && e.target !== colChooserBtn) {
+      colChooserPanel.classList.remove("open");
     }
   });
 
-  fetch("/api/jobs/")
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var rows = data.map(function(item) {
-        var locs = item.locations || [];
-        item.locations_display = locs.map(function(l) { return l.name; }).join(", ") || "";
-        item.employment_type_label = EMPLOYMENT_LABELS[item.employment_type] || item.employment_type || "";
-        item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "";
-        item.department = item.department || "";
-        item.country = item.country || [];
-        item.region = item.region || [];
-        item.city = item.city || [];
-        item.team = item.team || "";
-        return item;
-      });
-      table.setData(rows);
+  openColumnsPanelBtn.addEventListener("click", function() {
+    buildChooser(columnsPanelList, true);
+    openPanel("columns-side-panel");
+  });
+
+  openFiltersPanelBtn.addEventListener("click", function() {
+    renderFilterBuilder();
+    openPanel("filters-panel");
+  });
+
+  panelBackdrop.addEventListener("click", closePanels);
+
+  document.querySelectorAll("[data-close-panel]").forEach(function(btn) {
+    btn.addEventListener("click", closePanels);
+  });
+
+  document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") {
+      closePanels();
+    }
+  });
+
+  rootGroupOp.addEventListener("change", function() {
+    advancedState.op = rootGroupOp.value;
+    normalizeGroupChildren(advancedState);
+    renderFilterBuilder();
+  });
+
+  document.getElementById("add-root-rule").addEventListener("click", function() {
+    if (advancedState.op === "not") {
+      advancedState.children = [createRuleNode()];
+    } else {
+      advancedState.children.push(createRuleNode());
+    }
+    renderFilterBuilder();
+  });
+
+  document.getElementById("add-root-group").addEventListener("click", function() {
+    if (advancedState.op === "not") {
+      advancedState.children = [createGroupNode()];
+    } else {
+      advancedState.children.push(createGroupNode());
+    }
+    renderFilterBuilder();
+  });
+
+  document.getElementById("clear-advanced-filter").addEventListener("click", function() {
+    advancedState = { op: "and", children: [] };
+    rootGroupOp.value = "and";
+    activeExpression = null;
+    renderFilterBuilder();
+    fetchJobs(null).then(function() {
+      updateFilterSummary();
     });
+  });
+
+  document.getElementById("apply-advanced-filter").addEventListener("click", function() {
+    var expression = serializeNode(advancedState);
+    activeExpression = expression;
+    fetchJobs(expression)
+      .then(function() {
+        updateFilterSummary();
+      })
+      .catch(function(err) {
+        window.alert(err.message);
+      });
+  });
+
+  table.on("dataFiltered", function() {
+    updateFilterSummary();
+  });
+
+  renderFilterBuilder();
+  fetchJobs(null).then(function() {
+    updateFilterSummary();
+  });
 })();
 </script>
 {% endblock %}

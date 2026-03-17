@@ -217,10 +217,27 @@ td a:hover {
 .jobs-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.5rem 0;
   margin-bottom: 0.75rem;
   position: relative;
   flex-shrink: 0;
+}
+
+.jobs-toolbar-left {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-summary {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-align: right;
+  flex: 1;
+  min-width: 180px;
 }
 
 .col-chooser-wrap {
@@ -274,6 +291,200 @@ td a:hover {
   color: var(--text);
   cursor: pointer;
   transition: background 0.1s;
+}
+
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 150;
+}
+
+.panel-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.side-panel {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  width: 380px;
+  height: calc(100vh - 56px);
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+  background: #1f2329;
+  border-left: 1px solid var(--border);
+  padding: 1rem;
+  overflow-y: auto;
+  z-index: 200;
+}
+
+.side-panel.open {
+  transform: translateX(0);
+}
+
+.side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.side-panel-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.panel-close {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.panel-close:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.side-panel-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.columns-panel-list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.columns-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.25rem;
+}
+
+.filter-builder-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.filter-builder-controls label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.filter-builder-controls select,
+.filter-rule-row select,
+.filter-rule-row input,
+.filter-group-header select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.45rem;
+}
+
+.filter-builder-root {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.filter-group {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  background: rgba(34, 39, 48, 0.7);
+}
+
+.filter-group-body {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.filter-group-header {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-rule-row {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.5fr auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.value-wrap {
+  display: flex;
+}
+
+.value-wrap input {
+  width: 100%;
+}
+
+.filter-empty,
+.filter-value-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.chip-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 4px;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.chip-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.chip-btn.danger {
+  color: #f7a6a6;
+}
+
+.filter-panel-actions {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(31, 35, 41, 0.4), rgba(31, 35, 41, 1));
+  padding-top: 0.8rem;
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.panel-primary-btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.panel-primary-btn:hover {
+  background: var(--accent-hover);
 }
 
 .col-chooser-panel label:hover {
@@ -451,6 +662,17 @@ td a:hover {
   .jobs-toolbar {
     padding: 0.35rem 0;
     margin-bottom: 0.5rem;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .jobs-toolbar-left {
+    width: 100%;
+  }
+
+  .filter-summary {
+    text-align: left;
+    width: 100%;
   }
 
   .col-chooser-btn {
@@ -460,5 +682,18 @@ td a:hover {
 
   .col-chooser-panel {
     max-width: calc(100vw - 2rem);
+  }
+
+  .side-panel {
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding: 0.75rem;
+  }
+
+  .filter-rule-row {
+    grid-template-columns: 1fr;
   }
 }

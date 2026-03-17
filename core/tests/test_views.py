@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 import pytest
@@ -166,6 +167,172 @@ class TestJobsAPI:
         data = response.json()
         assert len(data) == 1
         assert data[0]["status"] == "active"
+
+    def test_filter_expression_with_not_clause(self):
+        source = Source.objects.create(
+            name="Filter Co", platform="greenhouse", board_id="filterco"
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="1",
+            title="Software Engineer",
+            url="https://example.com/1",
+            status="active",
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="2",
+            title="Senior Software Engineer",
+            url="https://example.com/2",
+            status="active",
+        )
+
+        expression = {
+            "op": "and",
+            "children": [
+                {"field": "title", "operator": "contains", "value": "engineer"},
+                {
+                    "op": "not",
+                    "child": {
+                        "field": "title",
+                        "operator": "contains",
+                        "value": "senior",
+                    },
+                },
+            ],
+        }
+
+        client = Client()
+        response = client.get(
+            "/api/jobs/",
+            {"filter": json.dumps(expression)},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert [row["title"] for row in data] == ["Software Engineer"]
+
+    def test_filter_expression_allows_multiple_predicates_same_field(self):
+        source = Source.objects.create(
+            name="Filter Co", platform="greenhouse", board_id="filterco"
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="1",
+            title="Software Engineer",
+            url="https://example.com/1",
+            status="active",
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="2",
+            title="Platform Engineer",
+            url="https://example.com/2",
+            status="active",
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="3",
+            title="Software Designer",
+            url="https://example.com/3",
+            status="active",
+        )
+
+        expression = {
+            "op": "and",
+            "children": [
+                {"field": "title", "operator": "contains", "value": "software"},
+                {"field": "title", "operator": "contains", "value": "engineer"},
+            ],
+        }
+
+        client = Client()
+        response = client.get("/api/jobs/", {"filter": json.dumps(expression)})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert [row["title"] for row in data] == ["Software Engineer"]
+
+    def test_filter_expression_supports_array_inclusion(self):
+        source = Source.objects.create(
+            name="Geo Co", platform="greenhouse", board_id="geoco"
+        )
+        us_listing = JobListing.objects.create(
+            source=source,
+            external_id="1",
+            title="US Job",
+            url="https://example.com/1",
+            status="active",
+        )
+        ca_listing = JobListing.objects.create(
+            source=source,
+            external_id="2",
+            title="CA Job",
+            url="https://example.com/2",
+            status="active",
+        )
+        us_tag = LocationTag.objects.create(name="NYC", country_code="US")
+        ca_tag = LocationTag.objects.create(name="Toronto", country_code="CA")
+        us_listing.locations.add(us_tag)
+        ca_listing.locations.add(ca_tag)
+
+        expression = {
+            "field": "country",
+            "operator": "in",
+            "value": ["US"],
+        }
+
+        client = Client()
+        response = client.get("/api/jobs/", {"filter": json.dumps(expression)})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert [row["title"] for row in data] == ["US Job"]
+
+    def test_filter_expression_can_combine_with_legacy_quick_filters(self):
+        source = Source.objects.create(
+            name="Blend Co", platform="greenhouse", board_id="blendco"
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="1",
+            title="Software Engineer",
+            url="https://example.com/1",
+            status="active",
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="2",
+            title="Software Engineer",
+            url="https://example.com/2",
+            status="expired",
+        )
+
+        expression = {
+            "field": "title",
+            "operator": "contains",
+            "value": "engineer",
+        }
+
+        client = Client()
+        response = client.get(
+            "/api/jobs/",
+            {"status": "active", "filter": json.dumps(expression)},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["status"] == "active"
+
+    def test_filter_expression_returns_400_on_invalid_payload(self):
+        expression = {"field": "title", "operator": "in", "value": "engineer"}
+
+        client = Client()
+        response = client.get("/api/jobs/", {"filter": json.dumps(expression)})
+
+        assert response.status_code == 400
+        assert "error" in response.json()
 
 
 @pytest.mark.django_db

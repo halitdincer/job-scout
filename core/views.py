@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
+from core.filter_expression import build_filter_q
 from core.ingestion import ingest_sources
 from core.models import JobListing, LocationTag, Run, Source
 
@@ -51,7 +52,15 @@ def list_jobs(request):
     if status:
         qs = qs.filter(status=status)
 
-    qs = qs.prefetch_related("locations")
+    expression_raw = request.GET.get("filter")
+    if expression_raw:
+        try:
+            expression = json.loads(expression_raw)
+            qs = qs.filter(build_filter_q(expression))
+        except (json.JSONDecodeError, ValueError) as exc:
+            return JsonResponse({"error": f"Invalid filter: {exc}"}, status=400)
+
+    qs = qs.prefetch_related("locations").distinct()
     data = []
     for listing in qs:
         tags = listing.locations.all()

@@ -34,7 +34,7 @@ python manage.py ingest --source-id 1
 |--------|----------|------|-------------|
 | GET | `/api/health` | No | Health check |
 | GET | `/api/sources/` | No | List all sources |
-| GET | `/api/jobs/` | No | List job listings (filter: `?source_id=`, `?status=`) |
+| GET | `/api/jobs/` | No | List job listings (legacy quick filters plus advanced filter expression) |
 | GET | `/api/runs/` | No | List ingestion runs |
 | POST | `/api/runs/` | Bearer token | Trigger ingestion run |
 
@@ -44,6 +44,40 @@ python manage.py ingest --source-id 1
 pip install -r requirements-dev.txt
 pytest
 ```
+
+## Advanced Filter Expression Contract
+
+`GET /api/jobs/` accepts the optional `filter` query parameter containing JSON for a canonical filter expression AST.
+
+Shape:
+
+- Group nodes:
+  - `{ "op": "and", "children": [<node>, ...] }`
+  - `{ "op": "or", "children": [<node>, ...] }`
+  - `{ "op": "not", "child": <node> }`
+- Predicate nodes:
+  - `{ "field": "title", "operator": "contains", "value": "engineer" }`
+
+Example:
+
+```json
+{
+  "op": "and",
+  "children": [
+    { "field": "title", "operator": "contains", "value": "engineer" },
+    {
+      "op": "not",
+      "child": { "field": "title", "operator": "contains", "value": "senior" }
+    }
+  ]
+}
+```
+
+Compatibility notes:
+
+- Existing quick filters (`source_id`, `status`) remain supported.
+- Effective query semantics are `quick_filters AND advanced_filter` when both are present.
+- The AST format is intentionally deterministic so it can be reused by future notifications without changing filter meaning.
 
 ## Deployment
 

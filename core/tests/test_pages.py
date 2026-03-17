@@ -32,6 +32,19 @@ class TestJobsPage:
         response = client.get("/")
         assert b'class="full-bleed"' in response.content
 
+    def test_contains_advanced_filter_panel_controls(self):
+        client = Client()
+        response = client.get("/")
+        assert b'id="open-filters-panel"' in response.content
+        assert b'id="filters-panel"' in response.content
+        assert b'id="advanced-filter-summary"' in response.content
+
+    def test_contains_columns_side_panel_controls(self):
+        client = Client()
+        response = client.get("/")
+        assert b'id="open-columns-panel"' in response.content
+        assert b'id="columns-side-panel"' in response.content
+
 
 @pytest.mark.django_db
 class TestSourcesPage:
