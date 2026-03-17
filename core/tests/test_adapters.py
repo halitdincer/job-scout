@@ -115,6 +115,7 @@ class TestGreenhouseAdapter:
         assert listing["country"] is None
         assert listing["published_at"] == "2026-01-15T10:00:00-05:00"
         assert listing["updated_at_source"] == "2026-03-01T12:00:00-05:00"
+        assert listing["is_listed"] is None
         mock_get.assert_called_once_with(
             "https://boards-api.greenhouse.io/v1/boards/airbnb/jobs",
             params={"content": "true"},
@@ -197,6 +198,7 @@ class TestLeverAdapter:
         assert listing["country"] == "US"
         assert listing["published_at"] == "2024-01-01T00:00:00+00:00"
         assert listing["updated_at_source"] is None
+        assert listing["is_listed"] is None
 
     @patch("core.adapters.requests.get")
     def test_missing_department(self, mock_get):
@@ -244,6 +246,7 @@ class TestAshbyAdapter:
                         }
                     },
                     "publishedAt": "2026-01-15T10:00:00+00:00",
+                    "isListed": True,
                     "jobUrl": "https://jobs.ashbyhq.com/company/uuid-456",
                 }
             ]
@@ -263,6 +266,7 @@ class TestAshbyAdapter:
         assert listing["country"] == "United Kingdom"
         assert listing["published_at"] == "2026-01-15T10:00:00+00:00"
         assert listing["updated_at_source"] is None
+        assert listing["is_listed"] is True
 
     @patch("core.adapters.requests.get")
     def test_no_secondary_locations(self, mock_get):

@@ -31,6 +31,7 @@ class TestJobListingAdmin:
             "status",
             "employment_type",
             "workplace_type",
+            "expired_at",
             "first_seen_at",
         )
 

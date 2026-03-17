@@ -70,6 +70,7 @@ class JobListing(models.Model):
         max_length=20, choices=WORKPLACE_TYPE_CHOICES, null=True, blank=True
     )
     country = models.CharField(max_length=100, null=True, blank=True)
+    expired_at = models.DateTimeField(null=True, blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
     updated_at_source = models.DateTimeField(null=True, blank=True)
     first_seen_at = models.DateTimeField(auto_now_add=True)

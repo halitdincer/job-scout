@@ -66,6 +66,7 @@ class GreenhouseAdapter:
                 "country": None,
                 "published_at": job.get("first_published"),
                 "updated_at_source": job.get("updated_at"),
+                "is_listed": None,
             })
         return listings
 
@@ -105,6 +106,7 @@ class LeverAdapter:
                 "country": posting.get("country"),
                 "published_at": published_at,
                 "updated_at_source": None,
+                "is_listed": None,
             })
         return listings
 
@@ -142,6 +144,7 @@ class AshbyAdapter:
                 "country": postal.get("addressCountry"),
                 "published_at": job.get("publishedAt"),
                 "updated_at_source": None,
+                "is_listed": job.get("isListed"),
             })
         return listings
 

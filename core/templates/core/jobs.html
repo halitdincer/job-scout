@@ -46,6 +46,7 @@
       <th>Workplace</th>
       <th>Country</th>
       <th>Status</th>
+      <th>Expired At</th>
       <th>First Seen</th>
     </tr>
   </thead>
@@ -60,6 +61,7 @@
       <td>{{ job.get_workplace_type_display|default:"—" }}</td>
       <td>{{ job.country|default:"—" }}</td>
       <td><span class="badge badge-{{ job.status }}">{{ job.status }}</span></td>
+      <td>{{ job.expired_at|date:"M d, Y"|default:"—" }}</td>
       <td>{{ job.first_seen_at|date:"M d, Y" }}</td>
     </tr>
     {% endfor %}

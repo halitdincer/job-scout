@@ -81,9 +81,15 @@ def _process_source(source, fetched, result):
 
         _sync_locations(listing, item.get("locations", []))
 
+        if item.get("is_listed") is False and listing.status == "active":
+            listing.status = "expired"
+            listing.expired_at = now
+            listing.save()
+            result["listings_expired"] += 1
+
     expired_count = (
         JobListing.objects.filter(source=source, status="active")
         .exclude(external_id__in=fetched_ids)
-        .update(status="expired")
+        .update(status="expired", expired_at=now)
     )
     result["listings_expired"] += expired_count

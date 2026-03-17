@@ -129,6 +129,25 @@ class TestJobListingModel:
         assert listing.published_at is not None
         assert listing.updated_at_source is not None
 
+    def test_expired_at_set_on_expiration(self):
+        source = Source.objects.create(
+            name="Airbnb", platform="greenhouse", board_id="airbnb"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="exp1",
+            title="Engineer",
+            url="https://example.com/exp1",
+        )
+        assert listing.expired_at is None
+        now = timezone.now()
+        listing.status = "expired"
+        listing.expired_at = now
+        listing.save()
+        listing.refresh_from_db()
+        assert listing.status == "expired"
+        assert listing.expired_at == now
+
     def test_multiple_locations(self):
         source = Source.objects.create(
             name="Cohere", platform="ashby", board_id="cohere"
@@ -174,6 +193,7 @@ class TestJobListingModel:
         assert listing.country is None
         assert listing.published_at is None
         assert listing.updated_at_source is None
+        assert listing.expired_at is None
 
 
 @pytest.mark.django_db

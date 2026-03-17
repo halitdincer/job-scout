@@ -12,7 +12,7 @@ class SourceAdmin(admin.ModelAdmin):
 
 @admin.register(JobListing)
 class JobListingAdmin(admin.ModelAdmin):
-    list_display = ("title", "source", "department", "status", "employment_type", "workplace_type", "first_seen_at")
+    list_display = ("title", "source", "department", "status", "employment_type", "workplace_type", "expired_at", "first_seen_at")
     search_fields = ("title", "department")
     list_filter = ("status", "source", "employment_type", "workplace_type")
 

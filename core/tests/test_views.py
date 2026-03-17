@@ -82,6 +82,7 @@ class TestJobsAPI:
         assert engineer["employment_type"] == "full_time"
         assert engineer["workplace_type"] == "remote"
         assert engineer["country"] == "US"
+        assert "expired_at" in engineer
         assert "published_at" in engineer
         assert "updated_at_source" in engineer
 

@@ -24,6 +24,7 @@ class TestIngestSources:
             "country": None,
             "published_at": None,
             "updated_at_source": None,
+            "is_listed": None,
         }
         defaults.update(overrides)
         return defaults
@@ -94,6 +95,7 @@ class TestIngestSources:
         assert result["listings_expired"] == 1
         listing = JobListing.objects.get(source=source, external_id="1")
         assert listing.status == "expired"
+        assert listing.expired_at is not None
 
     @patch("core.ingestion.get_adapter")
     def test_already_expired_stays_expired(self, mock_get_adapter):
@@ -142,6 +144,37 @@ class TestIngestSources:
         assert result["listings_created"] == 2
         assert len(result["errors"]) == 1
         assert "Bad" in result["errors"][0]
+
+    @patch("core.ingestion.get_adapter")
+    def test_unlisted_job_marked_expired(self, mock_get_adapter):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", is_listed=False),
+        ]
+        mock_get_adapter.return_value = adapter
+
+        result = ingest_sources(Source.objects.filter(pk=source.pk))
+        assert result["listings_created"] == 1
+        assert result["listings_expired"] == 1
+        listing = JobListing.objects.get(source=source, external_id="1")
+        assert listing.status == "expired"
+        assert listing.expired_at is not None
+
+    @patch("core.ingestion.get_adapter")
+    def test_is_listed_none_does_not_expire(self, mock_get_adapter):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", is_listed=None),
+        ]
+        mock_get_adapter.return_value = adapter
+
+        result = ingest_sources(Source.objects.filter(pk=source.pk))
+        assert result["listings_expired"] == 0
+        listing = JobListing.objects.get(source=source, external_id="1")
+        assert listing.status == "active"
+        assert listing.expired_at is None
 
     @patch("core.ingestion.get_adapter")
     def test_creates_location_tags(self, mock_get_adapter):

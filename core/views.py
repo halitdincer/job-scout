@@ -104,6 +104,7 @@ def list_jobs(request):
             "employment_type": listing.employment_type,
             "workplace_type": listing.workplace_type,
             "country": listing.country,
+            "expired_at": listing.expired_at.isoformat() if listing.expired_at else None,
             "published_at": listing.published_at.isoformat() if listing.published_at else None,
             "updated_at_source": listing.updated_at_source.isoformat() if listing.updated_at_source else None,
             "first_seen_at": listing.first_seen_at.isoformat(),
