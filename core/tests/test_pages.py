@@ -45,6 +45,18 @@ class TestJobsPage:
         assert b'id="open-columns-panel"' in response.content
         assert b'id="columns-side-panel"' in response.content
 
+    def test_does_not_render_legacy_column_dropdown(self):
+        client = Client()
+        response = client.get("/")
+        assert b'id="col-chooser-btn"' not in response.content
+        assert b'id="col-chooser-panel"' not in response.content
+
+    def test_does_not_use_text_header_filter_inputs(self):
+        client = Client()
+        response = client.get("/")
+        assert b'headerFilter: "input"' not in response.content
+        assert b'headerFilterPlaceholder' not in response.content
+
 
 @pytest.mark.django_db
 class TestSourcesPage:

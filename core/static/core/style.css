@@ -402,6 +402,22 @@ td a:hover {
   gap: 0.75rem;
 }
 
+.quick-filters-mirror {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.quick-chip {
+  background: rgba(107, 155, 210, 0.15);
+  color: #cde4fb;
+  border: 1px solid rgba(107, 155, 210, 0.4);
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+}
+
 .filter-group {
   border: 1px solid var(--border);
   border-radius: 6px;
