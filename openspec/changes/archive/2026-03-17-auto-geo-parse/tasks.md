@@ -13,7 +13,7 @@
 
 - [x] 3.1 Write tests for `backfill_geo` command (parseable, already-mapped, unparseable, dry-run scenarios)
 - [x] 3.2 Implement `core/management/commands/backfill_geo.py` with rate limiting and `--dry-run` flag
-- [ ] 3.3 Run `backfill_geo --dry-run` against real data to verify results (requires deployed DB)
+- [x] 3.3 Run `backfill_geo --dry-run` against real data to verify results (requires deployed DB)
 
 ## 4. API — Add region and city computed fields
 
