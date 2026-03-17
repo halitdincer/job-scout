@@ -39,6 +39,12 @@ class TestJobsPage:
         assert b'id="filters-panel"' in response.content
         assert b'id="advanced-filter-summary"' in response.content
 
+    def test_contains_quick_filters_section_in_panel(self):
+        client = Client()
+        response = client.get("/")
+        assert b"Quick Filters" in response.content
+        assert b'id="quick-filter-rows"' in response.content
+
     def test_contains_columns_side_panel_controls(self):
         client = Client()
         response = client.get("/")

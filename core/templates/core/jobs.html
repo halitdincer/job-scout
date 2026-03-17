@@ -42,7 +42,10 @@
     </select>
   </div>
 
-  <div class="quick-filters-mirror" id="quick-filters-mirror"></div>
+  <h3 class="filter-section-title">Quick Filters</h3>
+  <div class="quick-filter-rows" id="quick-filter-rows"></div>
+
+  <h3 class="filter-section-title">Advanced Logic</h3>
   <div id="filter-builder-root" class="filter-builder-root"></div>
 
   <div class="filter-panel-actions">
@@ -251,7 +254,7 @@
   });
 
   var quickSummaryNode = document.getElementById("advanced-filter-summary");
-  var quickMirrorNode = document.getElementById("quick-filters-mirror");
+  var quickFilterRowsNode = document.getElementById("quick-filter-rows");
   var columnsPanelList = document.getElementById("columns-panel-list");
   var panelBackdrop = document.getElementById("panel-backdrop");
   var openColumnsPanelBtn = document.getElementById("open-columns-panel");
@@ -264,6 +267,20 @@
   var advancedState = { op: "and", children: [] };
   var activeAdvancedExpression = null;
   var isSyncingHeader = false;
+  var QUICK_FILTER_CONFIG = [
+    { headerField: "source_name", label: "Company", mode: "scalar" },
+    { headerField: "employment_type_label", label: "Type", mode: "scalar" },
+    { headerField: "workplace_type_label", label: "Workplace", mode: "scalar" },
+    { headerField: "country", label: "Country", mode: "array" },
+    { headerField: "region", label: "Region", mode: "array" },
+    { headerField: "city", label: "City", mode: "array" },
+    { headerField: "status", label: "Status", mode: "scalar" },
+    { headerField: "published_at", label: "Published At", mode: "date" },
+    { headerField: "first_seen_at", label: "First Seen", mode: "date" },
+    { headerField: "last_seen_at", label: "Last Seen", mode: "date" },
+    { headerField: "updated_at_source", label: "Updated At Source", mode: "date" },
+    { headerField: "expired_at", label: "Expired At", mode: "date" }
+  ];
 
   function mapApiRows(data) {
     return data.map(function(item) {
@@ -544,25 +561,164 @@
     isSyncingHeader = false;
   }
 
-  function renderQuickFilterMirror() {
-    var filters = table.getHeaderFilters();
-    if (!filters.length) {
-      quickMirrorNode.innerHTML = '<p class="filter-empty">No header filters set</p>';
+  function uniqueScalarValues(field) {
+    var seen = {};
+    var values = [];
+    table.getData().forEach(function(row) {
+      var value = row[field];
+      if (value === null || typeof value === "undefined" || value === "") {
+        return;
+      }
+      if (!seen[value]) {
+        seen[value] = true;
+        values.push(value);
+      }
+    });
+    values.sort();
+    return values;
+  }
+
+  function uniqueArrayValues(field) {
+    var seen = {};
+    var values = [];
+    table.getData().forEach(function(row) {
+      var arrayValue = row[field];
+      if (!arrayValue || !Array.isArray(arrayValue)) {
+        return;
+      }
+      arrayValue.forEach(function(value) {
+        if (value && !seen[value]) {
+          seen[value] = true;
+          values.push(value);
+        }
+      });
+    });
+    values.sort();
+    return values;
+  }
+
+  function getHeaderFilterValue(field) {
+    var active = table.getHeaderFilters();
+    for (var i = 0; i < active.length; i += 1) {
+      if (active[i].field === field) {
+        return active[i].value;
+      }
+    }
+    return "";
+  }
+
+  function updateHeaderFilterValue(field, value) {
+    if (value === "" || value === null || typeof value === "undefined") {
+      clearSingleHeaderFilter(field);
       return;
     }
-    quickMirrorNode.innerHTML = "";
-    filters.forEach(function(filter) {
-      var chip = document.createElement("span");
-      chip.className = "quick-chip";
-      chip.textContent = filter.field + ": " + filter.value;
-      quickMirrorNode.appendChild(chip);
+    isSyncingHeader = true;
+    table.setHeaderFilterValue(field, value);
+    isSyncingHeader = false;
+    updateFilterSummary();
+  }
+
+  function clearSingleHeaderFilter(field) {
+    var remaining = table.getHeaderFilters().filter(function(filter) {
+      return filter.field !== field;
+    });
+
+    isSyncingHeader = true;
+    table.clearHeaderFilter();
+    remaining.forEach(function(filter) {
+      table.setHeaderFilterValue(filter.field, filter.value);
+    });
+    isSyncingHeader = false;
+    updateFilterSummary();
+  }
+
+  function renderQuickFilterRows() {
+    quickFilterRowsNode.innerHTML = "";
+    QUICK_FILTER_CONFIG.forEach(function(config) {
+      var row = document.createElement("div");
+      row.className = "filter-rule-row quick-filter-row";
+
+      var topRow = document.createElement("div");
+      topRow.className = "filter-rule-top";
+
+      var fieldDisplay = document.createElement("div");
+      fieldDisplay.className = "quick-filter-pill";
+      fieldDisplay.textContent = config.label;
+      topRow.appendChild(fieldDisplay);
+
+      var operatorDisplay = document.createElement("div");
+      operatorDisplay.className = "quick-filter-pill";
+      operatorDisplay.textContent = config.mode === "date" ? "in last N days" : "equals";
+      topRow.appendChild(operatorDisplay);
+
+      var clearButton = document.createElement("button");
+      clearButton.type = "button";
+      clearButton.className = "chip-btn danger";
+      clearButton.textContent = "Clear";
+      clearButton.addEventListener("click", function() {
+        updateHeaderFilterValue(config.headerField, "");
+      });
+      topRow.appendChild(clearButton);
+
+      var valueRow = document.createElement("div");
+      valueRow.className = "filter-rule-value";
+      var valueWrap = document.createElement("div");
+      valueWrap.className = "value-wrap";
+
+      var select = document.createElement("select");
+      var allOption = document.createElement("option");
+      allOption.value = "";
+      allOption.textContent = "Any";
+      select.appendChild(allOption);
+
+      var options = [];
+      if (config.mode === "date") {
+        options = DATE_RANGE_PRESETS.map(function(preset) { return preset.value; });
+        DATE_RANGE_PRESETS.forEach(function(preset) {
+          var option = document.createElement("option");
+          option.value = preset.value;
+          option.textContent = preset.label;
+          select.appendChild(option);
+        });
+      } else if (config.mode === "array") {
+        options = uniqueArrayValues(config.headerField);
+      } else {
+        options = uniqueScalarValues(config.headerField);
+      }
+
+      if (config.mode !== "date") {
+        options.forEach(function(value) {
+          var option = document.createElement("option");
+          option.value = value;
+          option.textContent = value;
+          select.appendChild(option);
+        });
+      }
+
+      var activeValue = getHeaderFilterValue(config.headerField);
+      if (activeValue && options.indexOf(activeValue) === -1 && config.mode !== "date") {
+        var currentOption = document.createElement("option");
+        currentOption.value = activeValue;
+        currentOption.textContent = activeValue;
+        select.appendChild(currentOption);
+      }
+      select.value = activeValue || "";
+      select.addEventListener("change", function() {
+        updateHeaderFilterValue(config.headerField, select.value);
+      });
+
+      valueWrap.appendChild(select);
+      valueRow.appendChild(valueWrap);
+      row.appendChild(topRow);
+      row.appendChild(valueRow);
+      quickFilterRowsNode.appendChild(row);
     });
   }
 
   function updateFilterSummary() {
     var merged = mergeExpressions(activeAdvancedExpression, headerFiltersToExpression());
     quickSummaryNode.textContent = expressionToText(merged);
-    renderQuickFilterMirror();
+    renderQuickFilterRows();
   }
 
   function buildColumnsPanel() {
@@ -582,7 +738,7 @@
   }
 
   openColumnsPanelBtn.addEventListener("click", function() { buildColumnsPanel(); openPanel("columns-side-panel"); });
-  openFiltersPanelBtn.addEventListener("click", function() { renderFilterBuilder(); renderQuickFilterMirror(); openPanel("filters-panel"); });
+  openFiltersPanelBtn.addEventListener("click", function() { renderFilterBuilder(); renderQuickFilterRows(); openPanel("filters-panel"); });
   panelBackdrop.addEventListener("click", closePanels);
   document.querySelectorAll("[data-close-panel]").forEach(function(btn) { btn.addEventListener("click", closePanels); });
   document.addEventListener("keydown", function(event) { if (event.key === "Escape") closePanels(); });
