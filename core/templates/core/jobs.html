@@ -2,8 +2,9 @@
 
 {% block title %}Jobs — Job Scout{% endblock %}
 
+{% block main_attrs %} class="full-bleed"{% endblock %}
+
 {% block content %}
-<h1>Job Listings</h1>
 <div id="jobs-grid"></div>
 
 <script>
@@ -24,16 +25,47 @@
     unknown: "Unknown"
   };
 
-  function formatDate(iso) {
+  function formatDateTime(iso) {
     if (!iso) return "—";
     var d = new Date(iso);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return d.toLocaleString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit"
+    });
+  }
+
+  function timeAgo(iso) {
+    if (!iso) return "—";
+    var now = Date.now();
+    var then = new Date(iso).getTime();
+    var diff = Math.floor((now - then) / 1000);
+    if (diff < 0) return "just now";
+    if (diff < 60) return diff + "s ago";
+    var mins = Math.floor(diff / 60);
+    if (mins < 60) return mins + "m ago";
+    var hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + "h ago";
+    var days = Math.floor(hours / 24);
+    if (days < 30) return days + "d ago";
+    var months = Math.floor(days / 30);
+    if (months < 12) return months + "mo ago";
+    var years = Math.floor(months / 12);
+    return years + "y ago";
+  }
+
+  function timeAgoCellRenderer(params) {
+    if (!params.value) return "—";
+    var span = document.createElement("span");
+    span.textContent = timeAgo(params.value);
+    span.title = formatDateTime(params.value);
+    return span;
   }
 
   var theme = agGrid.themeQuartz.withPart(agGrid.colorSchemeDarkBlue);
 
   var gridOptions = {
     theme: theme,
+    sideBar: "columns",
     columnDefs: [
       {
         field: "title",
@@ -76,12 +108,18 @@
         field: "employment_type_label",
         headerName: "Type",
         filter: "agSetColumnFilter",
+        filterValueGetter: function(params) {
+          return params.data.employment_type_label;
+        },
         minWidth: 100
       },
       {
         field: "workplace_type_label",
         headerName: "Workplace",
         filter: "agSetColumnFilter",
+        filterValueGetter: function(params) {
+          return params.data.workplace_type_label;
+        },
         minWidth: 100
       },
       {
@@ -100,9 +138,68 @@
         field: "first_seen_at",
         headerName: "First Seen",
         filter: "agDateColumnFilter",
-        valueFormatter: function(params) { return formatDate(params.value); },
+        cellRenderer: timeAgoCellRenderer,
         sort: "desc",
         minWidth: 120
+      },
+      {
+        field: "last_seen_at",
+        headerName: "Last Seen",
+        filter: "agDateColumnFilter",
+        cellRenderer: timeAgoCellRenderer,
+        minWidth: 120
+      },
+      {
+        field: "team",
+        headerName: "Team",
+        filter: "agTextColumnFilter",
+        minWidth: 120,
+        hide: true
+      },
+      {
+        field: "published_at",
+        headerName: "Published At",
+        filter: "agDateColumnFilter",
+        valueFormatter: function(params) { return formatDateTime(params.value); },
+        minWidth: 160,
+        hide: true
+      },
+      {
+        field: "updated_at_source",
+        headerName: "Updated At Source",
+        filter: "agDateColumnFilter",
+        valueFormatter: function(params) { return formatDateTime(params.value); },
+        minWidth: 160,
+        hide: true
+      },
+      {
+        field: "expired_at",
+        headerName: "Expired At",
+        filter: "agDateColumnFilter",
+        valueFormatter: function(params) { return formatDateTime(params.value); },
+        minWidth: 160,
+        hide: true
+      },
+      {
+        field: "external_id",
+        headerName: "External ID",
+        filter: "agTextColumnFilter",
+        minWidth: 120,
+        hide: true
+      },
+      {
+        field: "source_id",
+        headerName: "Source ID",
+        filter: "agNumberColumnFilter",
+        minWidth: 100,
+        hide: true
+      },
+      {
+        field: "id",
+        headerName: "ID",
+        filter: "agNumberColumnFilter",
+        minWidth: 80,
+        hide: true
       }
     ],
     defaultColDef: {
@@ -130,6 +227,7 @@
         item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "—";
         item.department = item.department || "—";
         item.country = item.country || "—";
+        item.team = item.team || "—";
         return item;
       });
       gridApi.setGridOption("rowData", rows);

@@ -35,8 +35,6 @@ header {
 }
 
 nav {
-  max-width: 1200px;
-  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -76,9 +74,13 @@ nav a.active {
 }
 
 main {
-  max-width: 1200px;
-  margin: 0 auto;
   padding: 2rem;
+}
+
+main.full-bleed {
+  padding: 0;
+  height: calc(100vh - 56px);
+  overflow: hidden;
 }
 
 h1 {
@@ -212,15 +214,11 @@ td a:hover {
 /* AG Grid container */
 #jobs-grid {
   width: 100%;
-  height: 80vh;
+  height: 100%;
 }
 
 @media (max-width: 768px) {
-  main {
+  main:not(.full-bleed) {
     padding: 1rem;
-  }
-
-  #jobs-grid {
-    height: 70vh;
   }
 }

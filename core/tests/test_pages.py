@@ -22,6 +22,11 @@ class TestJobsPage:
         response = client.get("/")
         assert b"agGrid.createGrid" in response.content
 
+    def test_full_bleed_layout(self):
+        client = Client()
+        response = client.get("/")
+        assert b'class="full-bleed"' in response.content
+
 
 @pytest.mark.django_db
 class TestSourcesPage:

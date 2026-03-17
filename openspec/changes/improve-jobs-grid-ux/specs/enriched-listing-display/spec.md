@@ -1,0 +1,20 @@
+## MODIFIED Requirements
+
+### Requirement: Jobs page displays enriched fields
+The jobs grid at `/` SHALL have columns available for all API response fields: Title, Company (source name), Department, Locations (comma-separated), Type (employment type with display label), Workplace (workplace type with display label), Country, Status, First Seen, Last Seen, Team, Published At, Updated At Source, Expired At, External ID, Source ID, and ID. Default visibility is controlled by the grid configuration.
+
+#### Scenario: Grid shows locations
+- **WHEN** a job listing has locations ["Toronto", "New York"]
+- **THEN** the grid displays "Toronto, New York" in the Locations column
+
+#### Scenario: Grid shows employment type label
+- **WHEN** a job listing has `employment_type="full_time"`
+- **THEN** the grid displays "Full-time" in the Type column
+
+#### Scenario: Grid shows workplace type label
+- **WHEN** a job listing has `workplace_type="remote"`
+- **THEN** the grid displays "Remote" in the Workplace column
+
+#### Scenario: Grid shows team when enabled
+- **WHEN** a user enables the Team column via column chooser and a listing has `team="Engineering"`
+- **THEN** the Team column displays "Engineering"
