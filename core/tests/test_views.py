@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 from django.test import Client, override_settings
 
-from core.models import JobListing, Run, Source
+from core.models import JobListing, LocationTag, Run, Source
 
 
 @pytest.mark.django_db
@@ -37,15 +37,20 @@ class TestJobsAPI:
         source = Source.objects.create(
             name="Airbnb", platform="greenhouse", board_id="airbnb"
         )
-        JobListing.objects.create(
+        listing1 = JobListing.objects.create(
             source=source,
             external_id="1",
             title="Engineer",
             department="Eng",
-            location="SF",
             url="https://example.com/1",
             status="active",
+            team="Platform",
+            employment_type="full_time",
+            workplace_type="remote",
+            country="US",
         )
+        tag = LocationTag.objects.create(name="SF")
+        listing1.locations.add(tag)
         JobListing.objects.create(
             source=source,
             external_id="2",
@@ -65,6 +70,20 @@ class TestJobsAPI:
         assert "source_name" in data[0]
         assert "source_id" in data[0]
         assert "external_id" in data[0]
+
+    def test_includes_enriched_fields(self):
+        self._create_source_with_listings()
+        client = Client()
+        response = client.get("/api/jobs/")
+        data = response.json()
+        engineer = next(j for j in data if j["title"] == "Engineer")
+        assert engineer["locations"] == ["SF"]
+        assert engineer["team"] == "Platform"
+        assert engineer["employment_type"] == "full_time"
+        assert engineer["workplace_type"] == "remote"
+        assert engineer["country"] == "US"
+        assert "published_at" in engineer
+        assert "updated_at_source" in engineer
 
     def test_filter_by_source_id(self):
         source = self._create_source_with_listings()

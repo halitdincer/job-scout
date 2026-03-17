@@ -1,4 +1,43 @@
+from datetime import datetime, timezone
+
 import requests
+
+_EMPLOYMENT_TYPE_MAP = {
+    "permanent": "full_time",
+    "full-time": "full_time",
+    "fulltime": "full_time",
+    "full time": "full_time",
+    "part-time": "part_time",
+    "parttime": "part_time",
+    "part time": "part_time",
+    "contract": "contract",
+    "contractor": "contract",
+    "intern": "intern",
+    "internship": "intern",
+    "temporary": "temporary",
+    "temp": "temporary",
+}
+
+_WORKPLACE_TYPE_MAP = {
+    "onsite": "on_site",
+    "on-site": "on_site",
+    "on site": "on_site",
+    "inoffice": "on_site",
+    "remote": "remote",
+    "hybrid": "hybrid",
+}
+
+
+def normalize_employment_type(value):
+    if not value:
+        return "unknown"
+    return _EMPLOYMENT_TYPE_MAP.get(value.lower().strip(), "unknown")
+
+
+def normalize_workplace_type(value):
+    if not value:
+        return "unknown"
+    return _WORKPLACE_TYPE_MAP.get(value.lower().strip(), "unknown")
 
 
 class GreenhouseAdapter:
@@ -14,12 +53,19 @@ class GreenhouseAdapter:
         listings = []
         for job in response.json()["jobs"]:
             departments = job.get("departments", [])
+            loc_name = job.get("location", {}).get("name")
             listings.append({
                 "external_id": str(job["id"]),
                 "title": job["title"],
                 "department": departments[0]["name"] if departments else None,
-                "location": job.get("location", {}).get("name"),
+                "locations": [loc_name] if loc_name else [],
                 "url": job["absolute_url"],
+                "team": None,
+                "employment_type": "unknown",
+                "workplace_type": "unknown",
+                "country": None,
+                "published_at": job.get("first_published"),
+                "updated_at_source": job.get("updated_at"),
             })
         return listings
 
@@ -37,12 +83,28 @@ class LeverAdapter:
         listings = []
         for posting in response.json():
             categories = posting.get("categories", {})
+            created_at = posting.get("createdAt")
+            published_at = None
+            if created_at:
+                published_at = datetime.fromtimestamp(
+                    created_at / 1000, tz=timezone.utc
+                ).isoformat()
             listings.append({
                 "external_id": str(posting["id"]),
                 "title": posting["text"],
                 "department": categories.get("department"),
-                "location": categories.get("location"),
+                "locations": categories.get("allLocations", []),
                 "url": posting["hostedUrl"],
+                "team": categories.get("team"),
+                "employment_type": normalize_employment_type(
+                    categories.get("commitment")
+                ),
+                "workplace_type": normalize_workplace_type(
+                    posting.get("workplaceType")
+                ),
+                "country": posting.get("country"),
+                "published_at": published_at,
+                "updated_at_source": None,
             })
         return listings
 
@@ -58,12 +120,28 @@ class AshbyAdapter:
         response.raise_for_status()
         listings = []
         for job in response.json()["jobs"]:
+            primary = job.get("location")
+            secondary = job.get("secondaryLocations", [])
+            locations = [primary] if primary else []
+            locations.extend(secondary)
+            address = job.get("address", {})
+            postal = address.get("postalAddress", {}) if address else {}
             listings.append({
                 "external_id": str(job["id"]),
                 "title": job["title"],
                 "department": job.get("department"),
-                "location": job.get("location"),
+                "locations": locations,
                 "url": job["jobUrl"],
+                "team": job.get("team"),
+                "employment_type": normalize_employment_type(
+                    job.get("employmentType")
+                ),
+                "workplace_type": normalize_workplace_type(
+                    job.get("workplaceType")
+                ),
+                "country": postal.get("addressCountry"),
+                "published_at": job.get("publishedAt"),
+                "updated_at_source": None,
             })
         return listings
 

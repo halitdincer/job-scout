@@ -1,7 +1,8 @@
 import pytest
 from django.db import IntegrityError
+from django.utils import timezone
 
-from core.models import JobListing, Run, Source
+from core.models import JobListing, LocationTag, Run, Source
 
 
 @pytest.mark.django_db
@@ -37,6 +38,22 @@ class TestSourceModel:
 
 
 @pytest.mark.django_db
+class TestLocationTagModel:
+    def test_create_tag(self):
+        tag = LocationTag.objects.create(name="Toronto")
+        assert tag.name == "Toronto"
+
+    def test_str_representation(self):
+        tag = LocationTag(name="Toronto")
+        assert str(tag) == "Toronto"
+
+    def test_unique_name(self):
+        LocationTag.objects.create(name="Toronto")
+        with pytest.raises(IntegrityError):
+            LocationTag.objects.create(name="Toronto")
+
+
+@pytest.mark.django_db
 class TestJobListingModel:
     def test_create_listing(self):
         source = Source.objects.create(
@@ -50,7 +67,7 @@ class TestJobListingModel:
         )
         assert listing.status == "active"
         assert listing.department is None
-        assert listing.location is None
+        assert listing.locations.count() == 0
         assert listing.first_seen_at is not None
         assert listing.last_seen_at is not None
 
@@ -89,6 +106,75 @@ class TestJobListingModel:
         )
         assert listing.status == "active"
 
+    def test_enriched_fields(self):
+        source = Source.objects.create(
+            name="Spotify", platform="lever", board_id="spotify"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="abc",
+            title="Engineer",
+            url="https://example.com/abc",
+            team="Platform",
+            employment_type="full_time",
+            workplace_type="remote",
+            country="CA",
+            published_at=timezone.now(),
+            updated_at_source=timezone.now(),
+        )
+        assert listing.team == "Platform"
+        assert listing.employment_type == "full_time"
+        assert listing.workplace_type == "remote"
+        assert listing.country == "CA"
+        assert listing.published_at is not None
+        assert listing.updated_at_source is not None
+
+    def test_multiple_locations(self):
+        source = Source.objects.create(
+            name="Cohere", platform="ashby", board_id="cohere"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="xyz",
+            title="MLE",
+            url="https://example.com/xyz",
+        )
+        t1 = LocationTag.objects.create(name="Toronto")
+        t2 = LocationTag.objects.create(name="New York")
+        listing.locations.add(t1, t2)
+        assert listing.locations.count() == 2
+
+    def test_shared_location_tag(self):
+        tag = LocationTag.objects.create(name="Toronto")
+        s1 = Source.objects.create(name="A", platform="lever", board_id="a")
+        s2 = Source.objects.create(name="B", platform="ashby", board_id="b")
+        l1 = JobListing.objects.create(
+            source=s1, external_id="1", title="J1", url="https://example.com/1"
+        )
+        l2 = JobListing.objects.create(
+            source=s2, external_id="2", title="J2", url="https://example.com/2"
+        )
+        l1.locations.add(tag)
+        l2.locations.add(tag)
+        assert tag.joblisting_set.count() == 2
+
+    def test_enriched_fields_nullable(self):
+        source = Source.objects.create(
+            name="Airbnb", platform="greenhouse", board_id="airbnb"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="123",
+            title="Engineer",
+            url="https://example.com/123",
+        )
+        assert listing.team is None
+        assert listing.employment_type is None
+        assert listing.workplace_type is None
+        assert listing.country is None
+        assert listing.published_at is None
+        assert listing.updated_at_source is None
+
 
 @pytest.mark.django_db
 class TestRunModel:
@@ -109,8 +195,6 @@ class TestRunModel:
         assert str(run) == "Run #5 (completed)"
 
     def test_status_transition_to_completed(self):
-        from django.utils import timezone
-
         run = Run.objects.create()
         run.status = "completed"
         run.started_at = timezone.now()

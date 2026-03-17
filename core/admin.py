@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from core.models import JobListing, Run, Source
+from core.models import JobListing, LocationTag, Run, Source
 
 
 @admin.register(Source)
@@ -12,9 +12,15 @@ class SourceAdmin(admin.ModelAdmin):
 
 @admin.register(JobListing)
 class JobListingAdmin(admin.ModelAdmin):
-    list_display = ("title", "source", "department", "location", "status", "first_seen_at")
+    list_display = ("title", "source", "department", "status", "employment_type", "workplace_type", "first_seen_at")
     search_fields = ("title", "department")
-    list_filter = ("status", "source")
+    list_filter = ("status", "source", "employment_type", "workplace_type")
+
+
+@admin.register(LocationTag)
+class LocationTagAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
 
 
 @admin.register(Run)

@@ -1,8 +1,8 @@
 import pytest
 from django.contrib.admin.sites import site
 
-from core.admin import JobListingAdmin, RunAdmin, SourceAdmin
-from core.models import JobListing, Run, Source
+from core.admin import JobListingAdmin, LocationTagAdmin, RunAdmin, SourceAdmin
+from core.models import JobListing, LocationTag, Run, Source
 
 
 class TestSourceAdmin:
@@ -28,8 +28,9 @@ class TestJobListingAdmin:
             "title",
             "source",
             "department",
-            "location",
             "status",
+            "employment_type",
+            "workplace_type",
             "first_seen_at",
         )
 
@@ -37,7 +38,18 @@ class TestJobListingAdmin:
         assert JobListingAdmin.search_fields == ("title", "department")
 
     def test_list_filter(self):
-        assert JobListingAdmin.list_filter == ("status", "source")
+        assert JobListingAdmin.list_filter == ("status", "source", "employment_type", "workplace_type")
+
+
+class TestLocationTagAdmin:
+    def test_registered(self):
+        assert site.is_registered(LocationTag)
+
+    def test_list_display(self):
+        assert LocationTagAdmin.list_display == ("name",)
+
+    def test_search_fields(self):
+        assert LocationTagAdmin.search_fields == ("name",)
 
 
 class TestRunAdmin:

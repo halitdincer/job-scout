@@ -12,7 +12,7 @@ from core.models import JobListing, Run, Source
 
 
 def jobs_page(request):
-    qs = JobListing.objects.select_related("source").order_by("-last_seen_at")
+    qs = JobListing.objects.select_related("source").prefetch_related("locations").order_by("-last_seen_at")
 
     query = request.GET.get("q", "")
     if query:
@@ -26,12 +26,29 @@ def jobs_page(request):
     if source_filter:
         qs = qs.filter(source_id=source_filter)
 
+    employment_type_filter = request.GET.get("employment_type", "")
+    if employment_type_filter:
+        qs = qs.filter(employment_type=employment_type_filter)
+
+    workplace_type_filter = request.GET.get("workplace_type", "")
+    if workplace_type_filter:
+        qs = qs.filter(workplace_type=workplace_type_filter)
+
+    location_filter = request.GET.get("location", "")
+    if location_filter:
+        qs = qs.filter(locations__name__icontains=location_filter).distinct()
+
     return render(request, "core/jobs.html", {
         "listings": qs,
         "sources": Source.objects.all(),
         "query": query,
         "status_filter": status_filter,
         "source_filter": source_filter,
+        "employment_type_filter": employment_type_filter,
+        "workplace_type_filter": workplace_type_filter,
+        "location_filter": location_filter,
+        "employment_type_choices": JobListing.EMPLOYMENT_TYPE_CHOICES,
+        "workplace_type_choices": JobListing.WORKPLACE_TYPE_CHOICES,
     })
 
 
@@ -71,6 +88,7 @@ def list_jobs(request):
     if status:
         qs = qs.filter(status=status)
 
+    qs = qs.prefetch_related("locations")
     data = [
         {
             "id": listing.id,
@@ -79,9 +97,15 @@ def list_jobs(request):
             "external_id": listing.external_id,
             "title": listing.title,
             "department": listing.department,
-            "location": listing.location,
+            "locations": [tag.name for tag in listing.locations.all()],
             "url": listing.url,
             "status": listing.status,
+            "team": listing.team,
+            "employment_type": listing.employment_type,
+            "workplace_type": listing.workplace_type,
+            "country": listing.country,
+            "published_at": listing.published_at.isoformat() if listing.published_at else None,
+            "updated_at_source": listing.updated_at_source.isoformat() if listing.updated_at_source else None,
             "first_seen_at": listing.first_seen_at.isoformat(),
             "last_seen_at": listing.last_seen_at.isoformat(),
         }

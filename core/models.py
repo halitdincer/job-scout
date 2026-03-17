@@ -26,19 +26,52 @@ class Source(models.Model):
         return f"{self.name} ({self.platform})"
 
 
+class LocationTag(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
 class JobListing(models.Model):
     STATUS_CHOICES = [
         ("active", "Active"),
         ("expired", "Expired"),
     ]
 
+    EMPLOYMENT_TYPE_CHOICES = [
+        ("full_time", "Full-time"),
+        ("part_time", "Part-time"),
+        ("contract", "Contract"),
+        ("intern", "Intern"),
+        ("temporary", "Temporary"),
+        ("unknown", "Unknown"),
+    ]
+
+    WORKPLACE_TYPE_CHOICES = [
+        ("on_site", "On-site"),
+        ("remote", "Remote"),
+        ("hybrid", "Hybrid"),
+        ("unknown", "Unknown"),
+    ]
+
     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name="listings")
     external_id = models.CharField(max_length=255)
     title = models.CharField(max_length=500)
     department = models.CharField(max_length=255, null=True, blank=True)
-    location = models.CharField(max_length=255, null=True, blank=True)
+    locations = models.ManyToManyField(LocationTag, blank=True)
     url = models.URLField(max_length=1000)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="active")
+    team = models.CharField(max_length=255, null=True, blank=True)
+    employment_type = models.CharField(
+        max_length=20, choices=EMPLOYMENT_TYPE_CHOICES, null=True, blank=True
+    )
+    workplace_type = models.CharField(
+        max_length=20, choices=WORKPLACE_TYPE_CHOICES, null=True, blank=True
+    )
+    country = models.CharField(max_length=100, null=True, blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    updated_at_source = models.DateTimeField(null=True, blank=True)
     first_seen_at = models.DateTimeField(auto_now_add=True)
     last_seen_at = models.DateTimeField(auto_now=True)
 

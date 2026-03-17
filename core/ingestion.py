@@ -1,9 +1,10 @@
 import logging
 
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from core.adapters import get_adapter
-from core.models import JobListing
+from core.models import JobListing, LocationTag
 
 logger = logging.getLogger(__name__)
 
@@ -31,34 +32,54 @@ def ingest_sources(sources):
     return result
 
 
+def _parse_dt(value):
+    if not value:
+        return None
+    return parse_datetime(value)
+
+
+def _sync_locations(listing, location_names):
+    tags = []
+    for name in location_names:
+        if name:
+            tag, _ = LocationTag.objects.get_or_create(name=name)
+            tags.append(tag)
+    listing.locations.set(tags)
+
+
 def _process_source(source, fetched, result):
     now = timezone.now()
     fetched_ids = set()
 
     for item in fetched:
         fetched_ids.add(item["external_id"])
+        scalar_defaults = {
+            "title": item["title"],
+            "department": item.get("department"),
+            "url": item["url"],
+            "status": "active",
+            "team": item.get("team"),
+            "employment_type": item.get("employment_type"),
+            "workplace_type": item.get("workplace_type"),
+            "country": item.get("country"),
+            "published_at": _parse_dt(item.get("published_at")),
+            "updated_at_source": _parse_dt(item.get("updated_at_source")),
+        }
         listing, created = JobListing.objects.get_or_create(
             source=source,
             external_id=item["external_id"],
-            defaults={
-                "title": item["title"],
-                "department": item.get("department"),
-                "location": item.get("location"),
-                "url": item["url"],
-                "status": "active",
-            },
+            defaults=scalar_defaults,
         )
         if created:
             result["listings_created"] += 1
         else:
-            listing.title = item["title"]
-            listing.department = item.get("department")
-            listing.location = item.get("location")
-            listing.url = item["url"]
+            for field, value in scalar_defaults.items():
+                setattr(listing, field, value)
             listing.last_seen_at = now
-            listing.status = "active"
             listing.save()
             result["listings_updated"] += 1
+
+        _sync_locations(listing, item.get("locations", []))
 
     expired_count = (
         JobListing.objects.filter(source=source, status="active")

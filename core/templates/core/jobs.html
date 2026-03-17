@@ -18,6 +18,19 @@
     <option value="{{ s.id }}"{% if source_filter == s.id|stringformat:"d" %} selected{% endif %}>{{ s.name }}</option>
     {% endfor %}
   </select>
+  <select name="employment_type">
+    <option value="">All employment types</option>
+    {% for value, label in employment_type_choices %}
+    <option value="{{ value }}"{% if employment_type_filter == value %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="workplace_type">
+    <option value="">All workplace types</option>
+    {% for value, label in workplace_type_choices %}
+    <option value="{{ value }}"{% if workplace_type_filter == value %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="location" value="{{ location_filter }}" placeholder="Filter by location...">
   <button type="submit">Filter</button>
 </form>
 
@@ -28,7 +41,10 @@
       <th>Title</th>
       <th>Company</th>
       <th>Department</th>
-      <th>Location</th>
+      <th>Locations</th>
+      <th>Type</th>
+      <th>Workplace</th>
+      <th>Country</th>
       <th>Status</th>
       <th>First Seen</th>
     </tr>
@@ -39,7 +55,10 @@
       <td><a href="{{ job.url }}" target="_blank" rel="noopener">{{ job.title }}</a></td>
       <td>{{ job.source.name }}</td>
       <td>{{ job.department|default:"—" }}</td>
-      <td>{{ job.location|default:"—" }}</td>
+      <td>{% for loc in job.locations.all %}{{ loc.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+      <td>{{ job.get_employment_type_display|default:"—" }}</td>
+      <td>{{ job.get_workplace_type_display|default:"—" }}</td>
+      <td>{{ job.country|default:"—" }}</td>
       <td><span class="badge badge-{{ job.status }}">{{ job.status }}</span></td>
       <td>{{ job.first_seen_at|date:"M d, Y" }}</td>
     </tr>

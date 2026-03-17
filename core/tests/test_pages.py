@@ -1,7 +1,7 @@
 import pytest
 from django.test import Client
 
-from core.models import JobListing, Run, Source
+from core.models import JobListing, LocationTag, Run, Source
 
 
 @pytest.mark.django_db
@@ -10,21 +10,26 @@ class TestJobsPage:
         source = Source.objects.create(
             name="Airbnb", platform="greenhouse", board_id="airbnb"
         )
-        JobListing.objects.create(
+        listing1 = JobListing.objects.create(
             source=source,
             external_id="1",
             title="Software Engineer",
             department="Eng",
-            location="SF",
             url="https://example.com/1",
             status="active",
+            employment_type="full_time",
+            workplace_type="remote",
         )
+        tag = LocationTag.objects.create(name="SF")
+        listing1.locations.add(tag)
         JobListing.objects.create(
             source=source,
             external_id="2",
             title="Designer",
             url="https://example.com/2",
             status="expired",
+            employment_type="contract",
+            workplace_type="on_site",
         )
         return source
 
@@ -40,6 +45,12 @@ class TestJobsPage:
         response = client.get("/")
         assert len(response.context["listings"]) == 2
         assert len(response.context["sources"]) == 1
+
+    def test_context_has_filter_choices(self):
+        client = Client()
+        response = client.get("/")
+        assert "employment_type_choices" in response.context
+        assert "workplace_type_choices" in response.context
 
     def test_search_by_title(self):
         self._create_source_with_listings()
@@ -68,6 +79,30 @@ class TestJobsPage:
         listings = list(response.context["listings"])
         assert len(listings) == 2
         assert all(j.source_id == source.pk for j in listings)
+
+    def test_filter_by_employment_type(self):
+        self._create_source_with_listings()
+        client = Client()
+        response = client.get("/?employment_type=full_time")
+        listings = list(response.context["listings"])
+        assert len(listings) == 1
+        assert listings[0].employment_type == "full_time"
+
+    def test_filter_by_workplace_type(self):
+        self._create_source_with_listings()
+        client = Client()
+        response = client.get("/?workplace_type=remote")
+        listings = list(response.context["listings"])
+        assert len(listings) == 1
+        assert listings[0].workplace_type == "remote"
+
+    def test_filter_by_location(self):
+        self._create_source_with_listings()
+        client = Client()
+        response = client.get("/?location=SF")
+        listings = list(response.context["listings"])
+        assert len(listings) == 1
+        assert listings[0].title == "Software Engineer"
 
     def test_empty_state(self):
         client = Client()

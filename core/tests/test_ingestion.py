@@ -3,7 +3,7 @@ from unittest.mock import patch, Mock
 import pytest
 
 from core.ingestion import ingest_sources
-from core.models import JobListing, Source
+from core.models import JobListing, LocationTag, Source
 
 
 @pytest.mark.django_db
@@ -11,25 +11,30 @@ class TestIngestSources:
     def _create_source(self, name="Airbnb", platform="greenhouse", board_id="airbnb"):
         return Source.objects.create(name=name, platform=platform, board_id=board_id)
 
+    def _make_item(self, **overrides):
+        defaults = {
+            "external_id": "1",
+            "title": "Engineer",
+            "department": "Eng",
+            "locations": ["SF"],
+            "url": "https://example.com/1",
+            "team": None,
+            "employment_type": "unknown",
+            "workplace_type": "unknown",
+            "country": None,
+            "published_at": None,
+            "updated_at_source": None,
+        }
+        defaults.update(overrides)
+        return defaults
+
     @patch("core.ingestion.get_adapter")
     def test_creates_new_listings(self, mock_get_adapter):
         source = self._create_source()
         adapter = Mock()
         adapter.fetch_listings.return_value = [
-            {
-                "external_id": "1",
-                "title": "Engineer",
-                "department": "Eng",
-                "location": "SF",
-                "url": "https://example.com/1",
-            },
-            {
-                "external_id": "2",
-                "title": "Designer",
-                "department": "Design",
-                "location": "NYC",
-                "url": "https://example.com/2",
-            },
+            self._make_item(external_id="1", title="Engineer", locations=["SF"]),
+            self._make_item(external_id="2", title="Designer", locations=["NYC"]),
         ]
         mock_get_adapter.return_value = adapter
 
@@ -52,13 +57,13 @@ class TestIngestSources:
         )
         adapter = Mock()
         adapter.fetch_listings.return_value = [
-            {
-                "external_id": "1",
-                "title": "New Title",
-                "department": "Eng",
-                "location": "SF",
-                "url": "https://example.com/1-updated",
-            },
+            self._make_item(
+                external_id="1",
+                title="New Title",
+                url="https://example.com/1-updated",
+                team="Platform",
+                employment_type="full_time",
+            ),
         ]
         mock_get_adapter.return_value = adapter
 
@@ -68,6 +73,8 @@ class TestIngestSources:
         listing = JobListing.objects.get(source=source, external_id="1")
         assert listing.title == "New Title"
         assert listing.url == "https://example.com/1-updated"
+        assert listing.team == "Platform"
+        assert listing.employment_type == "full_time"
 
     @patch("core.ingestion.get_adapter")
     def test_marks_missing_listings_expired(self, mock_get_adapter):
@@ -121,13 +128,7 @@ class TestIngestSources:
                 adapter.fetch_listings.side_effect = Exception("API down")
             else:
                 adapter.fetch_listings.return_value = [
-                    {
-                        "external_id": "1",
-                        "title": "Job",
-                        "department": None,
-                        "location": None,
-                        "url": "https://example.com/1",
-                    }
+                    self._make_item(external_id="1", locations=[]),
                 ]
             return adapter
 
@@ -141,3 +142,56 @@ class TestIngestSources:
         assert result["listings_created"] == 2
         assert len(result["errors"]) == 1
         assert "Bad" in result["errors"][0]
+
+    @patch("core.ingestion.get_adapter")
+    def test_creates_location_tags(self, mock_get_adapter):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["Toronto", "New York"]),
+        ]
+        mock_get_adapter.return_value = adapter
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+        listing = JobListing.objects.get(source=source, external_id="1")
+        location_names = list(listing.locations.values_list("name", flat=True))
+        assert sorted(location_names) == ["New York", "Toronto"]
+        assert LocationTag.objects.count() == 2
+
+    @patch("core.ingestion.get_adapter")
+    def test_deduplicates_location_tags(self, mock_get_adapter):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["Toronto"]),
+            self._make_item(external_id="2", title="Designer", locations=["Toronto"]),
+        ]
+        mock_get_adapter.return_value = adapter
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+        assert LocationTag.objects.count() == 1
+        assert LocationTag.objects.first().name == "Toronto"
+
+    @patch("core.ingestion.get_adapter")
+    def test_persists_enriched_fields(self, mock_get_adapter):
+        source = self._create_source(platform="lever", board_id="spotify")
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(
+                external_id="abc",
+                team="Platform",
+                employment_type="full_time",
+                workplace_type="hybrid",
+                country="CA",
+                published_at="2026-01-15T10:00:00+00:00",
+            ),
+        ]
+        mock_get_adapter.return_value = adapter
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+        listing = JobListing.objects.get(source=source, external_id="abc")
+        assert listing.team == "Platform"
+        assert listing.employment_type == "full_time"
+        assert listing.workplace_type == "hybrid"
+        assert listing.country == "CA"
+        assert listing.published_at is not None
