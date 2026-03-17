@@ -12,44 +12,7 @@ from core.models import JobListing, Run, Source
 
 
 def jobs_page(request):
-    qs = JobListing.objects.select_related("source").prefetch_related("locations").order_by("-last_seen_at")
-
-    query = request.GET.get("q", "")
-    if query:
-        qs = qs.filter(title__icontains=query)
-
-    status_filter = request.GET.get("status", "")
-    if status_filter:
-        qs = qs.filter(status=status_filter)
-
-    source_filter = request.GET.get("source", "")
-    if source_filter:
-        qs = qs.filter(source_id=source_filter)
-
-    employment_type_filter = request.GET.get("employment_type", "")
-    if employment_type_filter:
-        qs = qs.filter(employment_type=employment_type_filter)
-
-    workplace_type_filter = request.GET.get("workplace_type", "")
-    if workplace_type_filter:
-        qs = qs.filter(workplace_type=workplace_type_filter)
-
-    location_filter = request.GET.get("location", "")
-    if location_filter:
-        qs = qs.filter(locations__name__icontains=location_filter).distinct()
-
-    return render(request, "core/jobs.html", {
-        "listings": qs,
-        "sources": Source.objects.all(),
-        "query": query,
-        "status_filter": status_filter,
-        "source_filter": source_filter,
-        "employment_type_filter": employment_type_filter,
-        "workplace_type_filter": workplace_type_filter,
-        "location_filter": location_filter,
-        "employment_type_choices": JobListing.EMPLOYMENT_TYPE_CHOICES,
-        "workplace_type_choices": JobListing.WORKPLACE_TYPE_CHOICES,
-    })
+    return render(request, "core/jobs.html")
 
 
 def sources_page(request):

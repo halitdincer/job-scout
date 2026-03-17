@@ -1,114 +1,26 @@
 import pytest
 from django.test import Client
 
-from core.models import JobListing, LocationTag, Run, Source
+from core.models import Run, Source
 
 
 @pytest.mark.django_db
 class TestJobsPage:
-    def _create_source_with_listings(self):
-        source = Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
-        )
-        listing1 = JobListing.objects.create(
-            source=source,
-            external_id="1",
-            title="Software Engineer",
-            department="Eng",
-            url="https://example.com/1",
-            status="active",
-            employment_type="full_time",
-            workplace_type="remote",
-        )
-        tag = LocationTag.objects.create(name="SF")
-        listing1.locations.add(tag)
-        JobListing.objects.create(
-            source=source,
-            external_id="2",
-            title="Designer",
-            url="https://example.com/2",
-            status="expired",
-            employment_type="contract",
-            workplace_type="on_site",
-        )
-        return source
-
     def test_renders_jobs_template(self):
         client = Client()
         response = client.get("/")
         assert response.status_code == 200
         assert "core/jobs.html" in [t.name for t in response.templates]
 
-    def test_context_has_listings_and_sources(self):
-        self._create_source_with_listings()
+    def test_contains_grid_container(self):
         client = Client()
         response = client.get("/")
-        assert len(response.context["listings"]) == 2
-        assert len(response.context["sources"]) == 1
+        assert b'id="jobs-grid"' in response.content
 
-    def test_context_has_filter_choices(self):
+    def test_contains_ag_grid_script(self):
         client = Client()
         response = client.get("/")
-        assert "employment_type_choices" in response.context
-        assert "workplace_type_choices" in response.context
-
-    def test_search_by_title(self):
-        self._create_source_with_listings()
-        client = Client()
-        response = client.get("/?q=engineer")
-        listings = list(response.context["listings"])
-        assert len(listings) == 1
-        assert listings[0].title == "Software Engineer"
-
-    def test_filter_by_status(self):
-        self._create_source_with_listings()
-        client = Client()
-        response = client.get("/?status=active")
-        listings = list(response.context["listings"])
-        assert len(listings) == 1
-        assert listings[0].status == "active"
-
-    def test_filter_by_source(self):
-        source = self._create_source_with_listings()
-        other = Source.objects.create(name="Other", platform="lever", board_id="other")
-        JobListing.objects.create(
-            source=other, external_id="99", title="Other Job", url="https://example.com/99"
-        )
-        client = Client()
-        response = client.get(f"/?source={source.pk}")
-        listings = list(response.context["listings"])
-        assert len(listings) == 2
-        assert all(j.source_id == source.pk for j in listings)
-
-    def test_filter_by_employment_type(self):
-        self._create_source_with_listings()
-        client = Client()
-        response = client.get("/?employment_type=full_time")
-        listings = list(response.context["listings"])
-        assert len(listings) == 1
-        assert listings[0].employment_type == "full_time"
-
-    def test_filter_by_workplace_type(self):
-        self._create_source_with_listings()
-        client = Client()
-        response = client.get("/?workplace_type=remote")
-        listings = list(response.context["listings"])
-        assert len(listings) == 1
-        assert listings[0].workplace_type == "remote"
-
-    def test_filter_by_location(self):
-        self._create_source_with_listings()
-        client = Client()
-        response = client.get("/?location=SF")
-        listings = list(response.context["listings"])
-        assert len(listings) == 1
-        assert listings[0].title == "Software Engineer"
-
-    def test_empty_state(self):
-        client = Client()
-        response = client.get("/")
-        assert response.status_code == 200
-        assert b"No job listings found." in response.content
+        assert b"agGrid.createGrid" in response.content
 
 
 @pytest.mark.django_db

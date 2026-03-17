@@ -4,70 +4,136 @@
 
 {% block content %}
 <h1>Job Listings</h1>
+<div id="jobs-grid"></div>
 
-<form class="toolbar" method="get" action="/">
-  <input type="text" name="q" value="{{ query }}" placeholder="Search by title...">
-  <select name="status">
-    <option value="">All statuses</option>
-    <option value="active"{% if status_filter == "active" %} selected{% endif %}>Active</option>
-    <option value="expired"{% if status_filter == "expired" %} selected{% endif %}>Expired</option>
-  </select>
-  <select name="source">
-    <option value="">All sources</option>
-    {% for s in sources %}
-    <option value="{{ s.id }}"{% if source_filter == s.id|stringformat:"d" %} selected{% endif %}>{{ s.name }}</option>
-    {% endfor %}
-  </select>
-  <select name="employment_type">
-    <option value="">All employment types</option>
-    {% for value, label in employment_type_choices %}
-    <option value="{{ value }}"{% if employment_type_filter == value %} selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
-  <select name="workplace_type">
-    <option value="">All workplace types</option>
-    {% for value, label in workplace_type_choices %}
-    <option value="{{ value }}"{% if workplace_type_filter == value %} selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
-  <input type="text" name="location" value="{{ location_filter }}" placeholder="Filter by location...">
-  <button type="submit">Filter</button>
-</form>
+<script>
+(function() {
+  var EMPLOYMENT_LABELS = {
+    full_time: "Full-time",
+    part_time: "Part-time",
+    contract: "Contract",
+    intern: "Intern",
+    temporary: "Temporary",
+    unknown: "Unknown"
+  };
 
-{% if listings %}
-<table>
-  <thead>
-    <tr>
-      <th>Title</th>
-      <th>Company</th>
-      <th>Department</th>
-      <th>Locations</th>
-      <th>Type</th>
-      <th>Workplace</th>
-      <th>Country</th>
-      <th>Status</th>
-      <th>Expired At</th>
-      <th>First Seen</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for job in listings %}
-    <tr>
-      <td><a href="{{ job.url }}" target="_blank" rel="noopener">{{ job.title }}</a></td>
-      <td>{{ job.source.name }}</td>
-      <td>{{ job.department|default:"—" }}</td>
-      <td>{% for loc in job.locations.all %}{{ loc.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
-      <td>{{ job.get_employment_type_display|default:"—" }}</td>
-      <td>{{ job.get_workplace_type_display|default:"—" }}</td>
-      <td>{{ job.country|default:"—" }}</td>
-      <td><span class="badge badge-{{ job.status }}">{{ job.status }}</span></td>
-      <td>{{ job.expired_at|date:"M d, Y"|default:"—" }}</td>
-      <td>{{ job.first_seen_at|date:"M d, Y" }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="empty">No job listings found.</p>
-{% endif %}
+  var WORKPLACE_LABELS = {
+    on_site: "On-site",
+    remote: "Remote",
+    hybrid: "Hybrid",
+    unknown: "Unknown"
+  };
+
+  function formatDate(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  var theme = agGrid.themeQuartz.withPart(agGrid.colorSchemeDarkBlue);
+
+  var gridOptions = {
+    theme: theme,
+    columnDefs: [
+      {
+        field: "title",
+        headerName: "Title",
+        filter: "agTextColumnFilter",
+        cellRenderer: function(params) {
+          if (!params.value) return "";
+          var a = document.createElement("a");
+          a.href = params.data.url;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = params.value;
+          return a;
+        },
+        minWidth: 250,
+        flex: 2
+      },
+      {
+        field: "source_name",
+        headerName: "Company",
+        filter: "agSetColumnFilter",
+        minWidth: 120,
+        flex: 1
+      },
+      {
+        field: "department",
+        headerName: "Department",
+        filter: "agTextColumnFilter",
+        minWidth: 120,
+        flex: 1
+      },
+      {
+        field: "locations_display",
+        headerName: "Locations",
+        filter: "agTextColumnFilter",
+        minWidth: 150,
+        flex: 1
+      },
+      {
+        field: "employment_type_label",
+        headerName: "Type",
+        filter: "agSetColumnFilter",
+        minWidth: 100
+      },
+      {
+        field: "workplace_type_label",
+        headerName: "Workplace",
+        filter: "agSetColumnFilter",
+        minWidth: 100
+      },
+      {
+        field: "country",
+        headerName: "Country",
+        filter: "agSetColumnFilter",
+        minWidth: 80
+      },
+      {
+        field: "status",
+        headerName: "Status",
+        filter: "agSetColumnFilter",
+        minWidth: 90
+      },
+      {
+        field: "first_seen_at",
+        headerName: "First Seen",
+        filter: "agDateColumnFilter",
+        valueFormatter: function(params) { return formatDate(params.value); },
+        sort: "desc",
+        minWidth: 120
+      }
+    ],
+    defaultColDef: {
+      sortable: true,
+      resizable: true,
+      filterParams: { buttons: ["reset"] }
+    },
+    pagination: true,
+    paginationPageSize: 50,
+    paginationPageSizeSelector: [25, 50, 100],
+    rowData: [],
+    autoSizeStrategy: { type: "fitGridWidth" },
+    suppressCellFocus: true
+  };
+
+  var gridDiv = document.getElementById("jobs-grid");
+  var gridApi = agGrid.createGrid(gridDiv, gridOptions);
+
+  fetch("/api/jobs/")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var rows = data.map(function(item) {
+        item.locations_display = (item.locations || []).join(", ") || "—";
+        item.employment_type_label = EMPLOYMENT_LABELS[item.employment_type] || item.employment_type || "—";
+        item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "—";
+        item.department = item.department || "—";
+        item.country = item.country || "—";
+        return item;
+      });
+      gridApi.setGridOption("rowData", rows);
+    });
+})();
+</script>
 {% endblock %}
