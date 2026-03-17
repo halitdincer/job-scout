@@ -375,6 +375,11 @@
   function renderRule(parentEl, ruleNode, parentNode, childIndex) {
     var row = document.createElement("div");
     row.className = "filter-rule-row";
+    var topRow = document.createElement("div");
+    topRow.className = "filter-rule-top";
+    var valueRow = document.createElement("div");
+    valueRow.className = "filter-rule-value";
+
     var fieldSelect = document.createElement("select");
     FIELD_ORDER.forEach(function(fieldName) {
       var option = document.createElement("option");
@@ -383,13 +388,13 @@
       fieldSelect.appendChild(option);
     });
     fieldSelect.value = ruleNode.field;
-    row.appendChild(fieldSelect);
+    topRow.appendChild(fieldSelect);
 
     var opSelect = document.createElement("select");
-    row.appendChild(opSelect);
+    topRow.appendChild(opSelect);
     var valueWrap = document.createElement("div");
     valueWrap.className = "value-wrap";
-    row.appendChild(valueWrap);
+    valueRow.appendChild(valueWrap);
 
     function rebuildValueInput() {
       valueWrap.innerHTML = "";
@@ -439,7 +444,10 @@
     removeBtn.className = "chip-btn danger";
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", function() { parentNode.children.splice(childIndex, 1); renderFilterBuilder(); });
-    row.appendChild(removeBtn);
+    topRow.appendChild(removeBtn);
+
+    row.appendChild(topRow);
+    row.appendChild(valueRow);
     parentEl.appendChild(row);
   }
 

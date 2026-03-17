@@ -440,9 +440,18 @@ td a:hover {
 
 .filter-rule-row {
   display: grid;
-  grid-template-columns: 1.15fr 1fr 1.5fr auto;
+  gap: 0.35rem;
+}
+
+.filter-rule-top {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr auto;
   gap: 0.4rem;
   align-items: center;
+}
+
+.filter-rule-value {
+  display: block;
 }
 
 .value-wrap {
@@ -710,6 +719,10 @@ td a:hover {
   }
 
   .filter-rule-row {
+    gap: 0.45rem;
+  }
+
+  .filter-rule-top {
     grid-template-columns: 1fr;
   }
 }
