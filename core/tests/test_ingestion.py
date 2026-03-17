@@ -395,3 +395,68 @@ class TestIngestSources:
         ingest_sources(Source.objects.filter(pk=source.pk))
 
         mock_geocode.assert_has_calls([call("Chicago"), call("Remote")])
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_stripe_source_comma_splits_locations(self, mock_get_adapter, mock_geocode):
+        source = self._create_source(name="Stripe", platform="greenhouse", board_id="stripe")
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["SF, NYC, CHI"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": None,
+            "region_code": None,
+            "city": None,
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+
+        listing = JobListing.objects.get(source=source, external_id="1")
+        assert sorted(listing.locations.values_list("name", flat=True)) == [
+            "CHI",
+            "NYC",
+            "SF",
+        ]
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_non_stripe_source_does_not_comma_split(self, mock_get_adapter, mock_geocode):
+        source = self._create_source(name="Pinterest", platform="greenhouse", board_id="pinterest")
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["San Francisco, CA, US"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": "US",
+            "region_code": "US-CA",
+            "city": "San Francisco",
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+
+        listing = JobListing.objects.get(source=source, external_id="1")
+        assert list(listing.locations.values_list("name", flat=True)) == [
+            "San Francisco, CA, US",
+        ]
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_stripe_geocodes_each_comma_split_token(self, mock_get_adapter, mock_geocode):
+        source = self._create_source(name="Stripe", platform="greenhouse", board_id="stripe")
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["SF, NYC"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": None,
+            "region_code": None,
+            "city": None,
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+
+        mock_geocode.assert_has_calls([call("SF"), call("NYC")])

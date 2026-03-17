@@ -240,6 +240,100 @@ class TestNormalizeLocationTagsCommand:
 
         assert "unchanged 1" in out.getvalue().lower()
 
+    def test_source_aware_stripe_comma_split_during_remediation(self):
+        source = Source.objects.create(
+            name="Stripe", platform="greenhouse", board_id="stripe"
+        )
+        listing = source.listings.create(
+            external_id="1",
+            title="Engineer",
+            url="https://example.com/1",
+        )
+        tag = LocationTag.objects.create(name="SF, NYC, CHI")
+        listing.locations.add(tag)
+
+        call_command("normalize_location_tags", delete_obsolete=True, stdout=StringIO())
+
+        listing.refresh_from_db()
+        assert sorted(listing.locations.values_list("name", flat=True)) == [
+            "CHI",
+            "NYC",
+            "SF",
+        ]
+        assert not LocationTag.objects.filter(pk=tag.pk).exists()
+
+    def test_source_aware_pinterest_not_comma_split_during_remediation(self):
+        source = Source.objects.create(
+            name="Pinterest", platform="greenhouse", board_id="pinterest"
+        )
+        listing = source.listings.create(
+            external_id="1",
+            title="Engineer",
+            url="https://example.com/1",
+        )
+        tag = LocationTag.objects.create(name="San Francisco, CA, US")
+        listing.locations.add(tag)
+
+        call_command("normalize_location_tags", stdout=StringIO())
+
+        listing.refresh_from_db()
+        assert list(listing.locations.values_list("name", flat=True)) == [
+            "San Francisco, CA, US",
+        ]
+
+    def test_multi_source_tag_uses_stripe_profile_when_mixed(self):
+        stripe_source = Source.objects.create(
+            name="Stripe", platform="greenhouse", board_id="stripe"
+        )
+        other_source = Source.objects.create(
+            name="Other", platform="lever", board_id="other"
+        )
+        stripe_listing = stripe_source.listings.create(
+            external_id="1",
+            title="Engineer",
+            url="https://example.com/1",
+        )
+        other_listing = other_source.listings.create(
+            external_id="2",
+            title="Designer",
+            url="https://example.com/2",
+        )
+        tag = LocationTag.objects.create(name="SF, NYC")
+        stripe_listing.locations.add(tag)
+        other_listing.locations.add(tag)
+
+        call_command("normalize_location_tags", delete_obsolete=True, stdout=StringIO())
+
+        stripe_listing.refresh_from_db()
+        assert sorted(stripe_listing.locations.values_list("name", flat=True)) == [
+            "NYC",
+            "SF",
+        ]
+        other_listing.refresh_from_db()
+        assert sorted(other_listing.locations.values_list("name", flat=True)) == [
+            "NYC",
+            "SF",
+        ]
+
+    def test_dry_run_source_aware_reports_stripe_splits(self):
+        source = Source.objects.create(
+            name="Stripe", platform="greenhouse", board_id="stripe"
+        )
+        listing = source.listings.create(
+            external_id="1",
+            title="Engineer",
+            url="https://example.com/1",
+        )
+        tag = LocationTag.objects.create(name="SF, NYC")
+        listing.locations.add(tag)
+        out = StringIO()
+
+        call_command("normalize_location_tags", dry_run=True, stdout=out)
+
+        listing.refresh_from_db()
+        assert list(listing.locations.values_list("name", flat=True)) == ["SF, NYC"]
+        assert "dry run" in out.getvalue().lower()
+
     @patch("core.management.commands.backfill_geo.geocode_location")
     def test_remediation_generated_tags_are_backfillable(self, mock_geocode):
         self._create_listing_with_tag("Chicago / Remote")

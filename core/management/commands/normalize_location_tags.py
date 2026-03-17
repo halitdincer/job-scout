@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from core.location_normalization import normalize_location_value
+from core.location_normalization import get_parsing_profile, normalize_location_value
 from core.models import LocationTag
 
 
@@ -19,6 +19,18 @@ class Command(BaseCommand):
             help="Delete remediated tags once no listings reference them",
         )
 
+    def _get_best_profile(self, tag):
+        listings = tag.joblisting_set.select_related("source").all()
+        profiles = set()
+        for listing in listings:
+            src = listing.source
+            profiles.add(get_parsing_profile(src.platform, src.board_id))
+        if len(profiles) == 1:
+            return profiles.pop()
+        if "stripe" in profiles:
+            return "stripe"
+        return "default"  # pragma: no cover — multiple non-default profiles not yet registered
+
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         delete_obsolete = options["delete_obsolete"]
@@ -33,7 +45,8 @@ class Command(BaseCommand):
             self.stdout.write("Running in dry run mode.")
 
         for tag in LocationTag.objects.all().order_by("id"):
-            normalized = normalize_location_value(tag.name)
+            profile = self._get_best_profile(tag)
+            normalized = normalize_location_value(tag.name, profile=profile)
 
             if not normalized:
                 skipped_tags += 1
@@ -53,7 +66,7 @@ class Command(BaseCommand):
                         missing_count += 1
                 created_tags += missing_count
                 self.stdout.write(
-                    f"  [dry run] '{tag.name}' -> {', '.join(normalized)} "
+                    f"  [dry run] '{tag.name}' -> {normalized} "
                     f"({len(listings)} listing(s))"
                 )
                 continue
@@ -75,7 +88,7 @@ class Command(BaseCommand):
                 deleted_tags += 1
 
             self.stdout.write(
-                f"  Remediated '{tag.name}' -> {', '.join(normalized)} "
+                f"  Remediated '{tag.name}' -> {normalized} "
                 f"({len(listings)} listing(s))"
             )
 

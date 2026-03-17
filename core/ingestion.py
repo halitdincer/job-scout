@@ -5,7 +5,7 @@ from django.utils.dateparse import parse_datetime
 
 from core.adapters import get_adapter
 from core.geo import geocode_location
-from core.location_normalization import normalize_location_values
+from core.location_normalization import get_parsing_profile, normalize_location_values
 from core.models import JobListing, LocationTag
 
 logger = logging.getLogger(__name__)
@@ -40,9 +40,9 @@ def _parse_dt(value):
     return parse_datetime(value)
 
 
-def _sync_locations(listing, location_names):
+def _sync_locations(listing, location_names, profile="default"):
     tags = []
-    for name in normalize_location_values(location_names):
+    for name in normalize_location_values(location_names, profile=profile):
         tag, created = LocationTag.objects.get_or_create(name=name)
         if created:
             geo = geocode_location(name)
@@ -57,6 +57,7 @@ def _sync_locations(listing, location_names):
 def _process_source(source, fetched, result):
     now = timezone.now()
     fetched_ids = set()
+    profile = get_parsing_profile(source.platform, source.board_id)
 
     for item in fetched:
         fetched_ids.add(item["external_id"])
@@ -85,7 +86,7 @@ def _process_source(source, fetched, result):
             listing.save()
             result["listings_updated"] += 1
 
-        _sync_locations(listing, item.get("locations", []))
+        _sync_locations(listing, item.get("locations", []), profile=profile)
 
         if item.get("is_listed") is False and listing.status == "active":
             listing.status = "expired"
