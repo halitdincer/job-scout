@@ -76,6 +76,39 @@
     return '<a href="' + row.url + '" target="_blank" rel="noopener">' + val.replace(/</g, "&lt;") + '</a>';
   }
 
+  function isoDateSorter(a, b) {
+    if (!a && !b) return 0;
+    if (!a) return 1;
+    if (!b) return -1;
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  }
+
+  var DATE_RANGE_PRESETS = [
+    { label: "Today", value: "0" },
+    { label: "Last 7 days", value: "7" },
+    { label: "Last 14 days", value: "14" },
+    { label: "Last 30 days", value: "30" },
+    { label: "Last 90 days", value: "90" }
+  ];
+
+  function dateRangeFilter(headerValue, rowValue) {
+    if (!headerValue) return true;
+    if (!rowValue) return false;
+    var days = parseInt(headerValue, 10);
+    var rowTime = new Date(rowValue).getTime();
+    if (isNaN(rowTime)) return false;
+    if (days === 0) {
+      var today = new Date().toISOString().slice(0, 10);
+      return rowValue.slice(0, 10) === today;
+    }
+    var cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return rowTime >= cutoff;
+  }
+
+  var dateFilterParams = { values: DATE_RANGE_PRESETS, clearable: true };
+
   var listFilterParams = { valuesLookup: true, clearable: true, sort: "asc" };
 
   function arrayJoinFormatter(cell) {
@@ -143,13 +176,17 @@
       {
         title: "Published At", field: "published_at",
         formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: "datetime", sorterParams: { format: "iso" },
+        sorter: isoDateSorter,
+        headerFilter: "list", headerFilterParams: dateFilterParams,
+        headerFilterFunc: dateRangeFilter,
         minWidth: 120
       },
       {
         title: "First Seen", field: "first_seen_at",
         formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: "datetime", sorterParams: { format: "iso" },
+        sorter: isoDateSorter,
+        headerFilter: "list", headerFilterParams: dateFilterParams,
+        headerFilterFunc: dateRangeFilter,
         minWidth: 120
       },
       {
@@ -191,7 +228,9 @@
       {
         title: "Last Seen", field: "last_seen_at",
         formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: "datetime", sorterParams: { format: "iso" },
+        sorter: isoDateSorter,
+        headerFilter: "list", headerFilterParams: dateFilterParams,
+        headerFilterFunc: dateRangeFilter,
         minWidth: 120, visible: false
       },
       {
@@ -202,13 +241,17 @@
       {
         title: "Updated At Source", field: "updated_at_source",
         formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: "datetime", sorterParams: { format: "iso" },
+        sorter: isoDateSorter,
+        headerFilter: "list", headerFilterParams: dateFilterParams,
+        headerFilterFunc: dateRangeFilter,
         minWidth: 120, visible: false
       },
       {
         title: "Expired At", field: "expired_at",
         formatter: timeAgoFormatter, tooltip: timeAgoTooltip,
-        sorter: "datetime", sorterParams: { format: "iso" },
+        sorter: isoDateSorter,
+        headerFilter: "list", headerFilterParams: dateFilterParams,
+        headerFilterFunc: dateRangeFilter,
         minWidth: 120, visible: false
       },
       {
