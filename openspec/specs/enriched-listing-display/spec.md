@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Jobs page displays enriched fields
-The jobs grid at `/` SHALL display columns: Title, Company (source name), Department, Locations (comma-separated), Type (employment type with display label), Workplace (workplace type with display label), Country, Status, and First Seen (formatted date). All filtering is handled by AG Grid's built-in column filters instead of server-side query parameters.
+The jobs grid at `/` SHALL have columns available for all API response fields: Title, Company (source name), Department, Locations (comma-separated), Type (employment type with display label), Workplace (workplace type with display label), Country, Status, First Seen, Last Seen, Team, Published At, Updated At Source, Expired At, External ID, Source ID, and ID. Default visibility is controlled by the grid configuration.
 
 #### Scenario: Grid shows locations
 - **WHEN** a job listing has locations ["Toronto", "New York"]
@@ -14,6 +14,10 @@ The jobs grid at `/` SHALL display columns: Title, Company (source name), Depart
 #### Scenario: Grid shows workplace type label
 - **WHEN** a job listing has `workplace_type="remote"`
 - **THEN** the grid displays "Remote" in the Workplace column
+
+#### Scenario: Grid shows team when enabled
+- **WHEN** a user enables the Team column via column chooser and a listing has `team="Engineering"`
+- **THEN** the Team column displays "Engineering"
 
 ### Requirement: Jobs page workplace type filter
 The Workplace column SHALL include an AG Grid set filter with multi-select, replacing the previous server-side dropdown.
