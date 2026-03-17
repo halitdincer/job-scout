@@ -1,4 +1,4 @@
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, call
 
 import pytest
 
@@ -225,3 +225,173 @@ class TestIngestSources:
         assert listing.employment_type == "full_time"
         assert listing.workplace_type == "hybrid"
         assert listing.published_at is not None
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_new_location_tag_gets_geocoded(self, mock_get_adapter, mock_geocode):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["Toronto, ON"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": "CA",
+            "region_code": "CA-ON",
+            "city": "Toronto",
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+        tag = LocationTag.objects.get(name="Toronto, ON")
+        assert tag.country_code == "CA"
+        assert tag.region_code == "CA-ON"
+        assert tag.city == "Toronto"
+        mock_geocode.assert_called_once_with("Toronto, ON")
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_existing_location_tag_not_re_geocoded(self, mock_get_adapter, mock_geocode):
+        source = self._create_source()
+        LocationTag.objects.create(
+            name="Toronto, ON", country_code="CA", region_code="CA-ON", city="Toronto"
+        )
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["Toronto, ON"]),
+        ]
+        mock_get_adapter.return_value = adapter
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+        mock_geocode.assert_not_called()
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_geocode_failure_leaves_nulls(self, mock_get_adapter, mock_geocode):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["Remote"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": None,
+            "region_code": None,
+            "city": None,
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+        tag = LocationTag.objects.get(name="Remote")
+        assert tag.country_code is None
+        assert tag.region_code is None
+        assert tag.city is None
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_splits_semicolon_delimited_locations(self, mock_get_adapter, mock_geocode):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(
+                external_id="1",
+                locations=["New York, NY, US; Chicago, IL, US"],
+            ),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": None,
+            "region_code": None,
+            "city": None,
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+
+        listing = JobListing.objects.get(source=source, external_id="1")
+        assert sorted(listing.locations.values_list("name", flat=True)) == [
+            "Chicago, IL, US",
+            "New York, NY, US",
+        ]
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_splits_slash_delimited_locations(self, mock_get_adapter, mock_geocode):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["Chicago / Remote"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": None,
+            "region_code": None,
+            "city": None,
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+
+        listing = JobListing.objects.get(source=source, external_id="1")
+        assert sorted(listing.locations.values_list("name", flat=True)) == [
+            "Chicago",
+            "Remote",
+        ]
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_splits_or_delimited_locations(self, mock_get_adapter, mock_geocode):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["San Francisco or New York"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": None,
+            "region_code": None,
+            "city": None,
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+
+        listing = JobListing.objects.get(source=source, external_id="1")
+        assert sorted(listing.locations.values_list("name", flat=True)) == [
+            "New York",
+            "San Francisco",
+        ]
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_does_not_split_city_state_pattern(self, mock_get_adapter, mock_geocode):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["Toronto, ON"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": "CA",
+            "region_code": "CA-ON",
+            "city": "Toronto",
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+
+        listing = JobListing.objects.get(source=source, external_id="1")
+        assert list(listing.locations.values_list("name", flat=True)) == ["Toronto, ON"]
+
+    @patch("core.ingestion.geocode_location")
+    @patch("core.ingestion.get_adapter")
+    def test_geocodes_each_new_split_location(self, mock_get_adapter, mock_geocode):
+        source = self._create_source()
+        adapter = Mock()
+        adapter.fetch_listings.return_value = [
+            self._make_item(external_id="1", locations=["Chicago / Remote"]),
+        ]
+        mock_get_adapter.return_value = adapter
+        mock_geocode.return_value = {
+            "country_code": None,
+            "region_code": None,
+            "city": None,
+        }
+
+        ingest_sources(Source.objects.filter(pk=source.pk))
+
+        mock_geocode.assert_has_calls([call("Chicago"), call("Remote")])

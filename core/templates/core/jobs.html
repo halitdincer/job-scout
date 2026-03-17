@@ -98,7 +98,7 @@
         minWidth: 120, widthGrow: 1
       },
       {
-        title: "Location", field: "locations_display",
+        title: "Location (Raw)", field: "locations_display",
         headerFilter: "input", headerFilterPlaceholder: "Search...",
         minWidth: 150, widthGrow: 1
       },
@@ -133,6 +133,16 @@
         title: "Country", field: "country",
         headerFilter: "list", headerFilterParams: listFilterParams,
         minWidth: 80, visible: false
+      },
+      {
+        title: "Region", field: "region",
+        headerFilter: "list", headerFilterParams: listFilterParams,
+        minWidth: 100, visible: false
+      },
+      {
+        title: "City", field: "city",
+        headerFilter: "list", headerFilterParams: listFilterParams,
+        minWidth: 100, visible: false
       },
       {
         title: "Status", field: "status",
@@ -222,6 +232,8 @@
         item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "";
         item.department = item.department || "";
         item.country = item.country || "";
+        item.region = item.region || "";
+        item.city = item.city || "";
         item.team = item.team || "";
         return item;
       });

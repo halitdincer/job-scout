@@ -86,12 +86,57 @@ class TestJobsAPI:
             }
         ]
         assert engineer["country"] == "US"
+        assert engineer["region"] == "US-CA"
+        assert engineer["city"] == "San Francisco"
         assert engineer["team"] == "Platform"
         assert engineer["employment_type"] == "full_time"
         assert engineer["workplace_type"] == "remote"
         assert "expired_at" in engineer
         assert "published_at" in engineer
         assert "updated_at_source" in engineer
+
+    def test_region_and_city_with_multiple_locations(self):
+        source = Source.objects.create(
+            name="Test", platform="greenhouse", board_id="test"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="multi",
+            title="Multi-loc",
+            url="https://example.com/multi",
+        )
+        tag1 = LocationTag.objects.create(
+            name="Toronto", country_code="CA", region_code="CA-ON", city="Toronto"
+        )
+        tag2 = LocationTag.objects.create(
+            name="Vancouver", country_code="CA", region_code="CA-BC", city="Vancouver"
+        )
+        listing.locations.add(tag1, tag2)
+        client = Client()
+        response = client.get("/api/jobs/")
+        data = response.json()
+        job = next(j for j in data if j["title"] == "Multi-loc")
+        assert job["region"] == "CA-BC, CA-ON"
+        assert job["city"] == "Toronto, Vancouver"
+
+    def test_region_and_city_empty_when_no_geo(self):
+        source = Source.objects.create(
+            name="Test", platform="greenhouse", board_id="test"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="nogeo",
+            title="No-geo",
+            url="https://example.com/nogeo",
+        )
+        tag = LocationTag.objects.create(name="Remote")
+        listing.locations.add(tag)
+        client = Client()
+        response = client.get("/api/jobs/")
+        data = response.json()
+        job = next(j for j in data if j["title"] == "No-geo")
+        assert job["region"] is None
+        assert job["city"] is None
 
     def test_filter_by_source_id(self):
         source = self._create_source_with_listings()

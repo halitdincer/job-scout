@@ -114,6 +114,26 @@ class LeverAdapter:
 class AshbyAdapter:
     BASE_URL = "https://api.ashbyhq.com/posting-api/job-board"
 
+    @staticmethod
+    def _normalize_locations(primary, secondary):
+        locations = []
+        if isinstance(primary, str) and primary.strip():
+            locations.append(primary.strip())
+
+        for item in secondary or []:
+            if isinstance(item, str):
+                value = item.strip()
+            elif isinstance(item, dict):
+                raw = item.get("location")
+                value = raw.strip() if isinstance(raw, str) else ""
+            else:
+                value = ""
+
+            if value:
+                locations.append(value)
+
+        return locations
+
     def fetch_listings(self, board_id):
         response = requests.get(
             f"{self.BASE_URL}/{board_id}",
@@ -124,8 +144,7 @@ class AshbyAdapter:
         for job in response.json()["jobs"]:
             primary = job.get("location")
             secondary = job.get("secondaryLocations", [])
-            locations = [primary] if primary else []
-            locations.extend(secondary)
+            locations = self._normalize_locations(primary, secondary)
             address = job.get("address", {})
             postal = address.get("postalAddress", {}) if address else {}
             listings.append({

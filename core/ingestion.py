@@ -4,6 +4,8 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from core.adapters import get_adapter
+from core.geo import geocode_location
+from core.location_normalization import normalize_location_values
 from core.models import JobListing, LocationTag
 
 logger = logging.getLogger(__name__)
@@ -40,10 +42,15 @@ def _parse_dt(value):
 
 def _sync_locations(listing, location_names):
     tags = []
-    for name in location_names:
-        if name:
-            tag, _ = LocationTag.objects.get_or_create(name=name)
-            tags.append(tag)
+    for name in normalize_location_values(location_names):
+        tag, created = LocationTag.objects.get_or_create(name=name)
+        if created:
+            geo = geocode_location(name)
+            tag.country_code = geo["country_code"]
+            tag.region_code = geo["region_code"]
+            tag.city = geo["city"]
+            tag.save()
+        tags.append(tag)
     listing.locations.set(tags)
 
 

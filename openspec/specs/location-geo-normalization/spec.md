@@ -51,3 +51,48 @@ The system SHALL provide a `GET /api/locations/` endpoint returning all Location
 #### Scenario: Empty locations
 - **WHEN** no LocationTags exist
 - **THEN** the response is an empty JSON array
+
+### Requirement: Jobs API geo computed fields
+The `GET /api/jobs/` endpoint SHALL include `region` and `city` computed fields on each job listing object. The `region` field SHALL be a comma-separated string of unique non-null `region_code` values from the listing's LocationTags. The `city` field SHALL be a comma-separated string of unique non-null `city` values from the listing's LocationTags. Both fields SHALL be empty string when no geo data is available, matching the existing `country` field pattern.
+
+#### Scenario: Job with geo-enriched locations
+- **WHEN** a job listing has LocationTags with `region_code="CA-ON"`, `city="Toronto"` and `region_code="CA-BC"`, `city="Vancouver"`
+- **THEN** the API response includes `"region": "CA-ON, CA-BC"` and `"city": "Toronto, Vancouver"`
+
+#### Scenario: Job with no geo data
+- **WHEN** a job listing has LocationTags with all geo fields null
+- **THEN** the API response includes `"region": ""` and `"city": ""`
+
+#### Scenario: Job with partial geo data
+- **WHEN** a job listing has one LocationTag with `region_code="US-CA"`, `city="San Francisco"` and another with all geo fields null
+- **THEN** the API response includes `"region": "US-CA"` and `"city": "San Francisco"`
+
+### Requirement: Auto-geocode on ingestion
+The ingestion pipeline SHALL auto-geocode newly created LocationTags. When `_sync_locations()` creates a new LocationTag via `get_or_create`, it SHALL call `geocode_location()` and populate the tag's `country_code`, `region_code`, and `city` fields before saving.
+
+#### Scenario: New location created during ingestion
+- **WHEN** a job listing is ingested with a location name that does not yet exist as a LocationTag
+- **THEN** a new LocationTag is created with geo fields populated via geocoding
+
+#### Scenario: Existing location reused during ingestion
+- **WHEN** a job listing is ingested with a location name that already exists as a LocationTag
+- **THEN** the existing tag is reused without re-geocoding
+
+#### Scenario: Geocoding failure during ingestion
+- **WHEN** geocoding fails for a new LocationTag
+- **THEN** the tag is still created with `name` set but geo fields left null
+
+### Requirement: Backfill geo fields management command
+The system SHALL provide a Django management command `backfill_geo` that iterates all LocationTags with null `country_code`, geocodes the `name` field, and populates geo fields. The command SHALL be idempotent, support `--dry-run`, and rate-limit at 1 req/sec.
+
+#### Scenario: Backfill parseable location
+- **WHEN** a LocationTag has `name="Toronto, ON, Canada"` and `country_code=None`
+- **THEN** after running `backfill_geo`, geo fields are populated
+
+#### Scenario: Skip already-mapped tags
+- **WHEN** a LocationTag has `country_code="CA"` already set
+- **THEN** `backfill_geo` skips it without modification
+
+#### Scenario: Dry run
+- **WHEN** `backfill_geo --dry-run` is run
+- **THEN** the command prints what would be updated but does not save changes

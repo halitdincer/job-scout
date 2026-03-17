@@ -289,6 +289,85 @@ class TestAshbyAdapter:
         assert listings[0]["country"] is None
 
     @patch("core.adapters.requests.get")
+    def test_secondary_location_objects_are_normalized_to_strings(self, mock_get):
+        mock_get.return_value = _mock_response({
+            "jobs": [
+                {
+                    "id": "uuid-2",
+                    "title": "Engineer II",
+                    "location": "London",
+                    "secondaryLocations": [
+                        {
+                            "location": "Toronto",
+                            "address": {
+                                "postalAddress": {
+                                    "addressCountry": "Canada",
+                                }
+                            },
+                        },
+                        {
+                            "location": "New York",
+                        },
+                    ],
+                    "jobUrl": "https://jobs.ashbyhq.com/co/uuid-2",
+                }
+            ]
+        })
+
+        adapter = AshbyAdapter()
+        listings = adapter.fetch_listings("co")
+
+        assert listings[0]["locations"] == ["London", "Toronto", "New York"]
+
+    @patch("core.adapters.requests.get")
+    def test_does_not_emit_stringified_dict_locations(self, mock_get):
+        mock_get.return_value = _mock_response({
+            "jobs": [
+                {
+                    "id": "uuid-3",
+                    "title": "Designer",
+                    "location": "Toronto",
+                    "secondaryLocations": [
+                        {
+                            "address": {
+                                "postalAddress": {
+                                    "addressCountry": "Canada",
+                                }
+                            },
+                        },
+                        "Montreal",
+                    ],
+                    "jobUrl": "https://jobs.ashbyhq.com/co/uuid-3",
+                }
+            ]
+        })
+
+        adapter = AshbyAdapter()
+        listings = adapter.fetch_listings("co")
+
+        assert listings[0]["locations"] == ["Toronto", "Montreal"]
+        assert all("{" not in loc for loc in listings[0]["locations"])
+
+    @patch("core.adapters.requests.get")
+    def test_ignores_unsupported_secondary_location_types(self, mock_get):
+        mock_get.return_value = _mock_response({
+            "jobs": [
+                {
+                    "id": "uuid-4",
+                    "title": "PM",
+                    "location": "Toronto",
+                    "secondaryLocations": ["Montreal", 42, None],
+                    "jobUrl": "https://jobs.ashbyhq.com/co/uuid-4",
+                }
+            ]
+        })
+
+        adapter = AshbyAdapter()
+        listings = adapter.fetch_listings("co")
+
+        assert listings[0]["locations"] == ["Toronto", "Montreal"]
+
+    @patch("core.adapters.requests.get")
     def test_http_error(self, mock_get):
         mock_get.return_value = _mock_response({}, status_code=404)
         adapter = AshbyAdapter()

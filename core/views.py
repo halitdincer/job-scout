@@ -68,6 +68,12 @@ def list_jobs(request):
         country_codes = sorted(
             {tag.country_code for tag in tags if tag.country_code}
         )
+        region_codes = sorted(
+            {tag.region_code for tag in tags if tag.region_code}
+        )
+        cities = sorted(
+            {tag.city for tag in tags if tag.city}
+        )
         data.append({
             "id": listing.id,
             "source_id": listing.source_id,
@@ -82,6 +88,8 @@ def list_jobs(request):
             "employment_type": listing.employment_type,
             "workplace_type": listing.workplace_type,
             "country": ", ".join(country_codes) if country_codes else None,
+            "region": ", ".join(region_codes) if region_codes else None,
+            "city": ", ".join(cities) if cities else None,
             "expired_at": listing.expired_at.isoformat() if listing.expired_at else None,
             "published_at": listing.published_at.isoformat() if listing.published_at else None,
             "updated_at_source": listing.updated_at_source.isoformat() if listing.updated_at_source else None,
