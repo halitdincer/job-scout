@@ -1,48 +1,48 @@
 ## ADDED Requirements
 
-### Requirement: AG Grid powered jobs table
-The jobs page at `/` SHALL render an AG Grid Community table that fetches all job listings from `/api/jobs/` and displays them client-side with all available columns. Default visible columns: Title, Company, Department, Locations, Type, Workplace, Country, Status, First Seen, Last Seen. Hidden by default: Team, Published At, Updated At Source, Expired At, External ID, Source ID, ID. The Country column SHALL derive its values from LocationTag `country_code` fields (via the locations M2M), not from a flat `country` field on JobListing.
+### Requirement: Tabulator powered jobs table
+The jobs page at `/` SHALL render a Tabulator table that fetches all job listings from `/api/jobs/` and displays them client-side with all available columns. Default visible columns: Title, Company, Location, Type, Published At, First Seen. Hidden by default: Department, Workplace, Country, Status, Last Seen, Team, Updated At Source, Expired At, External ID, Source ID, ID. The Country column SHALL derive its values from LocationTag `country_code` fields (via the locations M2M).
 
-#### Scenario: Grid loads data from API
+#### Scenario: Table loads data from API
 - **WHEN** a user visits `/`
-- **THEN** the page fetches `/api/jobs/` and renders all listings in an AG Grid table
+- **THEN** the page fetches `/api/jobs/` and renders all listings in a Tabulator table
 
-#### Scenario: Grid displays default visible columns
-- **WHEN** the grid loads with data
-- **THEN** 10 columns are visible: Title, Company, Department, Locations, Type, Workplace, Country, Status, First Seen, Last Seen
+#### Scenario: Table displays default visible columns
+- **WHEN** the table loads with data
+- **THEN** 6 columns are visible: Title, Company, Location, Type, Published At, First Seen
 
 #### Scenario: Hidden columns accessible via column chooser
-- **WHEN** a user opens the column chooser side panel
-- **THEN** all columns are listed with checkboxes and hidden columns (Team, Published At, Updated At Source, Expired At, External ID, Source ID, ID) can be toggled on
+- **WHEN** a user opens the column chooser
+- **THEN** all columns are listed with checkboxes and hidden columns can be toggled on
 
 ### Requirement: Column chooser
-The grid SHALL include a column chooser accessible via the AG Grid side bar that allows users to show or hide any column.
+The table SHALL include a custom column chooser button above the grid that opens a dropdown panel listing all columns with checkboxes to toggle visibility.
 
 #### Scenario: Open column chooser
-- **WHEN** a user clicks the columns side bar toggle
-- **THEN** a panel appears listing all available columns with visibility toggles
+- **WHEN** a user clicks the "Columns" button
+- **THEN** a dropdown panel appears listing all available columns with visibility toggles
 
 #### Scenario: Hide a visible column
-- **WHEN** a user unchecks "Department" in the column chooser
-- **THEN** the Department column is removed from the grid
+- **WHEN** a user unchecks "Company" in the column chooser
+- **THEN** the Company column is removed from the table
 
 #### Scenario: Show a hidden column
 - **WHEN** a user checks "Team" in the column chooser
-- **THEN** the Team column appears in the grid
+- **THEN** the Team column appears in the table
 
 ### Requirement: Full-width full-height layout
-The navbar and grid SHALL span the full viewport width and height. No page title SHALL be displayed. The grid height SHALL fill the viewport below the navbar.
+The navbar and table SHALL span the full viewport width and height. No page title SHALL be displayed. The table height SHALL fill the viewport below the navbar and toolbar.
 
-#### Scenario: Grid fills viewport
+#### Scenario: Table fills viewport
 - **WHEN** a user visits `/`
-- **THEN** the grid fills the full width and the remaining height below the 56px navbar
+- **THEN** the table fills the full width and the remaining height below the 56px navbar and toolbar
 
 #### Scenario: No page title shown
 - **WHEN** a user visits `/`
-- **THEN** no `<h1>` heading is displayed above the grid
+- **THEN** no `<h1>` heading is displayed above the table
 
 ### Requirement: Column sorting
-Every column in the jobs grid SHALL be sortable by clicking the column header. Clicking once sorts ascending, clicking again sorts descending, clicking a third time clears the sort.
+Every column in the jobs table SHALL be sortable by clicking the column header.
 
 #### Scenario: Sort by title ascending
 - **WHEN** a user clicks the Title column header
@@ -52,52 +52,38 @@ Every column in the jobs grid SHALL be sortable by clicking the column header. C
 - **WHEN** a user clicks the First Seen column header twice
 - **THEN** listings are sorted by first seen date, newest first
 
-### Requirement: Text column filters
-The Title, Department, Locations, and Country columns SHALL have text-based filters that match case-insensitively.
+### Requirement: Header filters
+Each column SHALL have a header filter. Categorical columns (Company, Type, Workplace, Country, Status) SHALL use a value-list dropdown auto-populated from column data. Text columns (Title, Department, Locations) SHALL use a text input filter.
+
+#### Scenario: Filter by company dropdown
+- **WHEN** a user clicks the Company header filter and selects "Stripe"
+- **THEN** only listings from Stripe are shown
 
 #### Scenario: Filter by title text
-- **WHEN** a user opens the Title column filter and types "engineer"
+- **WHEN** a user types "engineer" in the Title header filter
 - **THEN** only listings whose title contains "engineer" (case-insensitive) are shown
 
-### Requirement: Multi-select set filters
-The Company, Type, Workplace, Country, and Status columns SHALL have set filters allowing selection of multiple values. The Country filter SHALL use `country_code` values derived from LocationTags, enabling hierarchical geo filtering (selecting "CA" shows all jobs with any LocationTag mapped to country_code "CA").
+#### Scenario: Value-list shows actual values
+- **WHEN** a user clicks the Type header filter dropdown
+- **THEN** the dropdown shows "Full-time", "Part-time", etc. populated from the actual data
 
-#### Scenario: Multi-select company filter
-- **WHEN** a user opens the Company filter and selects "Stripe" and "Spotify"
-- **THEN** only listings from Stripe or Spotify are shown
-
-#### Scenario: Set filter shows display labels
-- **WHEN** a user opens the Type column filter
-- **THEN** the filter dropdown shows "Full-time", "Part-time", etc. (not "full_time", "part_time")
-
-#### Scenario: Country filter uses geo-mapped values
-- **WHEN** a user opens the Country filter and selects "CA"
-- **THEN** all listings that have at least one LocationTag with `country_code="CA"` are shown, regardless of raw location string
-
-### Requirement: Relative time display
-The First Seen and Last Seen columns SHALL display relative timestamps (e.g., "2h ago", "1d ago") with the full date-time available on hover via tooltip.
+### Requirement: Relative time display for all date columns
+ALL date/time columns (First Seen, Last Seen, Published At, Updated At Source, Expired At) SHALL display relative timestamps (e.g., "2h ago", "1d ago") with the full date-time available on hover via tooltip.
 
 #### Scenario: Recent listing shows relative time
 - **WHEN** a listing was first seen 3 hours ago
 - **THEN** the First Seen column displays "3h ago"
 
-#### Scenario: Older listing shows relative time
-- **WHEN** a listing was first seen 5 days ago
-- **THEN** the First Seen column displays "5d ago"
+#### Scenario: Published at shows relative time
+- **WHEN** a listing was published 2 days ago
+- **THEN** the Published At column displays "2d ago"
 
 #### Scenario: Hover shows full date-time
 - **WHEN** a user hovers over a relative time cell
 - **THEN** a tooltip shows the full date-time (e.g., "Mar 15, 2026 3:45 PM")
 
-### Requirement: Date-time columns show time of day
-All date-time columns (Published At, Updated At Source, Expired At) SHALL display both date and time (e.g., "Mar 15, 2026 3:45 PM").
-
-#### Scenario: Published at shows date and time
-- **WHEN** a listing has `published_at="2026-03-15T15:45:00Z"`
-- **THEN** the Published At column displays "Mar 15, 2026 3:45 PM"
-
 ### Requirement: Client-side pagination
-The grid SHALL paginate results with 50 rows per page, with navigation controls to move between pages.
+The table SHALL paginate results with 50 rows per page, with navigation controls and a page size selector.
 
 #### Scenario: Pagination with more than 50 listings
 - **WHEN** there are 100 listings loaded
@@ -107,19 +93,19 @@ The grid SHALL paginate results with 50 rows per page, with navigation controls 
 The Title column SHALL render each title as a clickable link that opens the job's external URL in a new tab.
 
 #### Scenario: Click job title
-- **WHEN** a user clicks a job title in the grid
+- **WHEN** a user clicks a job title in the table
 - **THEN** the external job posting URL opens in a new browser tab
 
 ### Requirement: Display label mapping
-Employment type and workplace type columns SHALL display human-readable labels instead of internal values (e.g., "Full-time" instead of "full_time", "Remote" instead of "remote").
+Employment type and workplace type columns SHALL display human-readable labels instead of internal values.
 
 #### Scenario: Employment type displays label
 - **WHEN** a listing has `employment_type="full_time"`
-- **THEN** the grid displays "Full-time"
+- **THEN** the table displays "Full-time"
 
 #### Scenario: Workplace type displays label
 - **WHEN** a listing has `workplace_type="on_site"`
-- **THEN** the grid displays "On-site"
+- **THEN** the table displays "On-site"
 
 ### Requirement: Mobile responsive grid
 The grid SHALL be usable on mobile devices with horizontal scrolling for columns that don't fit the viewport.
@@ -129,8 +115,8 @@ The grid SHALL be usable on mobile devices with horizontal scrolling for columns
 - **THEN** the grid is scrollable horizontally and all data is accessible
 
 ### Requirement: Dark theme
-The grid SHALL use AG Grid's dark theme, customized to match the existing site's dark neutral color palette.
+The table SHALL use Tabulator's midnight theme, with CSS overrides as needed to match the site's dark neutral color palette.
 
-#### Scenario: Grid matches site theme
-- **WHEN** the grid renders
+#### Scenario: Table matches site theme
+- **WHEN** the table renders
 - **THEN** it uses a dark background consistent with the site's existing color scheme

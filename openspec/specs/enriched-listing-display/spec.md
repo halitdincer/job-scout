@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Jobs page displays enriched fields
-The jobs grid at `/` SHALL have columns available for all API response fields: Title, Company (source name), Department, Locations (comma-separated raw names), Type (employment type with display label), Workplace (workplace type with display label), Country (derived from LocationTag country_code), Status, First Seen, Last Seen, Team, Published At, Updated At Source, Expired At, External ID, Source ID, and ID. Default visibility is controlled by the grid configuration. The Country column SHALL display comma-separated unique `country_code` values from the listing's LocationTags.
+The jobs table at `/` SHALL have columns available for all API response fields: Title, Company (source name), Department, Locations (comma-separated raw names), Type (employment type with display label), Workplace (workplace type with display label), Country (derived from LocationTag country_code), Status, First Seen, Last Seen, Team, Published At, Updated At Source, Expired At, External ID, Source ID, and ID. Default visible columns: Title, Company, Location, Type, Published At, First Seen. The Country column SHALL display comma-separated unique `country_code` values from the listing's LocationTags.
 
 #### Scenario: Grid shows locations
 - **WHEN** a job listing has locations [{"name": "Toronto, ON", "country_code": "CA"}, {"name": "New York, NY", "country_code": "US"}]
@@ -24,15 +24,15 @@ The jobs grid at `/` SHALL have columns available for all API response fields: T
 - **THEN** the Team column displays "Engineering"
 
 ### Requirement: Jobs page workplace type filter
-The Workplace column SHALL include an AG Grid set filter with multi-select, replacing the previous server-side dropdown.
+The Workplace column SHALL include a Tabulator header filter with a value-list dropdown auto-populated from column data.
 
 #### Scenario: Filter by workplace type
-- **WHEN** a user opens the Workplace column filter and selects "Remote"
+- **WHEN** a user selects "Remote" from the Workplace header filter dropdown
 - **THEN** only listings with `workplace_type="remote"` are shown
 
 ### Requirement: Jobs page employment type filter
-The Type column SHALL include an AG Grid set filter with multi-select, replacing the previous server-side dropdown.
+The Type column SHALL include a Tabulator header filter with a value-list dropdown auto-populated from column data.
 
 #### Scenario: Filter by employment type
-- **WHEN** a user opens the Type column filter and selects "Full-time"
+- **WHEN** a user selects "Full-time" from the Type header filter dropdown
 - **THEN** only listings with `employment_type="full_time"` are shown
