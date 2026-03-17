@@ -5,6 +5,12 @@
 {% block main_attrs %} class="full-bleed"{% endblock %}
 
 {% block content %}
+<div class="jobs-toolbar">
+  <div class="col-chooser-wrap">
+    <button class="col-chooser-btn" id="col-chooser-btn">Columns</button>
+    <div class="col-chooser-panel" id="col-chooser-panel"></div>
+  </div>
+</div>
 <div id="jobs-grid"></div>
 
 <script>
@@ -65,7 +71,6 @@
 
   var gridOptions = {
     theme: theme,
-    sideBar: "columns",
     columnDefs: [
       {
         field: "title",
@@ -217,6 +222,39 @@
 
   var gridDiv = document.getElementById("jobs-grid");
   var gridApi = agGrid.createGrid(gridDiv, gridOptions);
+
+  // Column chooser
+  var chooserBtn = document.getElementById("col-chooser-btn");
+  var chooserPanel = document.getElementById("col-chooser-panel");
+
+  function buildChooser() {
+    chooserPanel.innerHTML = "";
+    gridApi.getColumns().forEach(function(col) {
+      var colDef = col.getColDef();
+      var label = document.createElement("label");
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = col.isVisible();
+      cb.addEventListener("change", function() {
+        gridApi.setColumnsVisible([col.getColId()], cb.checked);
+      });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(colDef.headerName || col.getColId()));
+      chooserPanel.appendChild(label);
+    });
+  }
+
+  chooserBtn.addEventListener("click", function(e) {
+    e.stopPropagation();
+    var isOpen = chooserPanel.classList.toggle("open");
+    if (isOpen) buildChooser();
+  });
+
+  document.addEventListener("click", function(e) {
+    if (!chooserPanel.contains(e.target) && e.target !== chooserBtn) {
+      chooserPanel.classList.remove("open");
+    }
+  });
 
   fetch("/api/jobs/")
     .then(function(r) { return r.json(); })
