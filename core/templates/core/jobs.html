@@ -166,12 +166,12 @@
       {
         title: "Location (Raw)", field: "locations_display",
         headerFilter: "input", headerFilterPlaceholder: "Search...",
-        minWidth: 150, widthGrow: 1
+        minWidth: 150, widthGrow: 1, visible: false
       },
       {
         title: "Type", field: "employment_type_label",
         headerFilter: "list", headerFilterParams: listFilterParams,
-        minWidth: 100
+        minWidth: 100, visible: false
       },
       {
         title: "Published At", field: "published_at",
@@ -204,7 +204,7 @@
         formatter: arrayJoinFormatter,
         headerFilter: "list", headerFilterParams: arrayFilterParams,
         headerFilterFunc: arrayContainsFilter,
-        minWidth: 80, visible: false
+        minWidth: 80
       },
       {
         title: "Region", field: "region",
@@ -218,7 +218,7 @@
         formatter: arrayJoinFormatter,
         headerFilter: "list", headerFilterParams: arrayFilterParams,
         headerFilterFunc: arrayContainsFilter,
-        minWidth: 100, visible: false
+        minWidth: 100
       },
       {
         title: "Status", field: "status",

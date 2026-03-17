@@ -78,9 +78,11 @@ main {
 }
 
 main.full-bleed {
-  padding: 0;
+  padding: 1rem 1.25rem;
   height: calc(100vh - 56px);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 h1 {
@@ -215,10 +217,10 @@ td a:hover {
 .jobs-toolbar {
   display: flex;
   align-items: center;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0;
+  margin-bottom: 0.75rem;
   position: relative;
+  flex-shrink: 0;
 }
 
 .col-chooser-wrap {
@@ -281,27 +283,182 @@ td a:hover {
 /* Tabulator container */
 #jobs-grid {
   width: 100%;
-  height: calc(100% - 41px);
+  flex: 1;
+  min-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 /* Tabulator theme overrides */
 #jobs-grid .tabulator {
-  border: none;
-  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  background: var(--bg-surface);
 }
 
+/* Links */
 #jobs-grid .tabulator-cell a {
-  color: var(--accent);
+  color: #7cb8f0;
   text-decoration: none;
+  font-weight: 500;
 }
 
 #jobs-grid .tabulator-cell a:hover {
-  color: var(--accent-hover);
+  color: #a8d4ff;
   text-decoration: underline;
 }
 
+/* Header */
+#jobs-grid .tabulator-header {
+  background: var(--bg-elevated);
+  border-bottom: 2px solid var(--border);
+}
+
+#jobs-grid .tabulator-col {
+  background: transparent;
+  border-right: 1px solid var(--border);
+}
+
+#jobs-grid .tabulator-col-title {
+  color: #bbb;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#jobs-grid .tabulator-col.tabulator-sortable .tabulator-col-title {
+  padding-right: 1.25rem;
+}
+
+/* Header filter inputs */
+#jobs-grid .tabulator-header-filter input,
+#jobs-grid .tabulator-header-filter select {
+  background: var(--bg) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  width: 100%;
+}
+
+#jobs-grid .tabulator-header-filter input:focus,
+#jobs-grid .tabulator-header-filter select:focus {
+  border-color: var(--accent) !important;
+  outline: none;
+}
+
+#jobs-grid .tabulator-header-filter input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Rows */
+#jobs-grid .tabulator-row {
+  border-bottom: 1px solid #2a2a2a;
+}
+
+#jobs-grid .tabulator-row:hover {
+  background: #2a2f36 !important;
+}
+
+#jobs-grid .tabulator-row.tabulator-row-even {
+  background: transparent;
+}
+
+#jobs-grid .tabulator-cell {
+  padding: 0.5rem 0.75rem;
+  border-right: none;
+  color: var(--text);
+}
+
+/* Pagination */
+#jobs-grid .tabulator-footer {
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+}
+
+#jobs-grid .tabulator-page {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin: 0 0.15rem;
+}
+
+#jobs-grid .tabulator-page:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+#jobs-grid .tabulator-page.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+#jobs-grid .tabulator-page-size {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+}
+
+#jobs-grid .tabulator-pages,
+#jobs-grid .tabulator-page-counter {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* Scrollbar */
+#jobs-grid .tabulator-tableholder::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+#jobs-grid .tabulator-tableholder::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+#jobs-grid .tabulator-tableholder::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+#jobs-grid .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   main:not(.full-bleed) {
     padding: 1rem;
+  }
+
+  main.full-bleed {
+    padding: 0.5rem;
+  }
+
+  .jobs-toolbar {
+    padding: 0.35rem 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .col-chooser-btn {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+  }
+
+  .col-chooser-panel {
+    max-width: calc(100vw - 2rem);
   }
 }
