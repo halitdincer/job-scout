@@ -19,8 +19,10 @@ class JobListingAdmin(admin.ModelAdmin):
 
 @admin.register(LocationTag)
 class LocationTagAdmin(admin.ModelAdmin):
-    list_display = ("name",)
+    list_display = ("name", "country_code", "region_code", "city")
+    list_editable = ("country_code", "region_code", "city")
     search_fields = ("name",)
+    list_filter = ("country_code",)
 
 
 @admin.register(Run)

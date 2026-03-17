@@ -28,6 +28,19 @@ class Source(models.Model):
 
 class LocationTag(models.Model):
     name = models.CharField(max_length=255, unique=True)
+    country_code = models.CharField(max_length=2, null=True, blank=True)
+    region_code = models.CharField(max_length=10, null=True, blank=True)
+    city = models.CharField(max_length=255, null=True, blank=True)
+
+    @property
+    def geo_key(self):
+        if not self.country_code:
+            return None
+        if not self.region_code:
+            return self.country_code
+        if not self.city:
+            return self.region_code
+        return f"{self.region_code}-{self.city}"
 
     def __str__(self):
         return self.name
@@ -69,7 +82,6 @@ class JobListing(models.Model):
     workplace_type = models.CharField(
         max_length=20, choices=WORKPLACE_TYPE_CHOICES, null=True, blank=True
     )
-    country = models.CharField(max_length=100, null=True, blank=True)
     expired_at = models.DateTimeField(null=True, blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
     updated_at_source = models.DateTimeField(null=True, blank=True)

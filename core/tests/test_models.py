@@ -52,6 +52,54 @@ class TestLocationTagModel:
         with pytest.raises(IntegrityError):
             LocationTag.objects.create(name="Toronto")
 
+    def test_geo_fields_default_null(self):
+        tag = LocationTag.objects.create(name="Some Office")
+        assert tag.country_code is None
+        assert tag.region_code is None
+        assert tag.city is None
+
+    def test_geo_fields_full_mapping(self):
+        tag = LocationTag.objects.create(
+            name="Toronto, ON",
+            country_code="CA",
+            region_code="CA-ON",
+            city="Toronto",
+        )
+        assert tag.country_code == "CA"
+        assert tag.region_code == "CA-ON"
+        assert tag.city == "Toronto"
+
+    def test_geo_fields_partial_mapping(self):
+        tag = LocationTag.objects.create(
+            name="Canada", country_code="CA"
+        )
+        assert tag.country_code == "CA"
+        assert tag.region_code is None
+        assert tag.city is None
+
+    def test_geo_key_full(self):
+        tag = LocationTag(
+            name="Toronto, ON",
+            country_code="CA",
+            region_code="CA-ON",
+            city="Toronto",
+        )
+        assert tag.geo_key == "CA-ON-Toronto"
+
+    def test_geo_key_country_and_region(self):
+        tag = LocationTag(
+            name="Ontario", country_code="CA", region_code="CA-ON"
+        )
+        assert tag.geo_key == "CA-ON"
+
+    def test_geo_key_country_only(self):
+        tag = LocationTag(name="Canada", country_code="US")
+        assert tag.geo_key == "US"
+
+    def test_geo_key_none_when_unmapped(self):
+        tag = LocationTag(name="Unknown Place")
+        assert tag.geo_key is None
+
 
 @pytest.mark.django_db
 class TestJobListingModel:
@@ -118,14 +166,12 @@ class TestJobListingModel:
             team="Platform",
             employment_type="full_time",
             workplace_type="remote",
-            country="CA",
             published_at=timezone.now(),
             updated_at_source=timezone.now(),
         )
         assert listing.team == "Platform"
         assert listing.employment_type == "full_time"
         assert listing.workplace_type == "remote"
-        assert listing.country == "CA"
         assert listing.published_at is not None
         assert listing.updated_at_source is not None
 
@@ -190,7 +236,6 @@ class TestJobListingModel:
         assert listing.team is None
         assert listing.employment_type is None
         assert listing.workplace_type is None
-        assert listing.country is None
         assert listing.published_at is None
         assert listing.updated_at_source is None
         assert listing.expired_at is None

@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from core.ingestion import ingest_sources
-from core.models import JobListing, Run, Source
+from core.models import JobListing, LocationTag, Run, Source
 
 
 def jobs_page(request):
@@ -52,28 +52,58 @@ def list_jobs(request):
         qs = qs.filter(status=status)
 
     qs = qs.prefetch_related("locations")
-    data = [
-        {
+    data = []
+    for listing in qs:
+        tags = listing.locations.all()
+        locations = [
+            {
+                "name": tag.name,
+                "country_code": tag.country_code,
+                "region_code": tag.region_code,
+                "city": tag.city,
+                "geo_key": tag.geo_key,
+            }
+            for tag in tags
+        ]
+        country_codes = sorted(
+            {tag.country_code for tag in tags if tag.country_code}
+        )
+        data.append({
             "id": listing.id,
             "source_id": listing.source_id,
             "source_name": listing.source.name,
             "external_id": listing.external_id,
             "title": listing.title,
             "department": listing.department,
-            "locations": [tag.name for tag in listing.locations.all()],
+            "locations": locations,
             "url": listing.url,
             "status": listing.status,
             "team": listing.team,
             "employment_type": listing.employment_type,
             "workplace_type": listing.workplace_type,
-            "country": listing.country,
+            "country": ", ".join(country_codes) if country_codes else None,
             "expired_at": listing.expired_at.isoformat() if listing.expired_at else None,
             "published_at": listing.published_at.isoformat() if listing.published_at else None,
             "updated_at_source": listing.updated_at_source.isoformat() if listing.updated_at_source else None,
             "first_seen_at": listing.first_seen_at.isoformat(),
             "last_seen_at": listing.last_seen_at.isoformat(),
+        })
+    return JsonResponse(data, safe=False)
+
+
+@require_GET
+def list_locations(request):
+    tags = LocationTag.objects.all()
+    data = [
+        {
+            "id": tag.id,
+            "name": tag.name,
+            "country_code": tag.country_code,
+            "region_code": tag.region_code,
+            "city": tag.city,
+            "geo_key": tag.geo_key,
         }
-        for listing in qs
+        for tag in tags
     ]
     return JsonResponse(data, safe=False)
 

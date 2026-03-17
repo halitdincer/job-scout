@@ -47,9 +47,8 @@ class TestJobsAPI:
             team="Platform",
             employment_type="full_time",
             workplace_type="remote",
-            country="US",
         )
-        tag = LocationTag.objects.create(name="SF")
+        tag = LocationTag.objects.create(name="SF", country_code="US", region_code="US-CA", city="San Francisco")
         listing1.locations.add(tag)
         JobListing.objects.create(
             source=source,
@@ -77,11 +76,19 @@ class TestJobsAPI:
         response = client.get("/api/jobs/")
         data = response.json()
         engineer = next(j for j in data if j["title"] == "Engineer")
-        assert engineer["locations"] == ["SF"]
+        assert engineer["locations"] == [
+            {
+                "name": "SF",
+                "country_code": "US",
+                "region_code": "US-CA",
+                "city": "San Francisco",
+                "geo_key": "US-CA-San Francisco",
+            }
+        ]
+        assert engineer["country"] == "US"
         assert engineer["team"] == "Platform"
         assert engineer["employment_type"] == "full_time"
         assert engineer["workplace_type"] == "remote"
-        assert engineer["country"] == "US"
         assert "expired_at" in engineer
         assert "published_at" in engineer
         assert "updated_at_source" in engineer
@@ -112,6 +119,34 @@ class TestJobsAPI:
         data = response.json()
         assert len(data) == 1
         assert data[0]["status"] == "active"
+
+
+@pytest.mark.django_db
+class TestLocationsAPI:
+    def test_list_locations(self):
+        LocationTag.objects.create(
+            name="Toronto, ON", country_code="CA", region_code="CA-ON", city="Toronto"
+        )
+        LocationTag.objects.create(name="Unknown Place")
+        client = Client()
+        response = client.get("/api/locations/")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        toronto = next(loc for loc in data if loc["name"] == "Toronto, ON")
+        assert toronto["country_code"] == "CA"
+        assert toronto["region_code"] == "CA-ON"
+        assert toronto["city"] == "Toronto"
+        assert toronto["geo_key"] == "CA-ON-Toronto"
+        unknown = next(loc for loc in data if loc["name"] == "Unknown Place")
+        assert unknown["country_code"] is None
+        assert unknown["geo_key"] is None
+
+    def test_empty_locations(self):
+        client = Client()
+        response = client.get("/api/locations/")
+        assert response.status_code == 200
+        assert response.json() == []
 
 
 @pytest.mark.django_db

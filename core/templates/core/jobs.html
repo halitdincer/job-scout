@@ -260,7 +260,8 @@
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var rows = data.map(function(item) {
-        item.locations_display = (item.locations || []).join(", ") || "—";
+        var locs = item.locations || [];
+        item.locations_display = locs.map(function(l) { return l.name; }).join(", ") || "—";
         item.employment_type_label = EMPLOYMENT_LABELS[item.employment_type] || item.employment_type || "—";
         item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "—";
         item.department = item.department || "—";

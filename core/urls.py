@@ -9,5 +9,6 @@ urlpatterns = [
     path("api/health", views.health),
     path("api/sources/", views.list_sources),
     path("api/jobs/", views.list_jobs),
+    path("api/locations/", views.list_locations),
     path("api/runs/", views.runs_view),
 ]

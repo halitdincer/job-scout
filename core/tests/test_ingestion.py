@@ -21,7 +21,6 @@ class TestIngestSources:
             "team": None,
             "employment_type": "unknown",
             "workplace_type": "unknown",
-            "country": None,
             "published_at": None,
             "updated_at_source": None,
             "is_listed": None,
@@ -215,7 +214,6 @@ class TestIngestSources:
                 team="Platform",
                 employment_type="full_time",
                 workplace_type="hybrid",
-                country="CA",
                 published_at="2026-01-15T10:00:00+00:00",
             ),
         ]
@@ -226,5 +224,4 @@ class TestIngestSources:
         assert listing.team == "Platform"
         assert listing.employment_type == "full_time"
         assert listing.workplace_type == "hybrid"
-        assert listing.country == "CA"
         assert listing.published_at is not None

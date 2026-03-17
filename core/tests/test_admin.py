@@ -47,10 +47,16 @@ class TestLocationTagAdmin:
         assert site.is_registered(LocationTag)
 
     def test_list_display(self):
-        assert LocationTagAdmin.list_display == ("name",)
+        assert LocationTagAdmin.list_display == ("name", "country_code", "region_code", "city")
+
+    def test_list_editable(self):
+        assert LocationTagAdmin.list_editable == ("country_code", "region_code", "city")
 
     def test_search_fields(self):
         assert LocationTagAdmin.search_fields == ("name",)
+
+    def test_list_filter(self):
+        assert LocationTagAdmin.list_filter == ("country_code",)
 
 
 class TestRunAdmin:

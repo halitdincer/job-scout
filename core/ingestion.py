@@ -61,7 +61,6 @@ def _process_source(source, fetched, result):
             "team": item.get("team"),
             "employment_type": item.get("employment_type"),
             "workplace_type": item.get("workplace_type"),
-            "country": item.get("country"),
             "published_at": _parse_dt(item.get("published_at")),
             "updated_at_source": _parse_dt(item.get("updated_at_source")),
         }
