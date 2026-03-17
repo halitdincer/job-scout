@@ -78,6 +78,39 @@
 
   var listFilterParams = { valuesLookup: true, clearable: true, sort: "asc" };
 
+  function arrayJoinFormatter(cell) {
+    var val = cell.getValue();
+    if (!val || !Array.isArray(val)) return "";
+    return val.join(", ");
+  }
+
+  function arrayContainsFilter(headerValue, rowValue) {
+    if (!headerValue) return true;
+    if (!rowValue || !Array.isArray(rowValue)) return false;
+    return rowValue.indexOf(headerValue) !== -1;
+  }
+
+  function arrayValuesLookup(cell) {
+    var field = cell.getField();
+    var seen = {};
+    var values = [];
+    cell.getTable().getData().forEach(function(row) {
+      var arr = row[field];
+      if (arr && Array.isArray(arr)) {
+        arr.forEach(function(v) {
+          if (v && !seen[v]) {
+            seen[v] = true;
+            values.push(v);
+          }
+        });
+      }
+    });
+    values.sort();
+    return values;
+  }
+
+  var arrayFilterParams = { valuesLookup: arrayValuesLookup, clearable: true, sort: "asc" };
+
   var table = new Tabulator("#jobs-grid", {
     height: "100%",
     layout: "fitColumns",
@@ -131,17 +164,23 @@
       },
       {
         title: "Country", field: "country",
-        headerFilter: "list", headerFilterParams: listFilterParams,
+        formatter: arrayJoinFormatter,
+        headerFilter: "list", headerFilterParams: arrayFilterParams,
+        headerFilterFunc: arrayContainsFilter,
         minWidth: 80, visible: false
       },
       {
         title: "Region", field: "region",
-        headerFilter: "list", headerFilterParams: listFilterParams,
+        formatter: arrayJoinFormatter,
+        headerFilter: "list", headerFilterParams: arrayFilterParams,
+        headerFilterFunc: arrayContainsFilter,
         minWidth: 100, visible: false
       },
       {
         title: "City", field: "city",
-        headerFilter: "list", headerFilterParams: listFilterParams,
+        formatter: arrayJoinFormatter,
+        headerFilter: "list", headerFilterParams: arrayFilterParams,
+        headerFilterFunc: arrayContainsFilter,
         minWidth: 100, visible: false
       },
       {
@@ -231,9 +270,9 @@
         item.employment_type_label = EMPLOYMENT_LABELS[item.employment_type] || item.employment_type || "";
         item.workplace_type_label = WORKPLACE_LABELS[item.workplace_type] || item.workplace_type || "";
         item.department = item.department || "";
-        item.country = item.country || "";
-        item.region = item.region || "";
-        item.city = item.city || "";
+        item.country = item.country || [];
+        item.region = item.region || [];
+        item.city = item.city || [];
         item.team = item.team || "";
         return item;
       });

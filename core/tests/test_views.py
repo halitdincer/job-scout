@@ -85,9 +85,9 @@ class TestJobsAPI:
                 "geo_key": "US-CA-San Francisco",
             }
         ]
-        assert engineer["country"] == "US"
-        assert engineer["region"] == "US-CA"
-        assert engineer["city"] == "San Francisco"
+        assert engineer["country"] == ["US"]
+        assert engineer["region"] == ["US-CA"]
+        assert engineer["city"] == ["San Francisco"]
         assert engineer["team"] == "Platform"
         assert engineer["employment_type"] == "full_time"
         assert engineer["workplace_type"] == "remote"
@@ -116,8 +116,9 @@ class TestJobsAPI:
         response = client.get("/api/jobs/")
         data = response.json()
         job = next(j for j in data if j["title"] == "Multi-loc")
-        assert job["region"] == "CA-BC, CA-ON"
-        assert job["city"] == "Toronto, Vancouver"
+        assert job["country"] == ["CA"]
+        assert job["region"] == ["CA-BC", "CA-ON"]
+        assert job["city"] == ["Toronto", "Vancouver"]
 
     def test_region_and_city_empty_when_no_geo(self):
         source = Source.objects.create(
@@ -135,8 +136,9 @@ class TestJobsAPI:
         response = client.get("/api/jobs/")
         data = response.json()
         job = next(j for j in data if j["title"] == "No-geo")
-        assert job["region"] is None
-        assert job["city"] is None
+        assert job["country"] == []
+        assert job["region"] == []
+        assert job["city"] == []
 
     def test_filter_by_source_id(self):
         source = self._create_source_with_listings()
