@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Tabulator powered jobs table
-The jobs page at `/` SHALL render a Tabulator table that fetches all job listings from `/api/jobs/` and displays them client-side with all available columns. Default visible columns: Title, Company, Location (Raw), Type, Published At, First Seen. Hidden by default: Department, Workplace, Country, Region, City, Status, Last Seen, Team, Updated At Source, Expired At, External ID, Source ID, ID. The Country column SHALL derive its values from LocationTag `country_code` fields (via the locations M2M). The Region column SHALL derive its values from `region_code` fields. The City column SHALL derive its values from `city` fields.
+The jobs page at `/` SHALL render a Tabulator table that fetches all job listings from `/api/jobs/` and displays them client-side with all available columns. The table SHALL support drag-and-drop column reordering via Tabulator's `movableColumns` option. Default visible columns: Title, Company, Location (Raw), Type, Published At, First Seen. Hidden by default: Department, Workplace, Country, Region, City, Status, Last Seen, Team, Updated At Source, Expired At, External ID, Source ID, ID. The Country column SHALL derive its values from LocationTag `country_code` fields (via the locations M2M). The Region column SHALL derive its values from `region_code` fields. The City column SHALL derive its values from `city` fields.
 
 #### Scenario: Table loads data from API
 - **WHEN** a user visits `/`
@@ -30,6 +30,10 @@ The jobs page at `/` SHALL render a Tabulator table that fetches all job listing
 #### Scenario: Filter by city dropdown
 - **WHEN** a user clicks the City header filter and selects "Toronto"
 - **THEN** only listings with a location in city "Toronto" are shown
+
+#### Scenario: Columns are reorderable by drag and drop
+- **WHEN** a user drags a column header to a new position
+- **THEN** the column moves to the new position in the table
 
 ### Requirement: Column chooser
 The table SHALL include a custom column chooser button above the grid that opens a dropdown panel listing all columns with checkboxes to toggle visibility. The jobs page SHALL also provide an AG Grid-style columns side panel that exposes the same visibility controls in a mobile-responsive layout.
