@@ -176,6 +176,11 @@ class TestJobsPage:
         response = client.get("/")
         assert b"labelToKey" in response.content
 
+    def test_contains_date_header_normalizer(self):
+        client = Client()
+        response = client.get("/")
+        assert b"normalizeDateHeaderValue" in response.content
+
     def test_company_filter_supports_in_operator(self):
         client = Client()
         response = client.get("/")

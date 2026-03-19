@@ -137,12 +137,23 @@
     { label: "Last 30 days", value: "30" },
     { label: "Last 90 days", value: "90" }
   ];
+
+  function normalizeDateHeaderValue(value) {
+    if (value === null || typeof value === "undefined") return "";
+    var normalized = String(value).trim();
+    if (!normalized) return "";
+    if (["0", "7", "14", "30", "90"].indexOf(normalized) === -1) return "";
+    return normalized;
+  }
+
   function dateRangeFilter(headerValue, rowValue) {
-    if (!headerValue) return true;
+    var normalizedHeader = normalizeDateHeaderValue(headerValue);
+    if (!normalizedHeader) return true;
     if (!rowValue) return false;
-    var days = parseInt(headerValue, 10);
+    var days = parseInt(normalizedHeader, 10);
     var rowTime = new Date(rowValue).getTime();
     if (isNaN(rowTime)) return false;
+    if (isNaN(days)) return true;
     if (days === 0) {
       var today = new Date().toISOString().slice(0, 10);
       return rowValue.slice(0, 10) === today;
@@ -868,7 +879,9 @@
       if (def.headerField !== headerField) continue;
 
       if (def.type === "date") {
-        return [{ field: field, operator: "in_last_days", value: String(headerValue) }];
+        var normalizedDateValue = normalizeDateHeaderValue(headerValue);
+        if (!normalizedDateValue) return [];
+        return [{ field: field, operator: "in_last_days", value: normalizedDateValue }];
       }
 
       var vals = normalizeMultiSelectValue(headerValue);
@@ -941,7 +954,9 @@
       var filterField = fieldsWithHeaders[headerField];
       var headerValue = activeHeaderFields[headerField];
       var normalizedHeaderValue = headerValue;
-      if (FILTER_FIELD_DEFS[filterField] && FILTER_FIELD_DEFS[filterField].type !== "date") {
+      if (FILTER_FIELD_DEFS[filterField] && FILTER_FIELD_DEFS[filterField].type === "date") {
+        normalizedHeaderValue = normalizeDateHeaderValue(headerValue);
+      } else if (FILTER_FIELD_DEFS[filterField] && FILTER_FIELD_DEFS[filterField].type !== "date") {
         normalizedHeaderValue = normalizeMultiSelectValue(headerValue);
       }
       var isEmpty = !normalizedHeaderValue || normalizedHeaderValue === "" ||
