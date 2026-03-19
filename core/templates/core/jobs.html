@@ -501,6 +501,7 @@
   var rules = [];
   var activeExpression = null;
   var isSyncingHeader = false;
+  var lastHeaderSyncSignature = "";
 
   function mapApiRows(data) {
     return data.map(function(item) {
@@ -935,13 +936,34 @@
 
   table.on("columnMoved", function() { saveColumnOrder(table); });
 
-  table.on("dataFiltered", function() {
+  function syncRulesFromHeaderState() {
     if (isSyncingHeader) return;
     var headerFilters = table.getHeaderFilters();
     var activeHeaderFields = {};
     headerFilters.forEach(function(filter) {
       activeHeaderFields[filter.field] = filter.value;
     });
+
+    var normalizedForSignature = {};
+    Object.keys(activeHeaderFields).sort().forEach(function(key) {
+      var fieldKey = null;
+      for (var idx = 0; idx < FIELD_ORDER.length; idx++) {
+        var cand = FIELD_ORDER[idx];
+        if (FILTER_FIELD_DEFS[cand].headerField === key) {
+          fieldKey = cand;
+          break;
+        }
+      }
+      var val = activeHeaderFields[key];
+      if (fieldKey && FILTER_FIELD_DEFS[fieldKey].type === "date") {
+        normalizedForSignature[key] = normalizeDateHeaderValue(val);
+      } else {
+        normalizedForSignature[key] = normalizeMultiSelectValue(val);
+      }
+    });
+    var signature = JSON.stringify(normalizedForSignature);
+    if (signature === lastHeaderSyncSignature) return;
+    lastHeaderSyncSignature = signature;
 
     var fieldsWithHeaders = {};
     FIELD_ORDER.forEach(function(f) {
@@ -985,10 +1007,21 @@
 
     activeExpression = serializeRules();
     updateFilterSummary();
+    if (filtersPanel.classList.contains("open")) {
+      renderColumnFilterSections();
+    }
     if (needsServerRefetch) {
       syncHeaderFromRules();
       fetchJobs(activeExpression).then(updateFilterSummary);
     }
+  }
+
+  table.on("headerFilterChanged", function() {
+    syncRulesFromHeaderState();
+  });
+
+  table.on("dataFiltered", function() {
+    syncRulesFromHeaderState();
   });
 
   renderColumnFilterSections();
