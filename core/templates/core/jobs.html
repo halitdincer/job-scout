@@ -986,6 +986,7 @@
     activeExpression = serializeRules();
     updateFilterSummary();
     if (needsServerRefetch) {
+      syncHeaderFromRules();
       fetchJobs(activeExpression).then(updateFilterSummary);
     }
   });
