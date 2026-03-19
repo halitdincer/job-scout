@@ -31,30 +31,17 @@
     <h2>Filters</h2>
     <button type="button" class="panel-close" data-close-panel="filters-panel">x</button>
   </div>
-  <p class="side-panel-subtitle">Panel and header filters stay in sync for supported filters.</p>
+  <p class="side-panel-subtitle">Per-column filter rules. All rules combine with AND.</p>
 
-  <div class="filter-builder-controls">
-    <label for="root-group-op">Match</label>
-    <select id="root-group-op">
-      <option value="and">All conditions (AND)</option>
-      <option value="or">Any condition (OR)</option>
-      <option value="not">NOT (invert single child)</option>
-    </select>
-  </div>
-
-  <h3 class="filter-section-title">Quick Filters</h3>
-  <div class="quick-filter-rows" id="quick-filter-rows"></div>
-
-  <h3 class="filter-section-title">Advanced Logic</h3>
-  <div id="filter-builder-root" class="filter-builder-root"></div>
+  <div id="column-filter-sections" class="column-filter-sections"></div>
 
   <div class="filter-panel-actions">
-    <button type="button" id="add-root-rule" class="col-chooser-btn">Add Rule</button>
-    <button type="button" id="add-root-group" class="col-chooser-btn">Add Group</button>
-    <button type="button" id="clear-advanced-filter" class="col-chooser-btn">Clear</button>
-    <button type="button" id="apply-advanced-filter" class="panel-primary-btn">Apply</button>
+    <button type="button" id="clear-all-filters" class="col-chooser-btn">Clear All</button>
+    <button type="button" id="apply-filters" class="panel-primary-btn">Apply</button>
   </div>
 </aside>
+
+<div id="col-filter-popover" class="col-filter-popover" style="display:none;"></div>
 
 <script>
 (function() {
@@ -72,27 +59,23 @@
     hybrid: "Hybrid",
     unknown: "Unknown"
   };
-  var EMPLOYMENT_KEY_BY_LABEL = {};
-  var WORKPLACE_KEY_BY_LABEL = {};
-  Object.keys(EMPLOYMENT_LABELS).forEach(function(key) { EMPLOYMENT_KEY_BY_LABEL[EMPLOYMENT_LABELS[key]] = key; });
-  Object.keys(WORKPLACE_LABELS).forEach(function(key) { WORKPLACE_KEY_BY_LABEL[WORKPLACE_LABELS[key]] = key; });
 
   var FILTER_FIELD_DEFS = {
-    title: { label: "Title", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"] },
-    source_name: { label: "Company", type: "text", operators: ["contains", "eq", "neq", "is_empty", "is_not_empty"] },
-    status: { label: "Status", type: "enum", operators: ["eq", "neq", "in", "not_in"] },
-    department: { label: "Department", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"] },
-    team: { label: "Team", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"] },
-    employment_type: { label: "Type", type: "enum", operators: ["eq", "neq", "in", "not_in"] },
-    workplace_type: { label: "Workplace", type: "enum", operators: ["eq", "neq", "in", "not_in"] },
-    country: { label: "Country", type: "array", operators: ["eq", "neq", "in", "not_in", "is_empty", "is_not_empty"] },
-    region: { label: "Region", type: "array", operators: ["eq", "neq", "in", "not_in", "is_empty", "is_not_empty"] },
-    city: { label: "City", type: "array", operators: ["contains", "not_contains", "eq", "neq", "in", "not_in", "is_empty", "is_not_empty"] },
-    published_at: { label: "Published At", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] },
-    first_seen_at: { label: "First Seen", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] },
-    last_seen_at: { label: "Last Seen", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] },
-    updated_at_source: { label: "Updated At Source", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] },
-    expired_at: { label: "Expired At", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"] }
+    title: { label: "Title", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"], headerField: null },
+    source_name: { label: "Company", type: "text", operators: ["contains", "eq", "neq", "is_empty", "is_not_empty"], headerField: "source_name" },
+    status: { label: "Status", type: "enum", operators: ["eq", "neq", "in", "not_in"], headerField: "status" },
+    department: { label: "Department", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"], headerField: null },
+    team: { label: "Team", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"], headerField: null },
+    employment_type: { label: "Type", type: "enum", operators: ["eq", "neq", "in", "not_in"], headerField: "employment_type_label" },
+    workplace_type: { label: "Workplace", type: "enum", operators: ["eq", "neq", "in", "not_in"], headerField: "workplace_type_label" },
+    country: { label: "Country", type: "array", operators: ["eq", "neq", "in", "not_in", "is_empty", "is_not_empty"], headerField: "country" },
+    region: { label: "Region", type: "array", operators: ["eq", "neq", "in", "not_in", "is_empty", "is_not_empty"], headerField: "region" },
+    city: { label: "City", type: "array", operators: ["contains", "not_contains", "eq", "neq", "in", "not_in", "is_empty", "is_not_empty"], headerField: "city" },
+    published_at: { label: "Published At", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"], headerField: "published_at" },
+    first_seen_at: { label: "First Seen", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"], headerField: "first_seen_at" },
+    last_seen_at: { label: "Last Seen", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"], headerField: "last_seen_at" },
+    updated_at_source: { label: "Updated At Source", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"], headerField: "updated_at_source" },
+    expired_at: { label: "Expired At", type: "date", operators: ["before", "after", "in_last_days", "is_empty", "is_not_empty"], headerField: "expired_at" }
   };
   var FIELD_ORDER = Object.keys(FILTER_FIELD_DEFS);
   var OPERATOR_LABELS = {
@@ -107,35 +90,6 @@
     before: "before",
     after: "after",
     in_last_days: "in last N days"
-  };
-
-  var HEADER_FIELD_TO_AST = {
-    source_name: { field: "source_name", operator: "eq" },
-    employment_type_label: { field: "employment_type", operator: "eq", decode: function(v) { return EMPLOYMENT_KEY_BY_LABEL[v] || v; }, encode: function(v) { return EMPLOYMENT_LABELS[v] || v; } },
-    workplace_type_label: { field: "workplace_type", operator: "eq", decode: function(v) { return WORKPLACE_KEY_BY_LABEL[v] || v; }, encode: function(v) { return WORKPLACE_LABELS[v] || v; } },
-    country: { field: "country", operator: "eq" },
-    region: { field: "region", operator: "eq" },
-    city: { field: "city", operator: "eq" },
-    status: { field: "status", operator: "eq" },
-    published_at: { field: "published_at", operator: "in_last_days", decode: function(v) { return parseInt(v, 10); }, encode: function(v) { return String(v); } },
-    first_seen_at: { field: "first_seen_at", operator: "in_last_days", decode: function(v) { return parseInt(v, 10); }, encode: function(v) { return String(v); } },
-    last_seen_at: { field: "last_seen_at", operator: "in_last_days", decode: function(v) { return parseInt(v, 10); }, encode: function(v) { return String(v); } },
-    updated_at_source: { field: "updated_at_source", operator: "in_last_days", decode: function(v) { return parseInt(v, 10); }, encode: function(v) { return String(v); } },
-    expired_at: { field: "expired_at", operator: "in_last_days", decode: function(v) { return parseInt(v, 10); }, encode: function(v) { return String(v); } }
-  };
-  var AST_FIELD_TO_HEADER = {
-    source_name: "source_name",
-    employment_type: "employment_type_label",
-    workplace_type: "workplace_type_label",
-    country: "country",
-    region: "region",
-    city: "city",
-    status: "status",
-    published_at: "published_at",
-    first_seen_at: "first_seen_at",
-    last_seen_at: "last_seen_at",
-    updated_at_source: "updated_at_source",
-    expired_at: "expired_at"
   };
 
   function formatDateTime(iso) {
@@ -222,6 +176,47 @@
   }
   var arrayFilterParams = { valuesLookup: arrayValuesLookup, clearable: true, sort: "asc" };
 
+  function filterIconHeaderEl(colDef) {
+    var wrap = document.createElement("div");
+    wrap.className = "col-header-with-filter";
+    var titleSpan = document.createElement("span");
+    titleSpan.textContent = colDef.title || colDef.field;
+    wrap.appendChild(titleSpan);
+    var icon = document.createElement("button");
+    icon.type = "button";
+    icon.className = "col-filter-icon";
+    icon.textContent = "\u25BC";
+    icon.setAttribute("data-filter-field", colDef.field);
+    icon.addEventListener("click", function(e) {
+      e.stopPropagation();
+      onColumnFilterIconClick(colDef.field, icon);
+    });
+    wrap.appendChild(icon);
+    return wrap;
+  }
+
+  var COLUMN_DEFS = [
+    { title: "Title", field: "title", formatter: titleFormatter, formatterParams: { allowHtml: true }, minWidth: 250, widthGrow: 3, filterField: "title" },
+    { title: "Company", field: "source_name", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 120, widthGrow: 1, filterField: "source_name" },
+    { title: "Location (Raw)", field: "locations_display", minWidth: 150, widthGrow: 1, visible: false },
+    { title: "Type", field: "employment_type_label", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 100, visible: false, filterField: "employment_type" },
+    { title: "Published At", field: "published_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, filterField: "published_at" },
+    { title: "First Seen", field: "first_seen_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, filterField: "first_seen_at" },
+    { title: "Department", field: "department", minWidth: 120, visible: false, filterField: "department" },
+    { title: "Workplace", field: "workplace_type_label", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 100, visible: false, filterField: "workplace_type" },
+    { title: "Country", field: "country", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 80, filterField: "country" },
+    { title: "Region", field: "region", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 100, visible: false, filterField: "region" },
+    { title: "City", field: "city", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 100, filterField: "city" },
+    { title: "Status", field: "status", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 90, visible: false, filterField: "status" },
+    { title: "Last Seen", field: "last_seen_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false, filterField: "last_seen_at" },
+    { title: "Team", field: "team", minWidth: 120, visible: false, filterField: "team" },
+    { title: "Updated At Source", field: "updated_at_source", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false, filterField: "updated_at_source" },
+    { title: "Expired At", field: "expired_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false, filterField: "expired_at" },
+    { title: "External ID", field: "external_id", minWidth: 120, visible: false },
+    { title: "Source ID", field: "source_id", minWidth: 100, visible: false },
+    { title: "ID", field: "id", minWidth: 80, visible: false }
+  ];
+
   var table = new Tabulator("#jobs-grid", {
     height: "100%",
     layout: "fitColumns",
@@ -229,58 +224,23 @@
     paginationSize: 50,
     paginationSizeSelector: [25, 50, 100],
     placeholder: "No jobs found",
-    columns: [
-      { title: "Title", field: "title", formatter: titleFormatter, formatterParams: { allowHtml: true }, minWidth: 250, widthGrow: 3 },
-      { title: "Company", field: "source_name", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 120, widthGrow: 1 },
-      { title: "Location (Raw)", field: "locations_display", minWidth: 150, widthGrow: 1, visible: false },
-      { title: "Type", field: "employment_type_label", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 100, visible: false },
-      { title: "Published At", field: "published_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120 },
-      { title: "First Seen", field: "first_seen_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120 },
-      { title: "Department", field: "department", minWidth: 120, visible: false },
-      { title: "Workplace", field: "workplace_type_label", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 100, visible: false },
-      { title: "Country", field: "country", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 80 },
-      { title: "Region", field: "region", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 100, visible: false },
-      { title: "City", field: "city", formatter: arrayJoinFormatter, headerFilter: "list", headerFilterParams: arrayFilterParams, headerFilterFunc: arrayContainsFilter, minWidth: 100 },
-      { title: "Status", field: "status", headerFilter: "list", headerFilterParams: listFilterParams, minWidth: 90, visible: false },
-      { title: "Last Seen", field: "last_seen_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false },
-      { title: "Team", field: "team", minWidth: 120, visible: false },
-      { title: "Updated At Source", field: "updated_at_source", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false },
-      { title: "Expired At", field: "expired_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false },
-      { title: "External ID", field: "external_id", minWidth: 120, visible: false },
-      { title: "Source ID", field: "source_id", minWidth: 100, visible: false },
-      { title: "ID", field: "id", minWidth: 80, visible: false }
-    ],
+    columns: COLUMN_DEFS,
     initialSort: [{ column: "first_seen_at", dir: "desc" }]
   });
 
-  var quickSummaryNode = document.getElementById("advanced-filter-summary");
-  var quickFilterRowsNode = document.getElementById("quick-filter-rows");
+  var summaryNode = document.getElementById("advanced-filter-summary");
+  var columnFilterSections = document.getElementById("column-filter-sections");
   var columnsPanelList = document.getElementById("columns-panel-list");
   var panelBackdrop = document.getElementById("panel-backdrop");
   var openColumnsPanelBtn = document.getElementById("open-columns-panel");
   var openFiltersPanelBtn = document.getElementById("open-filters-panel");
   var columnsSidePanel = document.getElementById("columns-side-panel");
   var filtersPanel = document.getElementById("filters-panel");
-  var rootGroupOp = document.getElementById("root-group-op");
-  var filterBuilderRoot = document.getElementById("filter-builder-root");
+  var popoverEl = document.getElementById("col-filter-popover");
 
-  var advancedState = { op: "and", children: [] };
-  var activeAdvancedExpression = null;
+  var rules = [];
+  var activeExpression = null;
   var isSyncingHeader = false;
-  var QUICK_FILTER_CONFIG = [
-    { headerField: "source_name", label: "Company", mode: "scalar" },
-    { headerField: "employment_type_label", label: "Type", mode: "scalar" },
-    { headerField: "workplace_type_label", label: "Workplace", mode: "scalar" },
-    { headerField: "country", label: "Country", mode: "array" },
-    { headerField: "region", label: "Region", mode: "array" },
-    { headerField: "city", label: "City", mode: "array" },
-    { headerField: "status", label: "Status", mode: "scalar" },
-    { headerField: "published_at", label: "Published At", mode: "date" },
-    { headerField: "first_seen_at", label: "First Seen", mode: "date" },
-    { headerField: "last_seen_at", label: "Last Seen", mode: "date" },
-    { headerField: "updated_at_source", label: "Updated At Source", mode: "date" },
-    { headerField: "expired_at", label: "Expired At", mode: "date" }
-  ];
 
   function mapApiRows(data) {
     return data.map(function(item) {
@@ -296,6 +256,7 @@
       return item;
     });
   }
+
   function fetchJobs(expression) {
     var params = new URLSearchParams();
     if (expression) params.set("filter", JSON.stringify(expression));
@@ -307,11 +268,13 @@
 
   function openPanel(panelId) {
     closePanels();
+    closePopover();
     var panel = document.getElementById(panelId);
     panel.classList.add("open");
     panel.setAttribute("aria-hidden", "false");
     panelBackdrop.classList.add("open");
   }
+
   function closePanels() {
     [columnsSidePanel, filtersPanel].forEach(function(panel) {
       panel.classList.remove("open");
@@ -320,182 +283,36 @@
     panelBackdrop.classList.remove("open");
   }
 
-  function createRuleNode() { return { field: "title", operator: "contains", value: "" }; }
-  function createGroupNode() { return { op: "and", children: [] }; }
-  function normalizeGroupChildren(groupNode) {
-    if (groupNode.op === "not") {
-      groupNode.children = groupNode.children.length ? [groupNode.children[0]] : [createRuleNode()];
-    }
-  }
-  function renderFilterBuilder() {
-    filterBuilderRoot.innerHTML = "";
-    renderGroup(filterBuilderRoot, advancedState, null, null);
-    rootGroupOp.value = advancedState.op;
-  }
-  function renderGroup(parentEl, groupNode, parentNode, childIndex) {
-    normalizeGroupChildren(groupNode);
-    var groupEl = document.createElement("div");
-    groupEl.className = "filter-group";
-    var header = document.createElement("div");
-    header.className = "filter-group-header";
-    var opSelect = document.createElement("select");
-    ["and", "or", "not"].forEach(function(op) {
-      var option = document.createElement("option");
-      option.value = op;
-      option.textContent = op.toUpperCase();
-      opSelect.appendChild(option);
-    });
-    opSelect.value = groupNode.op;
-    opSelect.addEventListener("change", function() { groupNode.op = opSelect.value; normalizeGroupChildren(groupNode); renderFilterBuilder(); });
-    header.appendChild(opSelect);
-
-    var addRuleBtn = document.createElement("button");
-    addRuleBtn.type = "button";
-    addRuleBtn.className = "chip-btn";
-    addRuleBtn.textContent = "+ Rule";
-    addRuleBtn.addEventListener("click", function() { groupNode.children = groupNode.op === "not" ? [createRuleNode()] : groupNode.children.concat([createRuleNode()]); renderFilterBuilder(); });
-    header.appendChild(addRuleBtn);
-
-    var addGroupBtn = document.createElement("button");
-    addGroupBtn.type = "button";
-    addGroupBtn.className = "chip-btn";
-    addGroupBtn.textContent = "+ Group";
-    addGroupBtn.addEventListener("click", function() { groupNode.children = groupNode.op === "not" ? [createGroupNode()] : groupNode.children.concat([createGroupNode()]); renderFilterBuilder(); });
-    header.appendChild(addGroupBtn);
-
-    if (parentNode) {
-      var removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "chip-btn danger";
-      removeBtn.textContent = "Remove";
-      removeBtn.addEventListener("click", function() { parentNode.children.splice(childIndex, 1); renderFilterBuilder(); });
-      header.appendChild(removeBtn);
-    }
-    groupEl.appendChild(header);
-
-    var body = document.createElement("div");
-    body.className = "filter-group-body";
-    if (!groupNode.children.length) {
-      var empty = document.createElement("p");
-      empty.className = "filter-empty";
-      empty.textContent = "No rules yet";
-      body.appendChild(empty);
-    } else {
-      groupNode.children.forEach(function(node, index) {
-        if (node.op) renderGroup(body, node, groupNode, index);
-        else renderRule(body, node, groupNode, index);
-      });
-    }
-    groupEl.appendChild(body);
-    parentEl.appendChild(groupEl);
-  }
-  function renderRule(parentEl, ruleNode, parentNode, childIndex) {
-    var row = document.createElement("div");
-    row.className = "filter-rule-row";
-    var topRow = document.createElement("div");
-    topRow.className = "filter-rule-top";
-    var valueRow = document.createElement("div");
-    valueRow.className = "filter-rule-value";
-
-    var fieldSelect = document.createElement("select");
-    FIELD_ORDER.forEach(function(fieldName) {
-      var option = document.createElement("option");
-      option.value = fieldName;
-      option.textContent = FILTER_FIELD_DEFS[fieldName].label;
-      fieldSelect.appendChild(option);
-    });
-    fieldSelect.value = ruleNode.field;
-    topRow.appendChild(fieldSelect);
-
-    var opSelect = document.createElement("select");
-    topRow.appendChild(opSelect);
-    var valueWrap = document.createElement("div");
-    valueWrap.className = "value-wrap";
-    valueRow.appendChild(valueWrap);
-
-    function rebuildValueInput() {
-      valueWrap.innerHTML = "";
-      if (ruleNode.operator === "is_empty" || ruleNode.operator === "is_not_empty") {
-        var hint = document.createElement("span");
-        hint.className = "filter-value-hint";
-        hint.textContent = "No value";
-        valueWrap.appendChild(hint);
+  function serializeRules() {
+    var predicates = [];
+    rules.forEach(function(rule) {
+      var payload = { field: rule.field, operator: rule.operator };
+      if (rule.operator === "is_empty" || rule.operator === "is_not_empty") {
+        predicates.push(payload);
         return;
       }
-      var input = document.createElement("input");
-      input.type = FILTER_FIELD_DEFS[ruleNode.field].type === "date" && ruleNode.operator !== "in_last_days" ? "datetime-local" : "text";
-      if (ruleNode.operator === "in_last_days") {
-        input.type = "number";
-        input.min = "0";
-        input.step = "1";
+      var rawValue = (rule.value || "").trim();
+      if (!rawValue) return;
+      if (rule.operator === "in" || rule.operator === "not_in") {
+        var listValue = rawValue.split(",").map(function(part) { return part.trim(); }).filter(Boolean);
+        if (!listValue.length) return;
+        payload.value = listValue;
+        predicates.push(payload);
+        return;
       }
-      if (ruleNode.operator === "in" || ruleNode.operator === "not_in") {
-        input.placeholder = "value1, value2";
+      if (rule.operator === "in_last_days") {
+        var parsed = parseInt(rawValue, 10);
+        if (isNaN(parsed) || parsed < 0) return;
+        payload.value = parsed;
+        predicates.push(payload);
+        return;
       }
-      input.value = ruleNode.value || "";
-      input.addEventListener("input", function() { ruleNode.value = input.value; });
-      valueWrap.appendChild(input);
-    }
-
-    function rebuildOperatorSelect() {
-      opSelect.innerHTML = "";
-      FILTER_FIELD_DEFS[ruleNode.field].operators.forEach(function(operator) {
-        var option = document.createElement("option");
-        option.value = operator;
-        option.textContent = OPERATOR_LABELS[operator] || operator;
-        opSelect.appendChild(option);
-      });
-      if (FILTER_FIELD_DEFS[ruleNode.field].operators.indexOf(ruleNode.operator) === -1) {
-        ruleNode.operator = FILTER_FIELD_DEFS[ruleNode.field].operators[0];
-      }
-      opSelect.value = ruleNode.operator;
-      rebuildValueInput();
-    }
-
-    fieldSelect.addEventListener("change", function() { ruleNode.field = fieldSelect.value; rebuildOperatorSelect(); });
-    opSelect.addEventListener("change", function() { ruleNode.operator = opSelect.value; rebuildValueInput(); });
-    rebuildOperatorSelect();
-
-    var removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "chip-btn danger";
-    removeBtn.textContent = "Remove";
-    removeBtn.addEventListener("click", function() { parentNode.children.splice(childIndex, 1); renderFilterBuilder(); });
-    topRow.appendChild(removeBtn);
-
-    row.appendChild(topRow);
-    row.appendChild(valueRow);
-    parentEl.appendChild(row);
-  }
-
-  function serializeNode(node) {
-    if (node.op) {
-      if (!node.children.length) return null;
-      if (node.op === "not") {
-        var notChild = serializeNode(node.children[0]);
-        return notChild ? { op: "not", child: notChild } : null;
-      }
-      var children = node.children.map(serializeNode).filter(Boolean);
-      return children.length ? { op: node.op, children: children } : null;
-    }
-    var payload = { field: node.field, operator: node.operator };
-    if (node.operator === "is_empty" || node.operator === "is_not_empty") return payload;
-    var rawValue = (node.value || "").trim();
-    if (!rawValue) return null;
-    if (node.operator === "in" || node.operator === "not_in") {
-      var listValue = rawValue.split(",").map(function(part) { return part.trim(); }).filter(Boolean);
-      if (!listValue.length) return null;
-      payload.value = listValue;
-      return payload;
-    }
-    if (node.operator === "in_last_days") {
-      var parsed = parseInt(rawValue, 10);
-      if (isNaN(parsed) || parsed < 0) return null;
-      payload.value = parsed;
-      return payload;
-    }
-    payload.value = rawValue;
-    return payload;
+      payload.value = rawValue;
+      predicates.push(payload);
+    });
+    if (!predicates.length) return null;
+    if (predicates.length === 1) return predicates[0];
+    return { op: "and", children: predicates };
   }
 
   function expressionToText(node) {
@@ -511,214 +328,262 @@
     return fieldLabel + " " + operatorLabel + " " + (Array.isArray(node.value) ? node.value.join(", ") : node.value);
   }
 
-  function headerFiltersToExpression() {
-    var rules = [];
-    table.getHeaderFilters().forEach(function(filter) {
-      var map = HEADER_FIELD_TO_AST[filter.field];
-      if (!map || filter.value === "" || filter.value === null || typeof filter.value === "undefined") return;
-      var value = map.decode ? map.decode(filter.value) : filter.value;
-      if (typeof value === "number" && isNaN(value)) return;
-      rules.push({ field: map.field, operator: map.operator, value: value });
+  function updateFilterSummary() {
+    summaryNode.textContent = expressionToText(activeExpression);
+  }
+
+  function rulesForField(field) {
+    return rules.filter(function(r) { return r.field === field; });
+  }
+
+  function addRule(field) {
+    var def = FILTER_FIELD_DEFS[field];
+    rules.push({ field: field, operator: def.operators[0], value: "" });
+  }
+
+  function removeRule(index) {
+    rules.splice(index, 1);
+  }
+
+  function renderRuleRow(rule, ruleIndex, container) {
+    var row = document.createElement("div");
+    row.className = "filter-rule-row";
+    var topRow = document.createElement("div");
+    topRow.className = "filter-rule-top";
+
+    var opSelect = document.createElement("select");
+    FILTER_FIELD_DEFS[rule.field].operators.forEach(function(operator) {
+      var option = document.createElement("option");
+      option.value = operator;
+      option.textContent = OPERATOR_LABELS[operator] || operator;
+      opSelect.appendChild(option);
     });
-    if (!rules.length) return null;
-    return rules.length === 1 ? rules[0] : { op: "and", children: rules };
-  }
+    opSelect.value = rule.operator;
+    opSelect.addEventListener("change", function() {
+      rule.operator = opSelect.value;
+      rebuildValueInput();
+    });
+    topRow.appendChild(opSelect);
 
-  function mergeExpressions(exprA, exprB) {
-    if (!exprA) return exprB;
-    if (!exprB) return exprA;
-    return { op: "and", children: [exprA, exprB] };
-  }
+    var removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "chip-btn danger";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", function() {
+      removeRule(ruleIndex);
+      renderColumnFilterSections();
+      renderPopoverForField(rule.field);
+    });
+    topRow.appendChild(removeBtn);
 
-  function expressionToHeaderValueMap(expression) {
-    if (!expression) return {};
-    var map = {};
-    function visit(node) {
-      if (!node) return;
-      if (node.op) {
-        if (node.op !== "and") return;
-        node.children.forEach(visit);
+    var valueRow = document.createElement("div");
+    valueRow.className = "filter-rule-value";
+    var valueWrap = document.createElement("div");
+    valueWrap.className = "value-wrap";
+    valueRow.appendChild(valueWrap);
+
+    function rebuildValueInput() {
+      valueWrap.innerHTML = "";
+      if (rule.operator === "is_empty" || rule.operator === "is_not_empty") {
+        var hint = document.createElement("span");
+        hint.className = "filter-value-hint";
+        hint.textContent = "No value needed";
+        valueWrap.appendChild(hint);
         return;
       }
-      var headerField = AST_FIELD_TO_HEADER[node.field];
-      if (!headerField) return;
-      if (node.operator !== "eq" && node.operator !== "in_last_days") return;
-      if (map[headerField]) return;
-      var sourceMap = HEADER_FIELD_TO_AST[headerField];
-      map[headerField] = sourceMap && sourceMap.encode ? sourceMap.encode(node.value) : node.value;
+      var input = document.createElement("input");
+      input.type = FILTER_FIELD_DEFS[rule.field].type === "date" && rule.operator !== "in_last_days" ? "datetime-local" : "text";
+      if (rule.operator === "in_last_days") {
+        input.type = "number";
+        input.min = "0";
+        input.step = "1";
+      }
+      if (rule.operator === "in" || rule.operator === "not_in") {
+        input.placeholder = "value1, value2";
+      }
+      input.value = rule.value || "";
+      input.addEventListener("input", function() { rule.value = input.value; });
+      valueWrap.appendChild(input);
     }
-    visit(expression);
-    return map;
+
+    rebuildValueInput();
+
+    row.appendChild(topRow);
+    row.appendChild(valueRow);
+    container.appendChild(row);
   }
 
-  function syncHeaderFromAdvancedExpression() {
-    isSyncingHeader = true;
-    table.clearHeaderFilter();
-    var map = expressionToHeaderValueMap(activeAdvancedExpression);
-    Object.keys(map).forEach(function(field) {
-      table.setHeaderFilterValue(field, map[field]);
-    });
-    isSyncingHeader = false;
-  }
+  function renderColumnFilterSections() {
+    columnFilterSections.innerHTML = "";
+    FIELD_ORDER.forEach(function(field) {
+      var fieldRules = rulesForField(field);
+      var section = document.createElement("div");
+      section.className = "col-filter-section";
+      section.setAttribute("data-filter-section", field);
 
-  function uniqueScalarValues(field) {
-    var seen = {};
-    var values = [];
-    table.getData().forEach(function(row) {
-      var value = row[field];
-      if (value === null || typeof value === "undefined" || value === "") {
-        return;
+      var header = document.createElement("div");
+      header.className = "col-filter-section-header";
+      var label = document.createElement("span");
+      label.className = "col-filter-section-label";
+      label.textContent = FILTER_FIELD_DEFS[field].label;
+      if (fieldRules.length) {
+        var badge = document.createElement("span");
+        badge.className = "col-filter-count";
+        badge.textContent = fieldRules.length;
+        label.appendChild(badge);
       }
-      if (!seen[value]) {
-        seen[value] = true;
-        values.push(value);
-      }
-    });
-    values.sort();
-    return values;
-  }
+      header.appendChild(label);
 
-  function uniqueArrayValues(field) {
-    var seen = {};
-    var values = [];
-    table.getData().forEach(function(row) {
-      var arrayValue = row[field];
-      if (!arrayValue || !Array.isArray(arrayValue)) {
-        return;
-      }
-      arrayValue.forEach(function(value) {
-        if (value && !seen[value]) {
-          seen[value] = true;
-          values.push(value);
-        }
+      var addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "chip-btn";
+      addBtn.textContent = "+ Rule";
+      addBtn.addEventListener("click", function() {
+        addRule(field);
+        renderColumnFilterSections();
+        renderPopoverForField(field);
       });
-    });
-    values.sort();
-    return values;
-  }
+      header.appendChild(addBtn);
+      section.appendChild(header);
 
-  function getHeaderFilterValue(field) {
-    var active = table.getHeaderFilters();
-    for (var i = 0; i < active.length; i += 1) {
-      if (active[i].field === field) {
-        return active[i].value;
+      if (fieldRules.length) {
+        var body = document.createElement("div");
+        body.className = "col-filter-section-body";
+        fieldRules.forEach(function(rule) {
+          var globalIndex = rules.indexOf(rule);
+          renderRuleRow(rule, globalIndex, body);
+        });
+        section.appendChild(body);
       }
-    }
-    return "";
+
+      columnFilterSections.appendChild(section);
+    });
   }
 
-  function updateHeaderFilterValue(field, value) {
-    if (value === "" || value === null || typeof value === "undefined") {
-      clearSingleHeaderFilter(field);
+  function closePopover() {
+    popoverEl.style.display = "none";
+    popoverEl.innerHTML = "";
+    popoverEl.removeAttribute("data-field");
+  }
+
+  function renderPopoverForField(field) {
+    if (popoverEl.getAttribute("data-field") !== field) return;
+    renderPopoverContent(field);
+  }
+
+  function renderPopoverContent(field) {
+    popoverEl.innerHTML = "";
+    var def = FILTER_FIELD_DEFS[field];
+    var heading = document.createElement("div");
+    heading.className = "popover-heading";
+    heading.textContent = def.label + " Filters";
+    popoverEl.appendChild(heading);
+
+    var fieldRules = rulesForField(field);
+    if (!fieldRules.length) {
+      var empty = document.createElement("p");
+      empty.className = "filter-empty";
+      empty.textContent = "No rules for this column";
+      popoverEl.appendChild(empty);
+    } else {
+      fieldRules.forEach(function(rule) {
+        var globalIndex = rules.indexOf(rule);
+        renderRuleRow(rule, globalIndex, popoverEl);
+      });
+    }
+
+    var addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "chip-btn";
+    addBtn.textContent = "+ Add Rule";
+    addBtn.addEventListener("click", function() {
+      addRule(field);
+      renderPopoverContent(field);
+      renderColumnFilterSections();
+    });
+    popoverEl.appendChild(addBtn);
+  }
+
+  function onColumnFilterIconClick(filterField, iconEl) {
+    if (window.innerWidth <= 768) {
+      openPanel("filters-panel");
+      renderColumnFilterSections();
+      setTimeout(function() {
+        var section = columnFilterSections.querySelector("[data-filter-section='" + filterField + "']");
+        if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
       return;
     }
-    isSyncingHeader = true;
-    table.setHeaderFilterValue(field, value);
-    isSyncingHeader = false;
-    updateFilterSummary();
+
+    if (popoverEl.style.display !== "none" && popoverEl.getAttribute("data-field") === filterField) {
+      closePopover();
+      return;
+    }
+
+    var rect = iconEl.getBoundingClientRect();
+    popoverEl.style.display = "block";
+    popoverEl.style.top = (rect.bottom + 4) + "px";
+    popoverEl.style.left = Math.max(8, rect.left - 150) + "px";
+    popoverEl.setAttribute("data-field", filterField);
+    renderPopoverContent(filterField);
   }
 
-  function clearSingleHeaderFilter(field) {
-    var remaining = table.getHeaderFilters().filter(function(filter) {
-      return filter.field !== field;
-    });
+  function applyFilters() {
+    activeExpression = serializeRules();
+    syncHeaderFromRules();
+    fetchJobs(activeExpression)
+      .then(updateFilterSummary)
+      .catch(function(err) { window.alert(err.message); });
+  }
 
+  function clearAllFilters() {
+    rules = [];
+    activeExpression = null;
     isSyncingHeader = true;
     table.clearHeaderFilter();
-    remaining.forEach(function(filter) {
-      table.setHeaderFilterValue(filter.field, filter.value);
+    isSyncingHeader = false;
+    renderColumnFilterSections();
+    closePopover();
+    fetchJobs(null).then(updateFilterSummary);
+  }
+
+  function syncHeaderFromRules() {
+    isSyncingHeader = true;
+    table.clearHeaderFilter();
+    rules.forEach(function(rule) {
+      var def = FILTER_FIELD_DEFS[rule.field];
+      if (!def || !def.headerField) return;
+      if (rule.operator !== "eq" && rule.operator !== "in_last_days") return;
+      var value = (rule.value || "").trim();
+      if (!value) return;
+      if (rule.field === "employment_type") value = EMPLOYMENT_LABELS[value] || value;
+      if (rule.field === "workplace_type") value = WORKPLACE_LABELS[value] || value;
+      table.setHeaderFilterValue(def.headerField, value);
     });
     isSyncingHeader = false;
-    updateFilterSummary();
   }
 
-  function renderQuickFilterRows() {
-    quickFilterRowsNode.innerHTML = "";
-    QUICK_FILTER_CONFIG.forEach(function(config) {
-      var row = document.createElement("div");
-      row.className = "filter-rule-row quick-filter-row";
-
-      var topRow = document.createElement("div");
-      topRow.className = "filter-rule-top";
-
-      var fieldDisplay = document.createElement("div");
-      fieldDisplay.className = "quick-filter-pill";
-      fieldDisplay.textContent = config.label;
-      topRow.appendChild(fieldDisplay);
-
-      var operatorDisplay = document.createElement("div");
-      operatorDisplay.className = "quick-filter-pill";
-      operatorDisplay.textContent = config.mode === "date" ? "in last N days" : "equals";
-      topRow.appendChild(operatorDisplay);
-
-      var clearButton = document.createElement("button");
-      clearButton.type = "button";
-      clearButton.className = "chip-btn danger";
-      clearButton.textContent = "Clear";
-      clearButton.addEventListener("click", function() {
-        updateHeaderFilterValue(config.headerField, "");
-      });
-      topRow.appendChild(clearButton);
-
-      var valueRow = document.createElement("div");
-      valueRow.className = "filter-rule-value";
-      var valueWrap = document.createElement("div");
-      valueWrap.className = "value-wrap";
-
-      var select = document.createElement("select");
-      var allOption = document.createElement("option");
-      allOption.value = "";
-      allOption.textContent = "Any";
-      select.appendChild(allOption);
-
-      var options = [];
-      if (config.mode === "date") {
-        options = DATE_RANGE_PRESETS.map(function(preset) { return preset.value; });
-        DATE_RANGE_PRESETS.forEach(function(preset) {
-          var option = document.createElement("option");
-          option.value = preset.value;
-          option.textContent = preset.label;
-          select.appendChild(option);
-        });
-      } else if (config.mode === "array") {
-        options = uniqueArrayValues(config.headerField);
-      } else {
-        options = uniqueScalarValues(config.headerField);
+  function headerFilterToRule(headerField, headerValue) {
+    for (var i = 0; i < FIELD_ORDER.length; i++) {
+      var field = FIELD_ORDER[i];
+      var def = FILTER_FIELD_DEFS[field];
+      if (def.headerField === headerField) {
+        var operator = def.type === "date" ? "in_last_days" : "eq";
+        var value = headerValue;
+        if (field === "employment_type") {
+          var EMPLOYMENT_KEY_BY_LABEL = {};
+          Object.keys(EMPLOYMENT_LABELS).forEach(function(key) { EMPLOYMENT_KEY_BY_LABEL[EMPLOYMENT_LABELS[key]] = key; });
+          value = EMPLOYMENT_KEY_BY_LABEL[headerValue] || headerValue;
+        }
+        if (field === "workplace_type") {
+          var WORKPLACE_KEY_BY_LABEL = {};
+          Object.keys(WORKPLACE_LABELS).forEach(function(key) { WORKPLACE_KEY_BY_LABEL[WORKPLACE_LABELS[key]] = key; });
+          value = WORKPLACE_KEY_BY_LABEL[headerValue] || headerValue;
+        }
+        return { field: field, operator: operator, value: String(value) };
       }
-
-      if (config.mode !== "date") {
-        options.forEach(function(value) {
-          var option = document.createElement("option");
-          option.value = value;
-          option.textContent = value;
-          select.appendChild(option);
-        });
-      }
-
-      var activeValue = getHeaderFilterValue(config.headerField);
-      if (activeValue && options.indexOf(activeValue) === -1 && config.mode !== "date") {
-        var currentOption = document.createElement("option");
-        currentOption.value = activeValue;
-        currentOption.textContent = activeValue;
-        select.appendChild(currentOption);
-      }
-      select.value = activeValue || "";
-      select.addEventListener("change", function() {
-        updateHeaderFilterValue(config.headerField, select.value);
-      });
-
-      valueWrap.appendChild(select);
-      valueRow.appendChild(valueWrap);
-      row.appendChild(topRow);
-      row.appendChild(valueRow);
-      quickFilterRowsNode.appendChild(row);
-    });
-  }
-
-  function updateFilterSummary() {
-    var merged = mergeExpressions(activeAdvancedExpression, headerFiltersToExpression());
-    quickSummaryNode.textContent = expressionToText(merged);
-    renderQuickFilterRows();
+    }
+    return null;
   }
 
   function buildColumnsPanel() {
@@ -738,49 +603,45 @@
   }
 
   openColumnsPanelBtn.addEventListener("click", function() { buildColumnsPanel(); openPanel("columns-side-panel"); });
-  openFiltersPanelBtn.addEventListener("click", function() { renderFilterBuilder(); renderQuickFilterRows(); openPanel("filters-panel"); });
-  panelBackdrop.addEventListener("click", closePanels);
+  openFiltersPanelBtn.addEventListener("click", function() { renderColumnFilterSections(); openPanel("filters-panel"); });
+  panelBackdrop.addEventListener("click", function() { closePanels(); closePopover(); });
   document.querySelectorAll("[data-close-panel]").forEach(function(btn) { btn.addEventListener("click", closePanels); });
-  document.addEventListener("keydown", function(event) { if (event.key === "Escape") closePanels(); });
+  document.addEventListener("keydown", function(event) { if (event.key === "Escape") { closePanels(); closePopover(); } });
 
-  rootGroupOp.addEventListener("change", function() { advancedState.op = rootGroupOp.value; normalizeGroupChildren(advancedState); renderFilterBuilder(); });
-  document.getElementById("add-root-rule").addEventListener("click", function() {
-    advancedState.children = advancedState.op === "not" ? [createRuleNode()] : advancedState.children.concat([createRuleNode()]);
-    renderFilterBuilder();
-  });
-  document.getElementById("add-root-group").addEventListener("click", function() {
-    advancedState.children = advancedState.op === "not" ? [createGroupNode()] : advancedState.children.concat([createGroupNode()]);
-    renderFilterBuilder();
+  document.addEventListener("click", function(e) {
+    if (popoverEl.style.display !== "none" && !popoverEl.contains(e.target) && !e.target.classList.contains("col-filter-icon")) {
+      closePopover();
+    }
   });
 
-  document.getElementById("clear-advanced-filter").addEventListener("click", function() {
-    advancedState = { op: "and", children: [] };
-    rootGroupOp.value = "and";
-    activeAdvancedExpression = null;
-    isSyncingHeader = true;
-    table.clearHeaderFilter();
-    isSyncingHeader = false;
-    renderFilterBuilder();
-    fetchJobs(null).then(updateFilterSummary);
-  });
-
-  document.getElementById("apply-advanced-filter").addEventListener("click", function() {
-    activeAdvancedExpression = serializeNode(advancedState);
-    syncHeaderFromAdvancedExpression();
-    fetchJobs(activeAdvancedExpression)
-      .then(updateFilterSummary)
-      .catch(function(err) { window.alert(err.message); });
-  });
+  document.getElementById("apply-filters").addEventListener("click", applyFilters);
+  document.getElementById("clear-all-filters").addEventListener("click", clearAllFilters);
 
   table.on("dataFiltered", function() {
-    if (isSyncingHeader) {
-      updateFilterSummary();
-      return;
-    }
+    if (isSyncingHeader) return;
+    var headerFilters = table.getHeaderFilters();
+    headerFilters.forEach(function(filter) {
+      if (filter.value === "" || filter.value === null || typeof filter.value === "undefined") return;
+      var newRule = headerFilterToRule(filter.field, filter.value);
+      if (!newRule) return;
+      var existingIndex = -1;
+      for (var i = 0; i < rules.length; i++) {
+        if (rules[i].field === newRule.field && (rules[i].operator === "eq" || rules[i].operator === "in_last_days")) {
+          existingIndex = i;
+          break;
+        }
+      }
+      if (existingIndex >= 0) {
+        rules[existingIndex].value = newRule.value;
+      } else {
+        rules.push(newRule);
+      }
+    });
+    activeExpression = serializeRules();
     updateFilterSummary();
   });
 
-  renderFilterBuilder();
+  renderColumnFilterSections();
   fetchJobs(null).then(updateFilterSummary);
 })();
 </script>

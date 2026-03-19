@@ -32,18 +32,18 @@ class TestJobsPage:
         response = client.get("/")
         assert b'class="full-bleed"' in response.content
 
-    def test_contains_advanced_filter_panel_controls(self):
+    def test_contains_filters_panel_controls(self):
         client = Client()
         response = client.get("/")
         assert b'id="open-filters-panel"' in response.content
         assert b'id="filters-panel"' in response.content
         assert b'id="advanced-filter-summary"' in response.content
 
-    def test_contains_quick_filters_section_in_panel(self):
+    def test_contains_per_column_filter_sections(self):
         client = Client()
         response = client.get("/")
-        assert b"Quick Filters" in response.content
-        assert b'id="quick-filter-rows"' in response.content
+        assert b'id="column-filter-sections"' in response.content
+        assert b"Per-column filter rules" in response.content
 
     def test_contains_columns_side_panel_controls(self):
         client = Client()
@@ -62,6 +62,19 @@ class TestJobsPage:
         response = client.get("/")
         assert b'headerFilter: "input"' not in response.content
         assert b'headerFilterPlaceholder' not in response.content
+
+    def test_does_not_contain_group_builder_controls(self):
+        client = Client()
+        response = client.get("/")
+        assert b'id="root-group-op"' not in response.content
+        assert b'id="add-root-group"' not in response.content
+        assert b"Add Group" not in response.content
+        assert b"Advanced Logic" not in response.content
+
+    def test_contains_column_filter_popover_element(self):
+        client = Client()
+        response = client.get("/")
+        assert b'id="col-filter-popover"' in response.content
 
 
 @pytest.mark.django_db
