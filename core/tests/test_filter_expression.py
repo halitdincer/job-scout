@@ -143,6 +143,28 @@ def test_build_filter_q_supports_or_group():
     assert isinstance(q_obj, Q)
 
 
+def test_validate_filter_expression_allows_source_name_in_operator():
+    expression = {
+        "field": "source_name",
+        "operator": "in",
+        "value": ["Stripe", "Google"],
+    }
+
+    validate_filter_expression(expression)
+
+
+def test_build_filter_q_supports_source_name_not_in_operator():
+    expression = {
+        "field": "source_name",
+        "operator": "not_in",
+        "value": ["Legacy Co"],
+    }
+
+    q_obj = build_filter_q(expression)
+
+    assert isinstance(q_obj, Q)
+
+
 def test_validate_operator_value_rejects_unsupported_operator():
     with pytest.raises(ValueError, match="Unsupported operator"):
         _validate_operator_value("bad_op", "x")

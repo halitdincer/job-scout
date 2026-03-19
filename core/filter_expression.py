@@ -25,7 +25,7 @@ FIELD_DEFINITIONS = {
     "source_name": {
         "path": "source__name",
         "type": "text",
-        "operators": {"contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"},
+        "operators": {"contains", "not_contains", "eq", "neq", "in", "not_in", "is_empty", "is_not_empty"},
     },
     "status": {
         "path": "status",

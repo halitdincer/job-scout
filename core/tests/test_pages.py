@@ -176,6 +176,11 @@ class TestJobsPage:
         response = client.get("/")
         assert b"labelToKey" in response.content
 
+    def test_company_filter_supports_in_operator(self):
+        client = Client()
+        response = client.get("/")
+        assert b'source_name: { label: "Company", type: "text", operators: ["contains", "eq", "neq", "in", "not_in"' in response.content
+
 
 @pytest.mark.django_db
 class TestSourcesPage:

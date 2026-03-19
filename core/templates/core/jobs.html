@@ -63,7 +63,7 @@
 
   var FILTER_FIELD_DEFS = {
     title: { label: "Title", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"], headerField: null },
-    source_name: { label: "Company", type: "text", operators: ["contains", "eq", "neq", "is_empty", "is_not_empty"], headerField: "source_name" },
+    source_name: { label: "Company", type: "text", operators: ["contains", "eq", "neq", "in", "not_in", "is_empty", "is_not_empty"], headerField: "source_name" },
     status: { label: "Status", type: "enum", operators: ["eq", "neq", "in", "not_in"], headerField: "status" },
     department: { label: "Department", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"], headerField: null },
     team: { label: "Team", type: "text", operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"], headerField: null },
@@ -159,6 +159,28 @@
 
   var EMPTY_SENTINEL = "__EMPTY__";
 
+  function normalizeMultiSelectValue(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      var trimmed = value.trim();
+      if (!trimmed) return [];
+      if (trimmed[0] === "[") {
+        try {
+          var parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          // fall through
+        }
+      }
+      if (trimmed.indexOf(",") !== -1) {
+        return trimmed.split(",").map(function(v) { return v.trim(); }).filter(Boolean);
+      }
+      return [trimmed];
+    }
+    return [];
+  }
+
   function collectUniqueValues(tableData, field, isArray) {
     var seen = {};
     var values = [];
@@ -177,9 +199,10 @@
   }
 
   function multiSelectFilter(headerValue, rowValue, rowData, filterParams) {
-    if (!headerValue || !Array.isArray(headerValue) || !headerValue.length) return true;
-    var hasEmpty = headerValue.indexOf(EMPTY_SENTINEL) !== -1;
-    var realValues = headerValue.filter(function(v) { return v !== EMPTY_SENTINEL; });
+    var selectedValues = normalizeMultiSelectValue(headerValue);
+    if (!selectedValues.length) return true;
+    var hasEmpty = selectedValues.indexOf(EMPTY_SENTINEL) !== -1;
+    var realValues = selectedValues.filter(function(v) { return v !== EMPTY_SENTINEL; });
     var isArray = filterParams && filterParams.isArrayField;
     if (isArray) {
       var arr = rowValue && Array.isArray(rowValue) ? rowValue : [];
@@ -848,7 +871,7 @@
         return [{ field: field, operator: "in_last_days", value: String(headerValue) }];
       }
 
-      var vals = Array.isArray(headerValue) ? headerValue : [headerValue];
+      var vals = normalizeMultiSelectValue(headerValue);
       var hasEmpty = vals.indexOf(EMPTY_SENTINEL) !== -1;
       var realVals = vals.filter(function(v) { return v !== EMPTY_SENTINEL; }).map(function(v) { return labelToKey(field, v); });
       var result = [];
@@ -917,8 +940,12 @@
     Object.keys(fieldsWithHeaders).forEach(function(headerField) {
       var filterField = fieldsWithHeaders[headerField];
       var headerValue = activeHeaderFields[headerField];
-      var isEmpty = !headerValue || headerValue === "" ||
-        (Array.isArray(headerValue) && headerValue.length === 0);
+      var normalizedHeaderValue = headerValue;
+      if (FILTER_FIELD_DEFS[filterField] && FILTER_FIELD_DEFS[filterField].type !== "date") {
+        normalizedHeaderValue = normalizeMultiSelectValue(headerValue);
+      }
+      var isEmpty = !normalizedHeaderValue || normalizedHeaderValue === "" ||
+        (Array.isArray(normalizedHeaderValue) && normalizedHeaderValue.length === 0);
 
       var headerOps = ["eq", "in", "in_last_days", "is_empty"];
       if (isEmpty) {
@@ -931,7 +958,7 @@
         }
         if (hadRules) needsServerRefetch = true;
       } else {
-        var newRules = headerFilterToRules(headerField, headerValue);
+        var newRules = headerFilterToRules(headerField, normalizedHeaderValue);
         for (var j = rules.length - 1; j >= 0; j--) {
           if (rules[j].field === filterField && headerOps.indexOf(rules[j].operator) !== -1) {
             rules.splice(j, 1);
