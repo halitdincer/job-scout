@@ -32,7 +32,7 @@ The jobs page at `/` SHALL render a Tabulator table that fetches all job listing
 - **THEN** only listings with a location in city "Toronto" are shown
 
 ### Requirement: Column chooser
-The table SHALL include a custom column chooser button above the grid that opens a dropdown panel listing all columns with checkboxes to toggle visibility.
+The table SHALL include a custom column chooser button above the grid that opens a dropdown panel listing all columns with checkboxes to toggle visibility. The jobs page SHALL also provide an AG Grid-style columns side panel that exposes the same visibility controls in a mobile-responsive layout.
 
 #### Scenario: Open column chooser
 - **WHEN** a user clicks the "Columns" button
@@ -45,6 +45,10 @@ The table SHALL include a custom column chooser button above the grid that opens
 #### Scenario: Show a hidden column
 - **WHEN** a user checks "Team" in the column chooser
 - **THEN** the Team column appears in the table
+
+#### Scenario: Open columns side panel on mobile
+- **WHEN** a user on a 375px wide viewport opens the columns panel
+- **THEN** the panel is usable with touch controls and can toggle column visibility without horizontal clipping
 
 ### Requirement: Full-width full-height layout
 The navbar and table SHALL span the full viewport width and height. No page title SHALL be displayed. The table height SHALL fill the viewport below the navbar and toolbar.
@@ -69,7 +73,7 @@ Every column in the jobs table SHALL be sortable by clicking the column header.
 - **THEN** listings are sorted by first seen date, newest first
 
 ### Requirement: Header filters
-Each column SHALL have a header filter. Categorical columns (Company, Type, Workplace, Country, Region, City, Status) SHALL use a value-list dropdown auto-populated from column data. Text columns (Title, Department, Location (Raw)) SHALL use a text input filter.
+Each column SHALL have a header filter. Categorical columns (Company, Type, Workplace, Country, Region, City, Status) SHALL use a value-list dropdown auto-populated from column data. Text columns (Title, Department, Location (Raw)) SHALL use a text input filter. Existing header filters SHALL remain available as quick filters after advanced filtering is introduced.
 
 #### Scenario: Filter by company dropdown
 - **WHEN** a user clicks the Company header filter and selects "Stripe"
@@ -82,6 +86,10 @@ Each column SHALL have a header filter. Categorical columns (Company, Type, Work
 #### Scenario: Value-list shows actual values
 - **WHEN** a user clicks the Type header filter dropdown
 - **THEN** the dropdown shows "Full-time", "Part-time", etc. populated from the actual data
+
+#### Scenario: Quick filters compose with advanced filters
+- **WHEN** a user has active quick filters and also applies an advanced filter expression
+- **THEN** the table applies both using logical `AND`
 
 ### Requirement: Relative time display for all date columns
 ALL date/time columns (First Seen, Last Seen, Published At, Updated At Source, Expired At) SHALL display relative timestamps (e.g., "2h ago", "1d ago") with the full date-time available on hover via tooltip.
@@ -124,11 +132,33 @@ Employment type and workplace type columns SHALL display human-readable labels i
 - **THEN** the table displays "On-site"
 
 ### Requirement: Mobile responsive grid
-The grid SHALL be usable on mobile devices with horizontal scrolling for columns that don't fit the viewport.
+The grid SHALL be usable on mobile devices with horizontal scrolling for columns that don't fit the viewport. Advanced filters and columns controls SHALL be accessible through slide-over side panels optimized for small screens.
 
 #### Scenario: Grid on mobile viewport
 - **WHEN** a user views the jobs page on a 375px wide screen
 - **THEN** the grid is scrollable horizontally and all data is accessible
+
+#### Scenario: Mobile filters panel
+- **WHEN** a user opens the filters panel on a mobile viewport
+- **THEN** filter builder controls render in a single-column layout with visible apply and clear actions
+
+### Requirement: Advanced filter builder panel
+The jobs page SHALL provide an AG Grid-style filters side panel that lets users build nested boolean filter expressions with `AND`, `OR`, and `NOT`, including multiple predicates for the same field.
+
+#### Scenario: Multiple predicates on one field
+- **WHEN** a user adds two title predicates (`contains engineer` and `not_contains senior`)
+- **THEN** both predicates are represented and applied in the active expression
+
+#### Scenario: Nested group editing
+- **WHEN** a user adds an `OR` subgroup inside an `AND` root group
+- **THEN** the builder displays group hierarchy and applies the nested logic correctly
+
+### Requirement: Active filter expression visibility
+The jobs page SHALL display a compact active-filter summary derived from the current advanced expression and quick filters.
+
+#### Scenario: Summary reflects active expression
+- **WHEN** a user applies an advanced expression with three predicates
+- **THEN** the UI shows a readable summary of active conditions and logical grouping
 
 ### Requirement: Dark theme
 The table SHALL use Tabulator's midnight theme, with CSS overrides as needed to match the site's dark neutral color palette.
