@@ -107,6 +107,75 @@ class TestJobsPage:
         response = client.get("/")
         assert b"resetColumnOrder" in response.content
 
+    def test_contains_multi_select_header_filter_function(self):
+        client = Client()
+        response = client.get("/")
+        assert b"multiSelectHeaderFilter" in response.content
+
+    def test_contains_multi_select_filter_function(self):
+        client = Client()
+        response = client.get("/")
+        assert b"multiSelectFilter" in response.content
+
+    def test_contains_empty_sentinel(self):
+        client = Client()
+        response = client.get("/")
+        assert b"EMPTY_SENTINEL" in response.content
+
+    def test_columns_use_multi_select_header_filter(self):
+        client = Client()
+        response = client.get("/")
+        content = response.content.decode()
+        assert "headerFilter: multiSelectHeaderFilter" in content
+
+    def test_does_not_use_list_header_filter_for_categorical(self):
+        client = Client()
+        response = client.get("/")
+        content = response.content.decode()
+        # Date columns still use "list", but categorical/array should not
+        assert 'field: "source_name"' in content
+        # Company should use multiSelectHeaderFilter, not "list"
+        lines = content.split("\n")
+        for line in lines:
+            if "source_name" in line and "headerFilter" in line:
+                assert "multiSelectHeaderFilter" in line
+                break
+
+    def test_contains_header_filter_to_rules_function(self):
+        client = Client()
+        response = client.get("/")
+        assert b"headerFilterToRules" in response.content
+
+    def test_contains_select_all_label(self):
+        client = Client()
+        response = client.get("/")
+        assert b"Select All" in response.content
+
+    def test_contains_empty_option_label(self):
+        client = Client()
+        response = client.get("/")
+        assert b'"(Empty)"' in response.content
+
+    def test_contains_ms_dropdown_class(self):
+        client = Client()
+        response = client.get("/")
+        assert b"ms-dropdown" in response.content
+
+    def test_data_filtered_handles_filter_removal(self):
+        client = Client()
+        response = client.get("/")
+        assert b"needsServerRefetch" in response.content
+
+    def test_contains_collect_unique_values_function(self):
+        client = Client()
+        response = client.get("/")
+        assert b"collectUniqueValues" in response.content
+
+    def test_contains_label_to_key_function(self):
+        client = Client()
+        response = client.get("/")
+        assert b"labelToKey" in response.content
+
 
 @pytest.mark.django_db
 class TestSourcesPage:

@@ -706,6 +706,100 @@ td a:hover {
   background: var(--text-muted);
 }
 
+/* Multi-select header filter */
+.ms-header-filter {
+  width: 100%;
+  cursor: pointer;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.ms-summary {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  min-height: 24px;
+  line-height: 1.4;
+}
+
+.ms-summary-active {
+  color: var(--text);
+}
+
+.ms-dropdown {
+  z-index: 400;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.ms-option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.ms-option:hover {
+  background: var(--bg-elevated);
+}
+
+.ms-option input[type="checkbox"] {
+  flex-shrink: 0;
+}
+
+.ms-option span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ms-select-all {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.15rem;
+  font-weight: 600;
+}
+
+.ms-empty-option span {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* Scrollbar for multi-select dropdown */
+.ms-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ms-dropdown::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+.ms-dropdown::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.ms-dropdown::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   main:not(.full-bleed) {
