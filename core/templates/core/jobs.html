@@ -9,6 +9,7 @@
   <div class="jobs-toolbar-left">
     <button class="col-chooser-btn" id="open-columns-panel">Columns</button>
     <button class="col-chooser-btn" id="open-filters-panel">Filters</button>
+    <button class="col-chooser-btn" id="reset-columns">Reset Columns</button>
   </div>
   <div id="advanced-filter-summary" class="filter-summary">No filters applied</div>
 </div>
@@ -217,14 +218,59 @@
     { title: "ID", field: "id", minWidth: 80, visible: false }
   ];
 
+  var COLUMN_ORDER_KEY = "jobscout_column_order";
+  var DEFAULT_COLUMN_ORDER = COLUMN_DEFS.map(function(c) { return c.field; });
+
+  function applyPersistedColumnOrder(defs) {
+    var raw = localStorage.getItem(COLUMN_ORDER_KEY);
+    if (!raw) return defs;
+    try {
+      var savedOrder = JSON.parse(raw);
+      if (!Array.isArray(savedOrder)) return defs;
+      var defsByField = {};
+      defs.forEach(function(d) { defsByField[d.field] = d; });
+      var ordered = [];
+      savedOrder.forEach(function(field) {
+        if (defsByField[field]) {
+          ordered.push(defsByField[field]);
+          delete defsByField[field];
+        }
+      });
+      Object.keys(defsByField).forEach(function(field) {
+        ordered.push(defsByField[field]);
+      });
+      return ordered;
+    } catch (e) {
+      return defs;
+    }
+  }
+
+  function saveColumnOrder(table) {
+    var order = table.getColumns().map(function(col) { return col.getField(); });
+    localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
+  }
+
+  function resetColumnOrder() {
+    localStorage.removeItem(COLUMN_ORDER_KEY);
+    DEFAULT_COLUMN_ORDER.forEach(function(field, index) {
+      var col = table.getColumn(field);
+      if (col) table.moveColumn(field, COLUMN_DEFS[0].field, true);
+    });
+    COLUMN_DEFS.forEach(function(def, index) {
+      if (index === 0) return;
+      table.moveColumn(def.field, COLUMN_DEFS[index - 1].field, false);
+    });
+  }
+
   var table = new Tabulator("#jobs-grid", {
     height: "100%",
     layout: "fitColumns",
+    movableColumns: true,
     pagination: true,
     paginationSize: 50,
     paginationSizeSelector: [25, 50, 100],
     placeholder: "No jobs found",
-    columns: COLUMN_DEFS,
+    columns: applyPersistedColumnOrder(COLUMN_DEFS),
     initialSort: [{ column: "first_seen_at", dir: "desc" }]
   });
 
@@ -604,6 +650,7 @@
 
   openColumnsPanelBtn.addEventListener("click", function() { buildColumnsPanel(); openPanel("columns-side-panel"); });
   openFiltersPanelBtn.addEventListener("click", function() { renderColumnFilterSections(); openPanel("filters-panel"); });
+  document.getElementById("reset-columns").addEventListener("click", resetColumnOrder);
   panelBackdrop.addEventListener("click", function() { closePanels(); closePopover(); });
   document.querySelectorAll("[data-close-panel]").forEach(function(btn) { btn.addEventListener("click", closePanels); });
   document.addEventListener("keydown", function(event) { if (event.key === "Escape") { closePanels(); closePopover(); } });
@@ -616,6 +663,8 @@
 
   document.getElementById("apply-filters").addEventListener("click", applyFilters);
   document.getElementById("clear-all-filters").addEventListener("click", clearAllFilters);
+
+  table.on("columnMoved", function() { saveColumnOrder(table); });
 
   table.on("dataFiltered", function() {
     if (isSyncingHeader) return;

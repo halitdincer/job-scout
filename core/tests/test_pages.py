@@ -76,6 +76,37 @@ class TestJobsPage:
         response = client.get("/")
         assert b'id="col-filter-popover"' in response.content
 
+    def test_tabulator_has_movable_columns_enabled(self):
+        client = Client()
+        response = client.get("/")
+        assert b"movableColumns: true" in response.content
+
+    def test_contains_column_order_persistence_key(self):
+        client = Client()
+        response = client.get("/")
+        assert b"jobscout_column_order" in response.content
+
+    def test_contains_column_moved_event_handler(self):
+        client = Client()
+        response = client.get("/")
+        assert b"columnMoved" in response.content
+
+    def test_contains_column_order_restore_logic(self):
+        client = Client()
+        response = client.get("/")
+        assert b"applyPersistedColumnOrder" in response.content
+
+    def test_contains_reset_columns_button(self):
+        client = Client()
+        response = client.get("/")
+        assert b'id="reset-columns"' in response.content
+        assert b"Reset Columns" in response.content
+
+    def test_contains_reset_columns_click_handler(self):
+        client = Client()
+        response = client.get("/")
+        assert b"resetColumnOrder" in response.content
+
 
 @pytest.mark.django_db
 class TestSourcesPage:
