@@ -91,3 +91,7 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 INGEST_API_KEY = os.environ.get("INGEST_API_KEY", "dev-ingest-key")
+
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = LOGIN_URL

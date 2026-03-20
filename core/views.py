@@ -1,6 +1,7 @@
 import json
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -12,16 +13,19 @@ from core.ingestion import ingest_sources
 from core.models import JobListing, LocationTag, Run, Source
 
 
+@login_required
 def jobs_page(request):
     return render(request, "core/jobs.html")
 
 
+@login_required
 def sources_page(request):
     return render(request, "core/sources.html", {
         "sources": Source.objects.all(),
     })
 
 
+@login_required
 def runs_page(request):
     return render(request, "core/runs.html", {
         "runs": Run.objects.order_by("-created_at"),
