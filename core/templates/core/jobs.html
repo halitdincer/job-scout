@@ -121,7 +121,8 @@
     var val = cell.getValue();
     if (!val) return "";
     var row = cell.getRow().getData();
-    return '<a href="' + row.url + '" target="_blank" rel="noopener">' + val.replace(/</g, "&lt;") + "</a>";
+    var className = row.seen ? "job-link seen-link" : "job-link";
+    return '<a class="' + className + '" data-listing-id="' + row.id + '" href="' + row.url + '" target="_blank" rel="noopener">' + val.replace(/</g, "&lt;") + "</a>";
   }
   function isoDateSorter(a, b) {
     if (!a && !b) return 0;
@@ -485,7 +486,11 @@
     paginationSizeSelector: [25, 50, 100],
     placeholder: "No jobs found",
     columns: applyPersistedColumnOrder(COLUMN_DEFS),
-    initialSort: [{ column: "first_seen_at", dir: "desc" }]
+    initialSort: [{ column: "first_seen_at", dir: "desc" }],
+    rowFormatter: function(row) {
+      var rowData = row.getData();
+      row.getElement().classList.toggle("tabulator-row-seen", !!rowData.seen);
+    }
   });
 
   var summaryNode = document.getElementById("advanced-filter-summary");
@@ -514,8 +519,31 @@
       item.region = item.region || [];
       item.city = item.city || [];
       item.team = item.team || "";
+      item.seen = !!item.seen;
       return item;
     });
+  }
+
+  function setListingSeenState(listingId) {
+    table.updateData([{ id: listingId, seen: true }]);
+  }
+
+  function markListingSeen(listingId, attempt) {
+    return fetch("/api/jobs/" + listingId + "/seen/", { method: "POST" })
+      .then(function(response) {
+        if (!response.ok) throw new Error("Failed to mark listing as seen");
+        return response.json();
+      })
+      .catch(function() {
+        if (attempt < 1) {
+          return new Promise(function(resolve) {
+            setTimeout(resolve, 250);
+          }).then(function() {
+            return markListingSeen(listingId, attempt + 1);
+          });
+        }
+        return null;
+      });
   }
 
   function fetchJobs(expression) {
@@ -933,6 +961,14 @@
 
   document.getElementById("apply-filters").addEventListener("click", applyFilters);
   document.getElementById("clear-all-filters").addEventListener("click", clearAllFilters);
+  document.getElementById("jobs-grid").addEventListener("click", function(event) {
+    var listingLink = event.target.closest("a[data-listing-id]");
+    if (!listingLink) return;
+    var listingId = parseInt(listingLink.getAttribute("data-listing-id"), 10);
+    if (isNaN(listingId)) return;
+    setListingSeenState(listingId);
+    markListingSeen(listingId, 0);
+  });
 
   table.on("columnMoved", function() { saveColumnOrder(table); });
 

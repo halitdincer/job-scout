@@ -202,6 +202,21 @@ class TestJobsPage:
         response = client.get("/")
         assert b'source_name: { label: "Company", type: "text", operators: ["contains", "eq", "neq", "in", "not_in"' in response.content
 
+    def test_contains_mark_listing_seen_client_function(self):
+        client = self._authenticated_client()
+        response = client.get("/")
+        assert b"markListingSeen" in response.content
+
+    def test_contains_seen_link_class(self):
+        client = self._authenticated_client()
+        response = client.get("/")
+        assert b"seen-link" in response.content
+
+    def test_contains_seen_row_class(self):
+        client = self._authenticated_client()
+        response = client.get("/")
+        assert b"tabulator-row-seen" in response.content
+
 
 @pytest.mark.django_db
 class TestSourcesPage:

@@ -2,7 +2,9 @@ import pytest
 from django.db import IntegrityError
 from django.utils import timezone
 
-from core.models import JobListing, LocationTag, Run, Source
+from django.contrib.auth import get_user_model
+
+from core.models import JobListing, LocationTag, Run, SeenListing, Source
 
 
 @pytest.mark.django_db
@@ -271,3 +273,65 @@ class TestRunModel:
         assert run.status == "completed"
         assert run.sources_processed == 2
         assert run.listings_created == 10
+
+
+@pytest.mark.django_db
+class TestSeenListingModel:
+    def test_create_seen_listing(self):
+        user = get_user_model().objects.create_user(
+            username="seen-model-user",
+            password="safe-test-password-123",
+        )
+        source = Source.objects.create(
+            name="Seen Co", platform="greenhouse", board_id="seenco"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="seen-1",
+            title="Seen Listing",
+            url="https://example.com/seen-1",
+        )
+
+        seen_listing = SeenListing.objects.create(user=user, listing=listing)
+
+        assert seen_listing.user == user
+        assert seen_listing.listing == listing
+        assert seen_listing.created_at is not None
+
+    def test_unique_constraint_per_user_and_listing(self):
+        user = get_user_model().objects.create_user(
+            username="seen-unique-user",
+            password="safe-test-password-123",
+        )
+        source = Source.objects.create(
+            name="Unique Seen Co", platform="lever", board_id="uniqueseen"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="seen-2",
+            title="Unique Seen Listing",
+            url="https://example.com/seen-2",
+        )
+
+        SeenListing.objects.create(user=user, listing=listing)
+
+        with pytest.raises(IntegrityError):
+            SeenListing.objects.create(user=user, listing=listing)
+
+    def test_str_representation(self):
+        user = get_user_model().objects.create_user(
+            username="seen-str-user",
+            password="safe-test-password-123",
+        )
+        source = Source.objects.create(
+            name="Seen String Co", platform="ashby", board_id="seen-string"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="seen-3",
+            title="Seen Str Listing",
+            url="https://example.com/seen-3",
+        )
+        seen_listing = SeenListing.objects.create(user=user, listing=listing)
+
+        assert str(seen_listing) == f"{user.id}:{listing.id}"

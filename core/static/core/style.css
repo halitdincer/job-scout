@@ -572,6 +572,10 @@ td a:hover {
   font-weight: 500;
 }
 
+#jobs-grid .tabulator-cell a.seen-link {
+  color: #b38cff;
+}
+
 #jobs-grid .tabulator-cell a:hover {
   color: #a8d4ff;
   text-decoration: underline;
@@ -630,6 +634,14 @@ td a:hover {
 
 #jobs-grid .tabulator-row:hover {
   background: #2a2f36 !important;
+}
+
+#jobs-grid .tabulator-row.tabulator-row-seen {
+  background: #252338;
+}
+
+#jobs-grid .tabulator-row.tabulator-row-seen:hover {
+  background: #2f2a47 !important;
 }
 
 #jobs-grid .tabulator-row.tabulator-row-even {

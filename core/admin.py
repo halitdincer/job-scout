@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from core.models import JobListing, LocationTag, Run, Source
+from core.models import JobListing, LocationTag, Run, SeenListing, Source
 
 
 @admin.register(Source)
@@ -37,3 +37,9 @@ class RunAdmin(admin.ModelAdmin):
         "listings_expired",
     )
     list_filter = ("status",)
+
+
+@admin.register(SeenListing)
+class SeenListingAdmin(admin.ModelAdmin):
+    list_display = ("user", "listing", "created_at")
+    search_fields = ("user__username", "listing__title", "listing__external_id")

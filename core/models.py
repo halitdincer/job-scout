@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -119,3 +120,31 @@ class Run(models.Model):
 
     def __str__(self):
         return f"Run #{self.id} ({self.status})"
+
+
+class SeenListing(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="seen_listings",
+    )
+    listing = models.ForeignKey(
+        JobListing,
+        on_delete=models.CASCADE,
+        related_name="seen_by_users",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "listing"],
+                name="unique_user_listing_seen",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "listing"], name="seen_user_listing_idx")
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.listing_id}"

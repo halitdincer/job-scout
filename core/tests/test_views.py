@@ -2,9 +2,10 @@ import json
 from unittest.mock import patch
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 
-from core.models import JobListing, LocationTag, Run, Source
+from core.models import JobListing, LocationTag, Run, SeenListing, Source
 
 
 @pytest.mark.django_db
@@ -34,6 +35,15 @@ class TestSourcesAPI:
 
 @pytest.mark.django_db
 class TestJobsAPI:
+    def _authenticated_client(self, username="jobs-api-user"):
+        user = get_user_model().objects.create_user(
+            username=username,
+            password="safe-test-password-123",
+        )
+        client = Client()
+        client.force_login(user)
+        return client, user
+
     def _create_source_with_listings(self):
         source = Source.objects.create(
             name="Airbnb", platform="greenhouse", board_id="airbnb"
@@ -333,6 +343,78 @@ class TestJobsAPI:
 
         assert response.status_code == 400
         assert "error" in response.json()
+
+    def test_list_jobs_includes_seen_field_for_anonymous_user(self):
+        self._create_source_with_listings()
+
+        client = Client()
+        response = client.get("/api/jobs/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert all(job["seen"] is False for job in data)
+
+    def test_list_jobs_includes_seen_status_for_authenticated_user(self):
+        source = Source.objects.create(
+            name="Seen Co", platform="greenhouse", board_id="seen-co"
+        )
+        seen_listing = JobListing.objects.create(
+            source=source,
+            external_id="seen-1",
+            title="Seen Job",
+            url="https://example.com/seen-1",
+        )
+        unseen_listing = JobListing.objects.create(
+            source=source,
+            external_id="seen-2",
+            title="Unseen Job",
+            url="https://example.com/seen-2",
+        )
+        client, user = self._authenticated_client(username="jobs-api-seen-user")
+        SeenListing.objects.create(user=user, listing=seen_listing)
+
+        response = client.get("/api/jobs/")
+
+        assert response.status_code == 200
+        data = response.json()
+        data_by_id = {job["id"]: job for job in data}
+        assert data_by_id[seen_listing.id]["seen"] is True
+        assert data_by_id[unseen_listing.id]["seen"] is False
+
+    def test_mark_listing_seen_requires_authentication(self):
+        source = Source.objects.create(
+            name="Seen Co", platform="greenhouse", board_id="seen-auth"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="mark-1",
+            title="Mark Me",
+            url="https://example.com/mark-1",
+        )
+
+        client = Client()
+        response = client.post(f"/api/jobs/{listing.id}/seen/")
+
+        assert response.status_code == 302
+
+    def test_mark_listing_seen_is_idempotent(self):
+        source = Source.objects.create(
+            name="Seen Co", platform="greenhouse", board_id="seen-idempotent"
+        )
+        listing = JobListing.objects.create(
+            source=source,
+            external_id="mark-2",
+            title="Mark Once",
+            url="https://example.com/mark-2",
+        )
+        client, user = self._authenticated_client(username="jobs-api-mark-user")
+
+        first_response = client.post(f"/api/jobs/{listing.id}/seen/")
+        second_response = client.post(f"/api/jobs/{listing.id}/seen/")
+
+        assert first_response.status_code == 201
+        assert second_response.status_code == 200
+        assert SeenListing.objects.filter(user=user, listing=listing).count() == 1
 
 
 @pytest.mark.django_db

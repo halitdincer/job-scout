@@ -3,14 +3,15 @@ import json
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core.filter_expression import build_filter_q
 from core.ingestion import ingest_sources
-from core.models import JobListing, LocationTag, Run, Source
+from core.models import JobListing, LocationTag, Run, SeenListing, Source
 
 
 @login_required
@@ -65,8 +66,20 @@ def list_jobs(request):
             return JsonResponse({"error": f"Invalid filter: {exc}"}, status=400)
 
     qs = qs.prefetch_related("locations").distinct()
+    listings = list(qs)
+    seen_listing_ids = set()
+    if request.user.is_authenticated:
+        listing_ids = [listing.id for listing in listings]
+        if listing_ids:
+            seen_listing_ids = set(
+                SeenListing.objects.filter(
+                    user=request.user,
+                    listing_id__in=listing_ids,
+                ).values_list("listing_id", flat=True)
+            )
+
     data = []
-    for listing in qs:
+    for listing in listings:
         tags = listing.locations.all()
         locations = [
             {
@@ -108,8 +121,24 @@ def list_jobs(request):
             "updated_at_source": listing.updated_at_source.isoformat() if listing.updated_at_source else None,
             "first_seen_at": listing.first_seen_at.isoformat(),
             "last_seen_at": listing.last_seen_at.isoformat(),
+            "seen": listing.id in seen_listing_ids,
         })
     return JsonResponse(data, safe=False)
+
+
+@csrf_exempt
+@login_required
+@require_POST
+def mark_listing_seen(request, listing_id):
+    listing = get_object_or_404(JobListing, id=listing_id)
+    _, created = SeenListing.objects.get_or_create(
+        user=request.user,
+        listing=listing,
+    )
+    return JsonResponse(
+        {"listing_id": listing.id, "seen": True, "created": created},
+        status=201 if created else 200,
+    )
 
 
 @require_GET
