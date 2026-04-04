@@ -104,3 +104,4 @@ Set these at `secret/job-scout/config` in Vault:
 | `DATABASE_URL` | PostgreSQL connection string: `postgres://postgres:<password>@postgres:5432/jobscout` |
 | `POSTGRES_PASSWORD` | PostgreSQL password (must match the password in DATABASE_URL) |
 | `INGEST_API_KEY` | API key for triggering ingestion (also set as GitHub repo secret `INGEST_API_KEY`) |
+
