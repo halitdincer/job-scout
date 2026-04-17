@@ -521,3 +521,21 @@ class TestRunsAPI:
             HTTP_AUTHORIZATION="Bearer wrong-key",
         )
         assert response.status_code == 401
+
+    @override_settings(INGEST_API_KEY="test-secret-key")
+    @patch("core.views.ingest_sources")
+    def test_post_unhandled_exception_records_failed_run(self, mock_ingest):
+        mock_ingest.side_effect = Exception("database exploded")
+        client = Client()
+        response = client.post(
+            "/api/runs/",
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer test-secret-key",
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "failed"
+        assert "database exploded" in data["error_message"]
+        run = Run.objects.get(id=data["id"])
+        assert run.status == "failed"
+        assert run.finished_at is not None

@@ -190,8 +190,28 @@ def _trigger_run(request):
 
     run = Run.objects.create(status="running", started_at=timezone.now())
 
-    sources = Source.objects.filter(is_active=True)
-    result = ingest_sources(sources)
+    try:
+        sources = Source.objects.filter(is_active=True)
+        result = ingest_sources(sources)
+    except Exception as exc:
+        run.status = "failed"
+        run.finished_at = timezone.now()
+        run.error_message = str(exc)
+        run.save()
+        return JsonResponse(
+            {
+                "id": run.id,
+                "status": run.status,
+                "started_at": run.started_at.isoformat(),
+                "finished_at": run.finished_at.isoformat(),
+                "sources_processed": run.sources_processed,
+                "listings_created": run.listings_created,
+                "listings_updated": run.listings_updated,
+                "listings_expired": run.listings_expired,
+                "error_message": run.error_message,
+            },
+            status=201,
+        )
 
     run.finished_at = timezone.now()
     run.sources_processed = result["sources_processed"]
