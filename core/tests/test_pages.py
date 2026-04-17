@@ -285,6 +285,12 @@ class TestRunsPage:
         assert len(runs) == 2
         assert runs[0].id > runs[1].id
 
+    def test_error_message_shown_for_failed_run(self):
+        Run.objects.create(status="failed", error_message="Connection refused")
+        client = self._authenticated_client()
+        response = client.get("/runs/")
+        assert b"Connection refused" in response.content
+
     def test_empty_state(self):
         client = self._authenticated_client()
         response = client.get("/runs/")

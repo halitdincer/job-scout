@@ -188,6 +188,12 @@ def _trigger_run(request):
     if not auth_header.startswith("Bearer ") or auth_header[7:] != api_key:
         return JsonResponse({"error": "Unauthorized"}, status=401)
 
+    Run.objects.filter(status="running").update(
+        status="failed",
+        error_message="Marked as failed: stale running state",
+        finished_at=timezone.now(),
+    )
+
     run = Run.objects.create(status="running", started_at=timezone.now())
 
     try:

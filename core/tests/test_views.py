@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
+from django.utils import timezone
 
 from core.models import JobListing, LocationTag, Run, SeenListing, Source
 
@@ -539,3 +540,24 @@ class TestRunsAPI:
         run = Run.objects.get(id=data["id"])
         assert run.status == "failed"
         assert run.finished_at is not None
+    @override_settings(INGEST_API_KEY="test-secret-key")
+    @patch("core.views.ingest_sources")
+    def test_trigger_run_marks_stale_running_runs_as_failed(self, mock_ingest):
+        stale = Run.objects.create(status="running", started_at=timezone.now())
+        mock_ingest.return_value = {
+            "sources_processed": 1,
+            "listings_created": 0,
+            "listings_updated": 0,
+            "listings_expired": 0,
+            "errors": [],
+        }
+        client = Client()
+        client.post(
+            "/api/runs/",
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer test-secret-key",
+        )
+        stale.refresh_from_db()
+        assert stale.status == "failed"
+        assert stale.error_message == "Marked as failed: stale running state"
+

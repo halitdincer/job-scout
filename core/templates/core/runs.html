@@ -16,6 +16,7 @@
       <th>Sources</th>
       <th>Created</th>
       <th>Expired</th>
+      <th>Error</th>
     </tr>
   </thead>
   <tbody>
@@ -28,6 +29,7 @@
       <td>{{ run.sources_processed }}</td>
       <td>{{ run.listings_created }}</td>
       <td>{{ run.listings_expired }}</td>
+      <td>{{ run.error_message|default:"—" }}</td>
     </tr>
     {% endfor %}
   </tbody>
