@@ -11,11 +11,11 @@ from core.models import JobListing, LocationTag, Run, SeenListing, Source
 class TestSourceModel:
     def test_create_source(self):
         source = Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
+            name="Airbnb", platform="greenhouse", board_id="airbnb-model"
         )
         assert source.name == "Airbnb"
         assert source.platform == "greenhouse"
-        assert source.board_id == "airbnb"
+        assert source.board_id == "airbnb-model"
         assert source.is_active is True
         assert source.created_at is not None
         assert source.updated_at is not None
@@ -31,11 +31,11 @@ class TestSourceModel:
 
     def test_unique_constraint_platform_board_id(self):
         Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
+            name="Airbnb", platform="greenhouse", board_id="airbnb-model"
         )
         with pytest.raises(IntegrityError):
             Source.objects.create(
-                name="Airbnb Copy", platform="greenhouse", board_id="airbnb"
+                name="Airbnb Copy", platform="greenhouse", board_id="airbnb-model"
             )
 
 
@@ -107,7 +107,7 @@ class TestLocationTagModel:
 class TestJobListingModel:
     def test_create_listing(self):
         source = Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
+            name="Airbnb", platform="greenhouse", board_id="airbnb-model"
         )
         listing = JobListing.objects.create(
             source=source,
@@ -128,7 +128,7 @@ class TestJobListingModel:
 
     def test_unique_constraint_source_external_id(self):
         source = Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
+            name="Airbnb", platform="greenhouse", board_id="airbnb-model"
         )
         JobListing.objects.create(
             source=source,
@@ -146,7 +146,7 @@ class TestJobListingModel:
 
     def test_status_defaults_to_active(self):
         source = Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
+            name="Airbnb", platform="greenhouse", board_id="airbnb-model"
         )
         listing = JobListing.objects.create(
             source=source,
@@ -179,7 +179,7 @@ class TestJobListingModel:
 
     def test_expired_at_set_on_expiration(self):
         source = Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
+            name="Airbnb", platform="greenhouse", board_id="airbnb-model"
         )
         listing = JobListing.objects.create(
             source=source,
@@ -227,7 +227,7 @@ class TestJobListingModel:
 
     def test_enriched_fields_nullable(self):
         source = Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
+            name="Airbnb", platform="greenhouse", board_id="airbnb-model"
         )
         listing = JobListing.objects.create(
             source=source,

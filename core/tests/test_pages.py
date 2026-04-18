@@ -242,12 +242,16 @@ class TestSourcesPage:
         assert "core/sources.html" in [t.name for t in response.templates]
 
     def test_context_has_sources(self):
-        Source.objects.create(name="Airbnb", platform="greenhouse", board_id="airbnb")
+        Source.objects.all().delete()
+        Source.objects.create(
+            name="Airbnb", platform="greenhouse", board_id="airbnb-page"
+        )
         client = self._authenticated_client()
         response = client.get("/sources/")
         assert len(response.context["sources"]) == 1
 
     def test_empty_state(self):
+        Source.objects.all().delete()
         client = self._authenticated_client()
         response = client.get("/sources/")
         assert b"No sources configured." in response.content

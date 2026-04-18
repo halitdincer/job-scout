@@ -20,8 +20,11 @@ def test_health_returns_200_with_status_ok():
 @pytest.mark.django_db
 class TestSourcesAPI:
     def test_list_sources(self):
-        Source.objects.create(name="Airbnb", platform="greenhouse", board_id="airbnb")
-        Source.objects.create(name="Stripe", platform="lever", board_id="stripe")
+        Source.objects.all().delete()
+        Source.objects.create(
+            name="Airbnb", platform="greenhouse", board_id="airbnb-view"
+        )
+        Source.objects.create(name="Stripe", platform="lever", board_id="stripe-view")
         client = Client()
         response = client.get("/api/sources/")
         assert response.status_code == 200
@@ -29,7 +32,7 @@ class TestSourcesAPI:
         assert len(data) == 2
         assert data[0]["name"] == "Airbnb"
         assert data[0]["platform"] == "greenhouse"
-        assert data[0]["board_id"] == "airbnb"
+        assert data[0]["board_id"] == "airbnb-view"
         assert data[0]["is_active"] is True
         assert "id" in data[0]
 
@@ -47,7 +50,7 @@ class TestJobsAPI:
 
     def _create_source_with_listings(self):
         source = Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb"
+            name="Airbnb", platform="greenhouse", board_id="airbnb-jobs"
         )
         listing1 = JobListing.objects.create(
             source=source,
@@ -466,7 +469,7 @@ class TestRunsAPI:
     @override_settings(INGEST_API_KEY="test-secret-key")
     @patch("core.views.ingest_sources")
     def test_post_triggers_ingestion(self, mock_ingest):
-        Source.objects.create(name="Airbnb", platform="greenhouse", board_id="airbnb")
+        Source.objects.create(name="Airbnb", platform="greenhouse", board_id="airbnb-run")
         mock_ingest.return_value = {
             "sources_processed": 1,
             "listings_created": 5,

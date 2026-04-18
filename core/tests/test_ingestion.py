@@ -8,7 +8,12 @@ from core.models import JobListing, LocationTag, Source
 
 @pytest.mark.django_db
 class TestIngestSources:
-    def _create_source(self, name="Airbnb", platform="greenhouse", board_id="airbnb"):
+    def _create_source(
+        self,
+        name="Airbnb",
+        platform="greenhouse",
+        board_id="airbnb-test",
+    ):
         return Source.objects.create(name=name, platform=platform, board_id=board_id)
 
     def _make_item(self, **overrides):

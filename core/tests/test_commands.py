@@ -11,6 +11,7 @@ from core.models import LocationTag, Source
 class TestIngestCommand:
     @patch("core.management.commands.ingest.ingest_sources")
     def test_ingests_all_active_sources(self, mock_ingest):
+        Source.objects.all().delete()
         Source.objects.create(name="A", platform="greenhouse", board_id="a")
         Source.objects.create(name="B", platform="lever", board_id="b")
         mock_ingest.return_value = {
@@ -28,6 +29,7 @@ class TestIngestCommand:
 
     @patch("core.management.commands.ingest.ingest_sources")
     def test_skips_inactive_sources(self, mock_ingest):
+        Source.objects.all().delete()
         Source.objects.create(name="Active", platform="greenhouse", board_id="a")
         Source.objects.create(
             name="Inactive", platform="lever", board_id="b", is_active=False
