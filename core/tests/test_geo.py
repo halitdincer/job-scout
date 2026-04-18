@@ -150,6 +150,19 @@ class TestGeocodeLocation:
         }
 
     @patch("core.geo.Nominatim")
+    def test_no_nominatim_result_returns_none(self, mock_nominatim_cls):
+        geocoder = Mock()
+        mock_nominatim_cls.return_value = geocoder
+        geocoder.geocode.return_value = None
+
+        result = geocode_location("Nonexistent Place")
+        assert result == {
+            "country_code": None,
+            "region_code": None,
+            "city": None,
+        }
+
+    @patch("core.geo.Nominatim")
     def test_exception_returns_none(self, mock_nominatim_cls):
         geocoder = Mock()
         mock_nominatim_cls.return_value = geocoder
