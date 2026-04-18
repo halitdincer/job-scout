@@ -116,7 +116,7 @@ class TestJobsPage:
         client = self._authenticated_client()
         response = client.get("/")
         assert b'id="reset-columns"' in response.content
-        assert b"Reset Columns" in response.content
+        assert b">Reset<" in response.content
 
     def test_contains_reset_columns_click_handler(self):
         client = self._authenticated_client()

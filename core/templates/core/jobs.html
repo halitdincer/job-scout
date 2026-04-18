@@ -7,16 +7,19 @@
 {% block content %}
 <div class="jobs-toolbar">
   <div class="jobs-toolbar-left">
-    <select id="views-select" class="views-select">
-      <option value="">-- No View --</option>
-    </select>
-    <button class="col-chooser-btn" id="save-view-btn">Save View</button>
-    <button class="col-chooser-btn" id="update-view-btn" style="display:none;">Update View</button>
-    <button class="col-chooser-btn danger" id="delete-view-btn" style="display:none;">Delete View</button>
-    <span class="views-separator"></span>
-    <button class="col-chooser-btn" id="open-columns-panel">Columns</button>
-    <button class="col-chooser-btn" id="open-filters-panel">Filters</button>
-    <button class="col-chooser-btn" id="reset-columns">Reset Columns</button>
+    <div class="toolbar-group">
+      <select id="views-select" class="views-select">
+        <option value="">-- No View --</option>
+      </select>
+      <button class="col-chooser-btn" id="save-view-btn">Save</button>
+      <button class="col-chooser-btn" id="update-view-btn" style="display:none;">Update</button>
+      <button class="col-chooser-btn danger" id="delete-view-btn" style="display:none;">Delete</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="col-chooser-btn" id="open-columns-panel">Columns</button>
+      <button class="col-chooser-btn" id="open-filters-panel">Filters</button>
+      <button class="col-chooser-btn" id="reset-columns">Reset</button>
+    </div>
   </div>
   <div id="advanced-filter-summary" class="filter-summary">No filters applied</div>
 </div>
