@@ -1147,7 +1147,7 @@
   table.on("columnMoved", function() { saveColumnOrder(table); });
 
   function syncRulesFromHeaderState() {
-    if (isSyncingHeader) return;
+    if (isSyncingHeader || isApplyingView) return;
     var headerFilters = table.getHeaderFilters();
     var activeHeaderFields = {};
     headerFilters.forEach(function(filter) {
@@ -1332,7 +1332,10 @@
     return [];
   }
 
+  var isApplyingView = false;
+
   function applyView(view) {
+    isApplyingView = true;
     activeViewId = view.id;
     viewsSelect.value = view.id;
     updateSaveMenu();
@@ -1368,10 +1371,15 @@
     activeExpression = view.filter_expression || null;
     syncHeaderFromRules();
     renderColumnFilterSections();
+    updateFilterSummary();
+    updateColumnsBadge();
     fetchJobs(activeExpression).then(function() {
+      isApplyingView = false;
       updateFilterSummary();
       updateColumnsBadge();
       snapshotView();
+    }).catch(function() {
+      isApplyingView = false;
     });
   }
 
