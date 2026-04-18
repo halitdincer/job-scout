@@ -642,24 +642,28 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
 
 #jobs-grid .tabulator-header-filter input::placeholder { color: var(--text-dim); }
 
-#jobs-grid .tabulator-row {
-  background: var(--bg-surface) !important;
+#jobs-grid .tabulator-row,
+#jobs-grid .tabulator-row.tabulator-row-even,
+#jobs-grid .tabulator-row.tabulator-selectable,
+#jobs-grid .tabulator-row.tabulator-selected {
+  background-color: var(--bg-surface) !important;
   border-bottom: 1px solid var(--border);
 }
 
-#jobs-grid .tabulator-row:hover {
-  background: var(--bg-hover) !important;
+#jobs-grid .tabulator-row:hover,
+#jobs-grid .tabulator-row.tabulator-selectable:hover,
+#jobs-grid .tabulator-row.tabulator-selected:hover {
+  background-color: var(--bg-hover) !important;
 }
 
-#jobs-grid .tabulator-row.tabulator-row-seen {
-  background: rgba(196, 181, 253, 0.04) !important;
+#jobs-grid .tabulator-row.tabulator-row-seen,
+#jobs-grid .tabulator-row.tabulator-row-seen.tabulator-row-even {
+  background-color: rgba(196, 181, 253, 0.04) !important;
 }
 
 #jobs-grid .tabulator-row.tabulator-row-seen:hover {
-  background: rgba(196, 181, 253, 0.08) !important;
+  background-color: rgba(196, 181, 253, 0.08) !important;
 }
-
-#jobs-grid .tabulator-row.tabulator-row-even { background: var(--bg-surface) !important; }
 
 #jobs-grid .tabulator-cell {
   padding: 8px 12px;
