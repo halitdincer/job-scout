@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from core.models import JobListing, LocationTag, Run, SeenListing, Source
+from core.models import JobListing, LocationTag, Run, SavedView, SeenListing, Source
 
 
 @admin.register(Source)
@@ -43,3 +43,10 @@ class RunAdmin(admin.ModelAdmin):
 class SeenListingAdmin(admin.ModelAdmin):
     list_display = ("user", "listing", "created_at")
     search_fields = ("user__username", "listing__title", "listing__external_id")
+
+
+@admin.register(SavedView)
+class SavedViewAdmin(admin.ModelAdmin):
+    list_display = ("name", "user", "created_at", "updated_at")
+    search_fields = ("name", "user__username")
+    list_filter = ("user",)

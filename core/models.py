@@ -148,3 +148,30 @@ class SeenListing(models.Model):
 
     def __str__(self):
         return f"{self.user_id}:{self.listing_id}"
+
+
+class SavedView(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="saved_views",
+    )
+    name = models.CharField(max_length=255)
+    filter_expression = models.JSONField(null=True, blank=True)
+    columns = models.JSONField()
+    sort = models.JSONField()
+    config = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "name"],
+                name="unique_user_view_name",
+            )
+        ]
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.user})"

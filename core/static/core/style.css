@@ -812,6 +812,42 @@ td a:hover {
   background: var(--text-muted);
 }
 
+/* Saved views */
+.views-select {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  min-width: 140px;
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.views-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.views-separator {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 0.15rem;
+}
+
+.col-chooser-btn.danger {
+  color: #f7a6a6;
+}
+
+.col-chooser-btn.danger:hover {
+  color: #fcc;
+  border-color: #f7a6a6;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   main:not(.full-bleed) {

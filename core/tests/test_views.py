@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 from django.utils import timezone
 
-from core.models import JobListing, LocationTag, Run, SeenListing, Source
+from core.models import JobListing, LocationTag, Run, SavedView, SeenListing, Source
 
 
 @pytest.mark.django_db
@@ -563,4 +563,268 @@ class TestRunsAPI:
         stale.refresh_from_db()
         assert stale.status == "failed"
         assert stale.error_message == "Marked as failed: stale running state"
+
+
+@pytest.mark.django_db
+class TestSavedViewsAPI:
+    def _authenticated_client(self, username="views-api-user"):
+        user = get_user_model().objects.create_user(
+            username=username, password="safe-test-password-123"
+        )
+        client = Client()
+        client.force_login(user)
+        return client, user
+
+    def _view_payload(self, **overrides):
+        defaults = {
+            "name": "US Remote",
+            "columns": [{"field": "title", "visible": True}],
+            "sort": [{"column": "first_seen_at", "dir": "desc"}],
+        }
+        defaults.update(overrides)
+        return defaults
+
+    def test_list_views_requires_auth(self):
+        client = Client()
+        response = client.get("/api/views/")
+        assert response.status_code == 302
+
+    def test_list_views_returns_empty(self):
+        client, _ = self._authenticated_client("views-empty")
+        response = client.get("/api/views/")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_list_views_returns_only_own_views(self):
+        c1, u1 = self._authenticated_client("views-owner")
+        c2, u2 = self._authenticated_client("views-other")
+        SavedView.objects.create(user=u1, name="Mine", columns=[], sort=[])
+        SavedView.objects.create(user=u2, name="Theirs", columns=[], sort=[])
+
+        response = c1.get("/api/views/")
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "Mine"
+
+    def test_create_view(self):
+        client, user = self._authenticated_client("views-create")
+        payload = self._view_payload(
+            filter_expression={"field": "title", "operator": "contains", "value": "eng"}
+        )
+        response = client.post(
+            "/api/views/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "US Remote"
+        assert data["filter_expression"] == payload["filter_expression"]
+        assert data["columns"] == payload["columns"]
+        assert data["sort"] == payload["sort"]
+        assert data["config"] == {}
+        assert "id" in data
+        assert "created_at" in data
+
+    def test_create_view_null_filter_expression(self):
+        client, _ = self._authenticated_client("views-null-filter")
+        payload = self._view_payload()
+        response = client.post(
+            "/api/views/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        assert response.json()["filter_expression"] is None
+
+    def test_create_view_invalid_json(self):
+        client, _ = self._authenticated_client("views-bad-json")
+        response = client.post(
+            "/api/views/", "not json", content_type="application/json"
+        )
+        assert response.status_code == 400
+
+    def test_create_view_name_required(self):
+        client, _ = self._authenticated_client("views-no-name")
+        payload = self._view_payload(name="")
+        response = client.post(
+            "/api/views/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert "name" in response.json()["error"]
+
+    def test_create_view_columns_required(self):
+        client, _ = self._authenticated_client("views-no-cols")
+        payload = self._view_payload()
+        del payload["columns"]
+        response = client.post(
+            "/api/views/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert "columns" in response.json()["error"]
+
+    def test_create_view_sort_required(self):
+        client, _ = self._authenticated_client("views-no-sort")
+        payload = self._view_payload()
+        del payload["sort"]
+        response = client.post(
+            "/api/views/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert "sort" in response.json()["error"]
+
+    def test_create_view_invalid_filter_expression(self):
+        client, _ = self._authenticated_client("views-bad-filter")
+        payload = self._view_payload(
+            filter_expression={"field": "title", "operator": "in", "value": "not-a-list"}
+        )
+        response = client.post(
+            "/api/views/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert "filter_expression" in response.json()["error"]
+
+    def test_create_view_duplicate_name_returns_409(self):
+        client, user = self._authenticated_client("views-dupe")
+        SavedView.objects.create(user=user, name="Taken", columns=[], sort=[])
+        payload = self._view_payload(name="Taken")
+        response = client.post(
+            "/api/views/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 409
+
+    def test_get_view(self):
+        client, user = self._authenticated_client("views-get")
+        view = SavedView.objects.create(
+            user=user, name="Detail", columns=[{"field": "title"}], sort=[]
+        )
+        response = client.get(f"/api/views/{view.id}/")
+        assert response.status_code == 200
+        assert response.json()["name"] == "Detail"
+
+    def test_get_view_404_for_other_user(self):
+        _, u1 = self._authenticated_client("views-get-owner")
+        c2, _ = self._authenticated_client("views-get-other")
+        view = SavedView.objects.create(user=u1, name="Private", columns=[], sort=[])
+        response = c2.get(f"/api/views/{view.id}/")
+        assert response.status_code == 404
+
+    def test_update_view(self):
+        client, user = self._authenticated_client("views-update")
+        view = SavedView.objects.create(
+            user=user, name="Old", columns=[], sort=[]
+        )
+        payload = self._view_payload(name="New")
+        response = client.put(
+            f"/api/views/{view.id}/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "New"
+        assert data["columns"] == payload["columns"]
+        view.refresh_from_db()
+        assert view.name == "New"
+
+    def test_update_view_404_for_other_user(self):
+        _, u1 = self._authenticated_client("views-put-owner")
+        c2, _ = self._authenticated_client("views-put-other")
+        view = SavedView.objects.create(user=u1, name="Private", columns=[], sort=[])
+        payload = self._view_payload(name="Hacked")
+        response = c2.put(
+            f"/api/views/{view.id}/",
+            json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 404
+
+    def test_update_view_invalid_json(self):
+        client, user = self._authenticated_client("views-put-bad")
+        view = SavedView.objects.create(user=user, name="Test", columns=[], sort=[])
+        response = client.put(
+            f"/api/views/{view.id}/", "bad", content_type="application/json"
+        )
+        assert response.status_code == 400
+
+    def test_update_view_validates_name(self):
+        client, user = self._authenticated_client("views-put-validate")
+        view = SavedView.objects.create(user=user, name="Test", columns=[], sort=[])
+        response = client.put(
+            f"/api/views/{view.id}/",
+            json.dumps({"name": "", "columns": [], "sort": []}),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+
+    def test_update_view_validates_columns(self):
+        client, user = self._authenticated_client("views-put-cols")
+        view = SavedView.objects.create(user=user, name="Test", columns=[], sort=[])
+        response = client.put(
+            f"/api/views/{view.id}/",
+            json.dumps({"name": "X", "columns": "bad", "sort": []}),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert "columns" in response.json()["error"]
+
+    def test_update_view_validates_sort(self):
+        client, user = self._authenticated_client("views-put-sort")
+        view = SavedView.objects.create(user=user, name="Test", columns=[], sort=[])
+        response = client.put(
+            f"/api/views/{view.id}/",
+            json.dumps({"name": "X", "columns": [], "sort": "bad"}),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert "sort" in response.json()["error"]
+
+    def test_update_view_validates_filter_expression(self):
+        client, user = self._authenticated_client("views-put-filter")
+        view = SavedView.objects.create(user=user, name="Test", columns=[], sort=[])
+        response = client.put(
+            f"/api/views/{view.id}/",
+            json.dumps({
+                "name": "X",
+                "columns": [],
+                "sort": [],
+                "filter_expression": {"field": "title", "operator": "in", "value": "bad"},
+            }),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert "filter_expression" in response.json()["error"]
+
+    def test_delete_view(self):
+        client, user = self._authenticated_client("views-delete")
+        view = SavedView.objects.create(user=user, name="Gone", columns=[], sort=[])
+        response = client.delete(f"/api/views/{view.id}/")
+        assert response.status_code == 204
+        assert not SavedView.objects.filter(id=view.id).exists()
+
+    def test_delete_view_404_for_other_user(self):
+        _, u1 = self._authenticated_client("views-del-owner")
+        c2, _ = self._authenticated_client("views-del-other")
+        view = SavedView.objects.create(user=u1, name="Private", columns=[], sort=[])
+        response = c2.delete(f"/api/views/{view.id}/")
+        assert response.status_code == 404
+
+    def test_create_requires_auth(self):
+        client = Client()
+        response = client.post(
+            "/api/views/",
+            json.dumps({"name": "x", "columns": [], "sort": []}),
+            content_type="application/json",
+        )
+        assert response.status_code == 302
 

@@ -7,6 +7,13 @@
 {% block content %}
 <div class="jobs-toolbar">
   <div class="jobs-toolbar-left">
+    <select id="views-select" class="views-select">
+      <option value="">-- No View --</option>
+    </select>
+    <button class="col-chooser-btn" id="save-view-btn">Save View</button>
+    <button class="col-chooser-btn" id="update-view-btn" style="display:none;">Update View</button>
+    <button class="col-chooser-btn danger" id="delete-view-btn" style="display:none;">Delete View</button>
+    <span class="views-separator"></span>
     <button class="col-chooser-btn" id="open-columns-panel">Columns</button>
     <button class="col-chooser-btn" id="open-filters-panel">Filters</button>
     <button class="col-chooser-btn" id="reset-columns">Reset Columns</button>
@@ -1062,6 +1069,212 @@
 
   renderColumnFilterSections();
   fetchJobs(null).then(updateFilterSummary);
+
+  // ── Saved Views ───────────────────────────────────────────────
+  var viewsSelect = document.getElementById("views-select");
+  var saveViewBtn = document.getElementById("save-view-btn");
+  var updateViewBtn = document.getElementById("update-view-btn");
+  var deleteViewBtn = document.getElementById("delete-view-btn");
+  var savedViews = [];
+  var activeViewId = null;
+
+  function captureColumns() {
+    return table.getColumns().map(function(col) {
+      return { field: col.getField(), visible: col.isVisible() };
+    });
+  }
+
+  function captureSort() {
+    var sorters = table.getSorters();
+    return sorters.map(function(s) { return { column: s.field, dir: s.dir }; });
+  }
+
+  function populateViewsSelect() {
+    viewsSelect.innerHTML = '<option value="">-- No View --</option>';
+    savedViews.forEach(function(v) {
+      var opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = v.name;
+      viewsSelect.appendChild(opt);
+    });
+    if (activeViewId) viewsSelect.value = activeViewId;
+  }
+
+  function updateViewButtons() {
+    var hasView = !!activeViewId;
+    updateViewBtn.style.display = hasView ? "" : "none";
+    deleteViewBtn.style.display = hasView ? "" : "none";
+  }
+
+  function fetchViews() {
+    return fetch("/api/views/")
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(data) {
+        savedViews = data;
+        populateViewsSelect();
+        updateViewButtons();
+      });
+  }
+
+  function expressionToRules(expr) {
+    if (!expr) return [];
+    if (expr.op === "and" && expr.children) {
+      var result = [];
+      expr.children.forEach(function(child) {
+        if (!child.op) {
+          result.push({
+            field: child.field,
+            operator: child.operator,
+            value: child.value !== undefined ? (Array.isArray(child.value) ? child.value.join(", ") : String(child.value)) : ""
+          });
+        }
+      });
+      return result;
+    }
+    if (!expr.op) {
+      return [{
+        field: expr.field,
+        operator: expr.operator,
+        value: expr.value !== undefined ? (Array.isArray(expr.value) ? expr.value.join(", ") : String(expr.value)) : ""
+      }];
+    }
+    return [];
+  }
+
+  function applyView(view) {
+    activeViewId = view.id;
+    viewsSelect.value = view.id;
+    updateViewButtons();
+
+    // Apply columns: order and visibility
+    var colState = view.columns || [];
+    if (colState.length) {
+      var fieldSet = {};
+      colState.forEach(function(c) { fieldSet[c.field] = c; });
+
+      // Reorder columns
+      for (var i = 0; i < colState.length; i++) {
+        var col = table.getColumn(colState[i].field);
+        if (!col) continue;
+        if (i === 0) {
+          table.moveColumn(colState[i].field, table.getColumns()[0].getField(), true);
+        } else {
+          table.moveColumn(colState[i].field, colState[i - 1].field, false);
+        }
+      }
+
+      // Set visibility
+      table.getColumns().forEach(function(col) {
+        var field = col.getField();
+        var saved = fieldSet[field];
+        if (saved) {
+          if (saved.visible) col.show(); else col.hide();
+        }
+      });
+    }
+
+    // Apply sort
+    var sortState = view.sort || [];
+    if (sortState.length) {
+      table.setSort(sortState.map(function(s) { return { column: s.column, dir: s.dir }; }));
+    }
+
+    // Apply filter
+    rules = expressionToRules(view.filter_expression);
+    activeExpression = view.filter_expression || null;
+    syncHeaderFromRules();
+    renderColumnFilterSections();
+    fetchJobs(activeExpression).then(updateFilterSummary);
+  }
+
+  function clearView() {
+    activeViewId = null;
+    viewsSelect.value = "";
+    updateViewButtons();
+  }
+
+  viewsSelect.addEventListener("change", function() {
+    var selectedId = viewsSelect.value;
+    if (!selectedId) {
+      clearView();
+      return;
+    }
+    var view = savedViews.find(function(v) { return String(v.id) === selectedId; });
+    if (view) applyView(view);
+  });
+
+  saveViewBtn.addEventListener("click", function() {
+    var name = window.prompt("View name:");
+    if (!name || !name.trim()) return;
+    var payload = {
+      name: name.trim(),
+      filter_expression: activeExpression,
+      columns: captureColumns(),
+      sort: captureSort()
+    };
+    fetch("/api/views/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) {
+      if (r.status === 409) throw new Error("A view with that name already exists.");
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || "Failed to save view"); });
+      return r.json();
+    })
+    .then(function(view) {
+      savedViews.push(view);
+      populateViewsSelect();
+      activeViewId = view.id;
+      viewsSelect.value = view.id;
+      updateViewButtons();
+    })
+    .catch(function(err) { window.alert(err.message); });
+  });
+
+  updateViewBtn.addEventListener("click", function() {
+    if (!activeViewId) return;
+    var view = savedViews.find(function(v) { return v.id === activeViewId; });
+    if (!view) return;
+    var payload = {
+      name: view.name,
+      filter_expression: activeExpression,
+      columns: captureColumns(),
+      sort: captureSort()
+    };
+    fetch("/api/views/" + activeViewId + "/", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || "Failed to update view"); });
+      return r.json();
+    })
+    .then(function(updated) {
+      for (var i = 0; i < savedViews.length; i++) {
+        if (savedViews[i].id === updated.id) { savedViews[i] = updated; break; }
+      }
+    })
+    .catch(function(err) { window.alert(err.message); });
+  });
+
+  deleteViewBtn.addEventListener("click", function() {
+    if (!activeViewId) return;
+    var view = savedViews.find(function(v) { return v.id === activeViewId; });
+    if (!view) return;
+    if (!window.confirm('Delete view "' + view.name + '"?')) return;
+    fetch("/api/views/" + activeViewId + "/", { method: "DELETE" })
+    .then(function(r) {
+      if (!r.ok && r.status !== 204) throw new Error("Failed to delete view");
+      savedViews = savedViews.filter(function(v) { return v.id !== activeViewId; });
+      clearView();
+      populateViewsSelect();
+    })
+    .catch(function(err) { window.alert(err.message); });
+  });
+
+  fetchViews();
 })();
 </script>
 {% endblock %}

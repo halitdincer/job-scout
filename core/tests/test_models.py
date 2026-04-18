@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from django.contrib.auth import get_user_model
 
-from core.models import JobListing, LocationTag, Run, SeenListing, Source
+from core.models import JobListing, LocationTag, Run, SavedView, SeenListing, Source
 
 
 @pytest.mark.django_db
@@ -335,3 +335,70 @@ class TestSeenListingModel:
         seen_listing = SeenListing.objects.create(user=user, listing=listing)
 
         assert str(seen_listing) == f"{user.id}:{listing.id}"
+
+
+@pytest.mark.django_db
+class TestSavedViewModel:
+    def _create_user(self, username="view-user"):
+        return get_user_model().objects.create_user(
+            username=username, password="safe-test-password-123"
+        )
+
+    def test_create_saved_view(self):
+        user = self._create_user()
+        view = SavedView.objects.create(
+            user=user,
+            name="US Remote",
+            filter_expression={"field": "country", "operator": "eq", "value": "US"},
+            columns=[{"field": "title", "visible": True}],
+            sort=[{"column": "first_seen_at", "dir": "desc"}],
+        )
+        assert view.name == "US Remote"
+        assert view.filter_expression == {"field": "country", "operator": "eq", "value": "US"}
+        assert view.columns == [{"field": "title", "visible": True}]
+        assert view.sort == [{"column": "first_seen_at", "dir": "desc"}]
+        assert view.config == {}
+        assert view.created_at is not None
+        assert view.updated_at is not None
+
+    def test_str_representation(self):
+        user = self._create_user("view-str-user")
+        view = SavedView(name="My View", user=user)
+        assert str(view) == "My View (view-str-user)"
+
+    def test_unique_constraint_user_name(self):
+        user = self._create_user("view-unique-user")
+        SavedView.objects.create(
+            user=user, name="Dupe", columns=[], sort=[]
+        )
+        with pytest.raises(IntegrityError):
+            SavedView.objects.create(
+                user=user, name="Dupe", columns=[], sort=[]
+            )
+
+    def test_different_users_same_name_allowed(self):
+        u1 = self._create_user("view-user-a")
+        u2 = self._create_user("view-user-b")
+        SavedView.objects.create(user=u1, name="Same", columns=[], sort=[])
+        SavedView.objects.create(user=u2, name="Same", columns=[], sort=[])
+        assert SavedView.objects.filter(name="Same").count() == 2
+
+    def test_filter_expression_nullable(self):
+        user = self._create_user("view-null-filter")
+        view = SavedView.objects.create(
+            user=user, name="No Filter", columns=[], sort=[]
+        )
+        assert view.filter_expression is None
+
+    def test_config_defaults_to_empty_dict(self):
+        user = self._create_user("view-config-user")
+        view = SavedView.objects.create(
+            user=user, name="Config Test", columns=[], sort=[]
+        )
+        assert view.config == {}
+
+    def test_cascade_delete_user(self):
+        user = self._create_user("view-cascade-user")
+        SavedView.objects.create(user=user, name="Gone", columns=[], sort=[])
+        user.delete()
+        assert SavedView.objects.filter(name="Gone").count() == 0

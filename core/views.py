@@ -9,9 +9,9 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from core.filter_expression import build_filter_q
+from core.filter_expression import build_filter_q, validate_filter_expression
 from core.ingestion import ingest_sources
-from core.models import JobListing, LocationTag, Run, SeenListing, Source
+from core.models import JobListing, LocationTag, Run, SavedView, SeenListing, Source
 
 
 @login_required
@@ -249,3 +249,114 @@ def _trigger_run(request):
         },
         status=201,
     )
+
+
+def _serialize_view(view):
+    return {
+        "id": view.id,
+        "name": view.name,
+        "filter_expression": view.filter_expression,
+        "columns": view.columns,
+        "sort": view.sort,
+        "config": view.config,
+        "created_at": view.created_at.isoformat(),
+        "updated_at": view.updated_at.isoformat(),
+    }
+
+
+@csrf_exempt
+@login_required
+@require_http_methods(["GET", "POST"])
+def saved_views_list(request):
+    if request.method == "GET":
+        views = SavedView.objects.filter(user=request.user)
+        return JsonResponse([_serialize_view(v) for v in views], safe=False)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    name = body.get("name", "").strip()
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+
+    columns = body.get("columns")
+    if not isinstance(columns, list):
+        return JsonResponse({"error": "columns must be a list"}, status=400)
+
+    sort = body.get("sort")
+    if not isinstance(sort, list):
+        return JsonResponse({"error": "sort must be a list"}, status=400)
+
+    filter_expression = body.get("filter_expression")
+    if filter_expression is not None:
+        try:
+            validate_filter_expression(filter_expression)
+        except ValueError as exc:
+            return JsonResponse(
+                {"error": f"Invalid filter_expression: {exc}"}, status=400
+            )
+
+    try:
+        view = SavedView.objects.create(
+            user=request.user,
+            name=name,
+            filter_expression=filter_expression,
+            columns=columns,
+            sort=sort,
+        )
+    except Exception:
+        return JsonResponse(
+            {"error": f"A view named '{name}' already exists"}, status=409
+        )
+
+    return JsonResponse(_serialize_view(view), status=201)
+
+
+@csrf_exempt
+@login_required
+@require_http_methods(["GET", "PUT", "DELETE"])
+def saved_view_detail(request, view_id):
+    view = get_object_or_404(SavedView, id=view_id, user=request.user)
+
+    if request.method == "GET":
+        return JsonResponse(_serialize_view(view))
+
+    if request.method == "DELETE":
+        view.delete()
+        return JsonResponse({}, status=204)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    name = body.get("name", "").strip()
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+
+    columns = body.get("columns")
+    if not isinstance(columns, list):
+        return JsonResponse({"error": "columns must be a list"}, status=400)
+
+    sort = body.get("sort")
+    if not isinstance(sort, list):
+        return JsonResponse({"error": "sort must be a list"}, status=400)
+
+    filter_expression = body.get("filter_expression")
+    if filter_expression is not None:
+        try:
+            validate_filter_expression(filter_expression)
+        except ValueError as exc:
+            return JsonResponse(
+                {"error": f"Invalid filter_expression: {exc}"}, status=400
+            )
+
+    view.name = name
+    view.filter_expression = filter_expression
+    view.columns = columns
+    view.sort = sort
+    view.save()
+
+    return JsonResponse(_serialize_view(view))

@@ -12,4 +12,6 @@ urlpatterns = [
     path("api/jobs/<int:listing_id>/seen/", views.mark_listing_seen),
     path("api/locations/", views.list_locations),
     path("api/runs/", views.runs_view),
+    path("api/views/", views.saved_views_list),
+    path("api/views/<int:view_id>/", views.saved_view_detail),
 ]
