@@ -9,7 +9,7 @@ EMPTY_RESULT = {"country_code": None, "region_code": None, "city": None}
 
 def geocode_location(name):
     try:
-        geolocator = Nominatim(user_agent="job-scout", timeout=5)
+        geolocator = Nominatim(user_agent="job-scout", timeout=2)
         location = geolocator.geocode(name, addressdetails=True)
     except Exception:
         logger.warning("Geocoding failed for '%s'", name)
