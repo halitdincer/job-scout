@@ -275,15 +275,15 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
 
 /* ── Views select ───────────────────────────────────────────── */
 .views-select {
-  background: transparent;
+  background: var(--bg-surface);
   color: var(--text);
-  border: none;
+  border: 1px solid var(--border);
   padding: 6px 24px 6px 8px;
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
   font-family: inherit;
-  min-width: 110px;
+  min-width: 130px;
   max-width: 200px;
   cursor: pointer;
   -webkit-appearance: none;
@@ -291,16 +291,25 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none'%3E%3Cpath d='M2.5 4L5 6.5 7.5 4' stroke='%23888898' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 6px center;
+  transition: border-color 0.15s;
 }
 
 .views-select:focus {
   outline: none;
-  background-color: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.views-select.views-placeholder {
+  color: var(--text-dim);
 }
 
 .views-select option {
   background: var(--bg-surface);
   color: var(--text);
+}
+
+.save-trigger-disabled {
+  opacity: 0.4;
 }
 
 /* ── Save dropdown ─────────────────────────────────────────── */
@@ -397,6 +406,24 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
 
 .filter-pill-close:hover {
   color: var(--text);
+}
+
+.filter-pills-more {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 999px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.filter-pills-more:hover {
+  color: var(--text);
+  border-color: var(--text-secondary);
 }
 
 .filter-pills-clear {
@@ -1050,12 +1077,19 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
     margin-bottom: 4px;
   }
 
-  .toolbar-spacer { display: none; }
+  .toolbar-spacer {
+    display: none;
+  }
 
   .views-select {
     flex: 1;
     max-width: none;
     min-width: 0;
+    order: -1;
+  }
+
+  .save-menu-wrap {
+    order: -1;
   }
 
   .toolbar-btn {
@@ -1066,6 +1100,10 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
   .save-dropdown {
     left: auto;
     right: 0;
+  }
+
+  .filter-pills-bar {
+    gap: 4px;
   }
 
   .side-panel {

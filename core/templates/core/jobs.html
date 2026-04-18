@@ -6,15 +6,15 @@
 
 {% block content %}
 <div class="jobs-toolbar">
-  <select id="views-select" class="views-select">
-    <option value="">All Jobs</option>
-  </select>
-  <span id="view-modified" class="view-modified-badge" style="display:none;">Modified</span>
-  <div class="toolbar-spacer"></div>
   <button class="toolbar-btn" id="open-columns-panel">Columns</button>
   <button class="toolbar-btn" id="open-filters-panel">Filters</button>
+  <div class="toolbar-spacer"></div>
+  <select id="views-select" class="views-select views-placeholder">
+    <option value="">Select a view...</option>
+  </select>
+  <span id="view-modified" class="view-modified-badge" style="display:none;">Modified</span>
   <div class="save-menu-wrap" id="save-menu-wrap">
-    <button class="toolbar-btn" id="save-trigger">Save &#9662;</button>
+    <button class="toolbar-btn save-trigger-disabled" id="save-trigger">Save &#9662;</button>
     <div id="save-menu" class="save-dropdown" style="display:none;">
       <button class="save-dropdown-item" id="save-overwrite" style="display:none;">Save</button>
       <button class="save-dropdown-item" id="save-as-new">Save as new view...</button>
@@ -446,17 +446,17 @@
   }
 
   var COLUMN_DEFS = [
-    { title: "Title", field: "title", formatter: titleFormatter, formatterParams: { allowHtml: true }, minWidth: 250, widthGrow: 3, filterField: "title" },
     { title: "Company", field: "source_name", headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: false }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: false }, minWidth: 120, widthGrow: 1, filterField: "source_name" },
-    { title: "Location (Raw)", field: "locations_display", minWidth: 150, widthGrow: 1, visible: false },
-    { title: "Type", field: "employment_type_label", headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: false }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: false }, minWidth: 100, visible: false, filterField: "employment_type" },
+    { title: "Title", field: "title", formatter: titleFormatter, formatterParams: { allowHtml: true }, minWidth: 250, widthGrow: 3, filterField: "title" },
+    { title: "Country", field: "country", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 80, filterField: "country" },
+    { title: "City", field: "city", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 100, filterField: "city" },
     { title: "Published At", field: "published_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, filterField: "published_at" },
     { title: "First Seen", field: "first_seen_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, filterField: "first_seen_at" },
+    { title: "Location (Raw)", field: "locations_display", minWidth: 150, widthGrow: 1, visible: false },
+    { title: "Type", field: "employment_type_label", headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: false }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: false }, minWidth: 100, visible: false, filterField: "employment_type" },
     { title: "Department", field: "department", minWidth: 120, visible: false, filterField: "department" },
     { title: "Workplace", field: "workplace_type_label", headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: false }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: false }, minWidth: 100, visible: false, filterField: "workplace_type" },
-    { title: "Country", field: "country", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 80, filterField: "country" },
     { title: "Region", field: "region", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 100, visible: false, filterField: "region" },
-    { title: "City", field: "city", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 100, filterField: "city" },
     { title: "Status", field: "status", headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: false }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: false }, minWidth: 90, visible: false, filterField: "status" },
     { title: "Last Seen", field: "last_seen_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120, visible: false, filterField: "last_seen_at" },
     { title: "Team", field: "team", minWidth: 120, visible: false, filterField: "team" },
@@ -656,16 +656,24 @@
     checkDirtyState();
   }
 
+  var filterPillsExpanded = false;
+  var PILL_COLLAPSE_LIMIT = 3;
+
   function renderFilterPills() {
     summaryNode.innerHTML = "";
-    if (!activeExpression) return;
+    if (!activeExpression) { filterPillsExpanded = false; updateFiltersBadge(); return; }
     var predicates = [];
     if (activeExpression.op === "and" && activeExpression.children) {
       predicates = activeExpression.children.filter(function(c) { return !c.op; });
     } else if (!activeExpression.op) {
       predicates = [activeExpression];
     }
-    predicates.forEach(function(pred, idx) {
+    if (!predicates.length) { filterPillsExpanded = false; updateFiltersBadge(); return; }
+
+    var shouldCollapse = predicates.length > PILL_COLLAPSE_LIMIT && !filterPillsExpanded;
+    var visiblePreds = shouldCollapse ? predicates.slice(0, PILL_COLLAPSE_LIMIT) : predicates;
+
+    visiblePreds.forEach(function(pred, idx) {
       var pill = document.createElement("span");
       pill.className = "filter-pill";
       var fieldLabel = FILTER_FIELD_DEFS[pred.field] ? FILTER_FIELD_DEFS[pred.field].label : pred.field;
@@ -678,11 +686,34 @@
       var close = document.createElement("button");
       close.type = "button";
       close.className = "filter-pill-close";
-      close.textContent = "\u00d7";
       close.addEventListener("click", function() { removePill(idx); });
+      close.textContent = "\u00d7";
       pill.appendChild(close);
       summaryNode.appendChild(pill);
     });
+
+    if (shouldCollapse) {
+      var moreBtn = document.createElement("button");
+      moreBtn.type = "button";
+      moreBtn.className = "filter-pills-more";
+      moreBtn.textContent = "+" + (predicates.length - PILL_COLLAPSE_LIMIT) + " more";
+      moreBtn.addEventListener("click", function() {
+        filterPillsExpanded = true;
+        renderFilterPills();
+      });
+      summaryNode.appendChild(moreBtn);
+    } else if (predicates.length > PILL_COLLAPSE_LIMIT) {
+      var lessBtn = document.createElement("button");
+      lessBtn.type = "button";
+      lessBtn.className = "filter-pills-more";
+      lessBtn.textContent = "Show less";
+      lessBtn.addEventListener("click", function() {
+        filterPillsExpanded = false;
+        renderFilterPills();
+      });
+      summaryNode.appendChild(lessBtn);
+    }
+
     if (predicates.length > 1) {
       var clearBtn = document.createElement("button");
       clearBtn.type = "button";
@@ -1242,7 +1273,7 @@
   }
 
   function populateViewsSelect() {
-    viewsSelect.innerHTML = '<option value="">All Jobs</option>';
+    viewsSelect.innerHTML = '<option value="">Select a view...</option>';
     savedViews.forEach(function(v) {
       var opt = document.createElement("option");
       opt.value = v.id;
@@ -1257,6 +1288,13 @@
     saveOverwrite.style.display = hasView ? "" : "none";
     saveMenuDivider.style.display = hasView ? "" : "none";
     deleteViewAction.style.display = hasView ? "" : "none";
+    if (hasView) {
+      saveTrigger.classList.remove("save-trigger-disabled");
+      viewsSelect.classList.remove("views-placeholder");
+    } else {
+      saveTrigger.classList.add("save-trigger-disabled");
+      viewsSelect.classList.add("views-placeholder");
+    }
   }
 
   function fetchViews() {
