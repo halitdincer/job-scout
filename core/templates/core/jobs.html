@@ -6,23 +6,24 @@
 
 {% block content %}
 <div class="jobs-toolbar">
-  <div class="jobs-toolbar-left">
-    <div class="toolbar-group">
-      <select id="views-select" class="views-select">
-        <option value="">-- No View --</option>
-      </select>
-      <button class="col-chooser-btn" id="save-view-btn">Save</button>
-      <button class="col-chooser-btn" id="update-view-btn" style="display:none;">Update</button>
-      <button class="col-chooser-btn danger" id="delete-view-btn" style="display:none;">Delete</button>
-    </div>
-    <div class="toolbar-group">
-      <button class="col-chooser-btn" id="open-columns-panel">Columns</button>
-      <button class="col-chooser-btn" id="open-filters-panel">Filters</button>
-      <button class="col-chooser-btn" id="reset-columns">Reset</button>
+  <select id="views-select" class="views-select">
+    <option value="">All Jobs</option>
+  </select>
+  <span id="view-modified" class="view-modified-badge" style="display:none;">Modified</span>
+  <div class="toolbar-spacer"></div>
+  <button class="toolbar-btn" id="open-columns-panel">Columns</button>
+  <button class="toolbar-btn" id="open-filters-panel">Filters</button>
+  <div class="save-menu-wrap" id="save-menu-wrap">
+    <button class="toolbar-btn" id="save-trigger">Save &#9662;</button>
+    <div id="save-menu" class="save-dropdown" style="display:none;">
+      <button class="save-dropdown-item" id="save-overwrite" style="display:none;">Save</button>
+      <button class="save-dropdown-item" id="save-as-new">Save as new view...</button>
+      <div class="save-dropdown-divider" id="save-menu-divider" style="display:none;"></div>
+      <button class="save-dropdown-item save-dropdown-danger" id="delete-view-action" style="display:none;">Delete view</button>
     </div>
   </div>
-  <div id="advanced-filter-summary" class="filter-summary">No filters applied</div>
 </div>
+<div id="advanced-filter-summary" class="filter-pills-bar"></div>
 
 <div id="jobs-grid"></div>
 
@@ -35,6 +36,9 @@
   </div>
   <p class="side-panel-subtitle">Show or hide columns.</p>
   <div id="columns-panel-list" class="columns-panel-list"></div>
+  <div class="columns-panel-footer">
+    <button type="button" id="reset-columns" class="chip-btn">Reset</button>
+  </div>
 </aside>
 
 <aside id="filters-panel" class="side-panel" aria-hidden="true">
@@ -53,6 +57,26 @@
 </aside>
 
 <div id="col-filter-popover" class="col-filter-popover" style="display:none;"></div>
+
+<dialog id="save-dialog" class="view-dialog">
+  <form method="dialog">
+    <h3>Save as new view</h3>
+    <input type="text" id="save-dialog-name" placeholder="View name" required autocomplete="off">
+    <div class="dialog-actions">
+      <button type="button" class="dialog-cancel" id="save-dialog-cancel">Cancel</button>
+      <button type="submit" class="dialog-confirm">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="delete-dialog" class="view-dialog">
+  <h3>Delete view</h3>
+  <p id="delete-dialog-msg">Are you sure?</p>
+  <div class="dialog-actions">
+    <button type="button" class="dialog-cancel" id="delete-dialog-cancel">Cancel</button>
+    <button type="button" class="dialog-confirm dialog-danger" id="delete-dialog-confirm">Delete</button>
+  </div>
+</dialog>
 
 <script>
 (function() {
@@ -628,8 +652,117 @@
   }
 
   function updateFilterSummary() {
-    summaryNode.textContent = expressionToText(activeExpression);
+    renderFilterPills();
+    checkDirtyState();
   }
+
+  function renderFilterPills() {
+    summaryNode.innerHTML = "";
+    if (!activeExpression) return;
+    var predicates = [];
+    if (activeExpression.op === "and" && activeExpression.children) {
+      predicates = activeExpression.children.filter(function(c) { return !c.op; });
+    } else if (!activeExpression.op) {
+      predicates = [activeExpression];
+    }
+    predicates.forEach(function(pred, idx) {
+      var pill = document.createElement("span");
+      pill.className = "filter-pill";
+      var fieldLabel = FILTER_FIELD_DEFS[pred.field] ? FILTER_FIELD_DEFS[pred.field].label : pred.field;
+      var opLabel = OPERATOR_LABELS[pred.operator] || pred.operator;
+      var text = fieldLabel + " " + opLabel;
+      if (pred.value !== undefined && pred.operator !== "is_empty" && pred.operator !== "is_not_empty") {
+        text += " " + (Array.isArray(pred.value) ? pred.value.join(", ") : pred.value);
+      }
+      pill.appendChild(document.createTextNode(text));
+      var close = document.createElement("button");
+      close.type = "button";
+      close.className = "filter-pill-close";
+      close.textContent = "\u00d7";
+      close.addEventListener("click", function() { removePill(idx); });
+      pill.appendChild(close);
+      summaryNode.appendChild(pill);
+    });
+    if (predicates.length > 1) {
+      var clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "filter-pills-clear";
+      clearBtn.textContent = "Clear all";
+      clearBtn.addEventListener("click", clearAllFilters);
+      summaryNode.appendChild(clearBtn);
+    }
+    updateFiltersBadge();
+  }
+
+  function removePill(predicateIndex) {
+    var predicates = [];
+    if (activeExpression && activeExpression.op === "and" && activeExpression.children) {
+      predicates = activeExpression.children.filter(function(c) { return !c.op; });
+    } else if (activeExpression && !activeExpression.op) {
+      predicates = [activeExpression];
+    }
+    if (predicateIndex < 0 || predicateIndex >= predicates.length) return;
+    var removed = predicates[predicateIndex];
+    for (var i = rules.length - 1; i >= 0; i--) {
+      if (rules[i].field === removed.field && rules[i].operator === removed.operator) {
+        rules.splice(i, 1);
+        break;
+      }
+    }
+    activeExpression = serializeRules();
+    syncHeaderFromRules();
+    renderColumnFilterSections();
+    fetchJobs(activeExpression).then(updateFilterSummary);
+  }
+
+  function updateFiltersBadge() {
+    var count = rules.length;
+    var btn = document.getElementById("open-filters-panel");
+    var existing = btn.querySelector(".toolbar-badge");
+    if (existing) existing.remove();
+    if (count > 0) {
+      var badge = document.createElement("span");
+      badge.className = "toolbar-badge";
+      badge.textContent = count;
+      btn.appendChild(badge);
+    }
+  }
+
+  function updateColumnsBadge() {
+    var hidden = table.getColumns().filter(function(c) { return !c.isVisible(); }).length;
+    var btn = document.getElementById("open-columns-panel");
+    var existing = btn.querySelector(".toolbar-badge");
+    if (existing) existing.remove();
+    if (hidden > 0) {
+      var badge = document.createElement("span");
+      badge.className = "toolbar-badge";
+      badge.textContent = hidden;
+      btn.appendChild(badge);
+    }
+  }
+
+  function checkDirtyState() {
+    if (typeof activeViewId === "undefined" || !activeViewId) {
+      var modBadge = document.getElementById("view-modified");
+      if (modBadge) modBadge.style.display = "none";
+      return;
+    }
+    if (!viewSnapshot) return;
+    var current = JSON.stringify(captureCurrentState());
+    var dirty = current !== viewSnapshot;
+    var modBadge2 = document.getElementById("view-modified");
+    if (modBadge2) modBadge2.style.display = dirty ? "" : "none";
+  }
+
+  function captureCurrentState() {
+    return {
+      filter_expression: activeExpression,
+      columns: captureColumns(),
+      sort: captureSort()
+    };
+  }
+
+  var viewSnapshot = null;
 
   function rulesForField(field) {
     return rules.filter(function(r) { return r.field === field; });
@@ -1075,9 +1208,21 @@
 
   // ── Saved Views ───────────────────────────────────────────────
   var viewsSelect = document.getElementById("views-select");
-  var saveViewBtn = document.getElementById("save-view-btn");
-  var updateViewBtn = document.getElementById("update-view-btn");
-  var deleteViewBtn = document.getElementById("delete-view-btn");
+  var viewModifiedBadge = document.getElementById("view-modified");
+  var saveTrigger = document.getElementById("save-trigger");
+  var saveMenu = document.getElementById("save-menu");
+  var saveOverwrite = document.getElementById("save-overwrite");
+  var saveAsNew = document.getElementById("save-as-new");
+  var saveMenuDivider = document.getElementById("save-menu-divider");
+  var deleteViewAction = document.getElementById("delete-view-action");
+  var saveDialog = document.getElementById("save-dialog");
+  var saveDialogName = document.getElementById("save-dialog-name");
+  var saveDialogCancel = document.getElementById("save-dialog-cancel");
+  var deleteDialog = document.getElementById("delete-dialog");
+  var deleteDialogMsg = document.getElementById("delete-dialog-msg");
+  var deleteDialogCancel = document.getElementById("delete-dialog-cancel");
+  var deleteDialogConfirm = document.getElementById("delete-dialog-confirm");
+
   var savedViews = [];
   var activeViewId = null;
 
@@ -1092,8 +1237,12 @@
     return sorters.map(function(s) { return { column: s.field, dir: s.dir }; });
   }
 
+  function snapshotView() {
+    viewSnapshot = JSON.stringify(captureCurrentState());
+  }
+
   function populateViewsSelect() {
-    viewsSelect.innerHTML = '<option value="">-- No View --</option>';
+    viewsSelect.innerHTML = '<option value="">All Jobs</option>';
     savedViews.forEach(function(v) {
       var opt = document.createElement("option");
       opt.value = v.id;
@@ -1103,10 +1252,11 @@
     if (activeViewId) viewsSelect.value = activeViewId;
   }
 
-  function updateViewButtons() {
+  function updateSaveMenu() {
     var hasView = !!activeViewId;
-    updateViewBtn.style.display = hasView ? "" : "none";
-    deleteViewBtn.style.display = hasView ? "" : "none";
+    saveOverwrite.style.display = hasView ? "" : "none";
+    saveMenuDivider.style.display = hasView ? "" : "none";
+    deleteViewAction.style.display = hasView ? "" : "none";
   }
 
   function fetchViews() {
@@ -1115,7 +1265,7 @@
       .then(function(data) {
         savedViews = data;
         populateViewsSelect();
-        updateViewButtons();
+        updateSaveMenu();
       });
   }
 
@@ -1147,15 +1297,12 @@
   function applyView(view) {
     activeViewId = view.id;
     viewsSelect.value = view.id;
-    updateViewButtons();
+    updateSaveMenu();
 
-    // Apply columns: order and visibility
     var colState = view.columns || [];
     if (colState.length) {
       var fieldSet = {};
       colState.forEach(function(c) { fieldSet[c.field] = c; });
-
-      // Reorder columns
       for (var i = 0; i < colState.length; i++) {
         var col = table.getColumn(colState[i].field);
         if (!col) continue;
@@ -1165,8 +1312,6 @@
           table.moveColumn(colState[i].field, colState[i - 1].field, false);
         }
       }
-
-      // Set visibility
       table.getColumns().forEach(function(col) {
         var field = col.getField();
         var saved = fieldSet[field];
@@ -1176,26 +1321,31 @@
       });
     }
 
-    // Apply sort
     var sortState = view.sort || [];
     if (sortState.length) {
       table.setSort(sortState.map(function(s) { return { column: s.column, dir: s.dir }; }));
     }
 
-    // Apply filter
     rules = expressionToRules(view.filter_expression);
     activeExpression = view.filter_expression || null;
     syncHeaderFromRules();
     renderColumnFilterSections();
-    fetchJobs(activeExpression).then(updateFilterSummary);
+    fetchJobs(activeExpression).then(function() {
+      updateFilterSummary();
+      updateColumnsBadge();
+      snapshotView();
+    });
   }
 
   function clearView() {
     activeViewId = null;
+    viewSnapshot = null;
     viewsSelect.value = "";
-    updateViewButtons();
+    viewModifiedBadge.style.display = "none";
+    updateSaveMenu();
   }
 
+  // ── View event listeners ─────────────────────────────────────
   viewsSelect.addEventListener("change", function() {
     var selectedId = viewsSelect.value;
     if (!selectedId) {
@@ -1206,36 +1356,20 @@
     if (view) applyView(view);
   });
 
-  saveViewBtn.addEventListener("click", function() {
-    var name = window.prompt("View name:");
-    if (!name || !name.trim()) return;
-    var payload = {
-      name: name.trim(),
-      filter_expression: activeExpression,
-      columns: captureColumns(),
-      sort: captureSort()
-    };
-    fetch("/api/views/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })
-    .then(function(r) {
-      if (r.status === 409) throw new Error("A view with that name already exists.");
-      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || "Failed to save view"); });
-      return r.json();
-    })
-    .then(function(view) {
-      savedViews.push(view);
-      populateViewsSelect();
-      activeViewId = view.id;
-      viewsSelect.value = view.id;
-      updateViewButtons();
-    })
-    .catch(function(err) { window.alert(err.message); });
+  saveTrigger.addEventListener("click", function(e) {
+    e.stopPropagation();
+    var open = saveMenu.style.display !== "none";
+    saveMenu.style.display = open ? "none" : "";
   });
 
-  updateViewBtn.addEventListener("click", function() {
+  document.addEventListener("click", function(e) {
+    if (!document.getElementById("save-menu-wrap").contains(e.target)) {
+      saveMenu.style.display = "none";
+    }
+  });
+
+  saveOverwrite.addEventListener("click", function() {
+    saveMenu.style.display = "none";
     if (!activeViewId) return;
     var view = savedViews.find(function(v) { return v.id === activeViewId; });
     if (!view) return;
@@ -1258,25 +1392,88 @@
       for (var i = 0; i < savedViews.length; i++) {
         if (savedViews[i].id === updated.id) { savedViews[i] = updated; break; }
       }
+      snapshotView();
+      checkDirtyState();
     })
     .catch(function(err) { window.alert(err.message); });
   });
 
-  deleteViewBtn.addEventListener("click", function() {
-    if (!activeViewId) return;
+  saveAsNew.addEventListener("click", function() {
+    saveMenu.style.display = "none";
+    saveDialogName.value = "";
+    saveDialog.showModal();
+  });
+
+  saveDialogCancel.addEventListener("click", function() {
+    saveDialog.close();
+  });
+
+  saveDialog.addEventListener("submit", function(e) {
+    e.preventDefault();
+    var name = saveDialogName.value.trim();
+    if (!name) return;
+    var payload = {
+      name: name,
+      filter_expression: activeExpression,
+      columns: captureColumns(),
+      sort: captureSort()
+    };
+    fetch("/api/views/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) {
+      if (r.status === 409) throw new Error("A view with that name already exists.");
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || "Failed to save view"); });
+      return r.json();
+    })
+    .then(function(view) {
+      savedViews.push(view);
+      populateViewsSelect();
+      activeViewId = view.id;
+      viewsSelect.value = view.id;
+      updateSaveMenu();
+      snapshotView();
+      checkDirtyState();
+      saveDialog.close();
+    })
+    .catch(function(err) { window.alert(err.message); });
+  });
+
+  deleteViewAction.addEventListener("click", function() {
+    saveMenu.style.display = "none";
     var view = savedViews.find(function(v) { return v.id === activeViewId; });
     if (!view) return;
-    if (!window.confirm('Delete view "' + view.name + '"?')) return;
+    deleteDialogMsg.textContent = 'Delete view "' + view.name + '"?';
+    deleteDialog.showModal();
+  });
+
+  deleteDialogCancel.addEventListener("click", function() {
+    deleteDialog.close();
+  });
+
+  deleteDialogConfirm.addEventListener("click", function() {
+    if (!activeViewId) return;
     fetch("/api/views/" + activeViewId + "/", { method: "DELETE" })
     .then(function(r) {
       if (!r.ok && r.status !== 204) throw new Error("Failed to delete view");
       savedViews = savedViews.filter(function(v) { return v.id !== activeViewId; });
       clearView();
       populateViewsSelect();
+      deleteDialog.close();
     })
     .catch(function(err) { window.alert(err.message); });
   });
 
+  // ── Dirty tracking via Tabulator events ──────────────────────
+  table.on("dataSorted", function() { checkDirtyState(); });
+  table.on("columnVisibilityChanged", function() {
+    updateColumnsBadge();
+    checkDirtyState();
+  });
+
+  updateColumnsBadge();
   fetchViews();
 })();
 </script>
