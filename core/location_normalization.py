@@ -1,7 +1,9 @@
 import ast
 import re
 
-_COMPOSITE_LOCATION_SPLIT_RE = re.compile(r"\s+or\s+|\s+/\s+|;", re.IGNORECASE)
+_COMPOSITE_LOCATION_SPLIT_RE = re.compile(
+    r"\s+or\s+|\s+/\s+|;|\s*\|\s*|\s*[•·]\s*", re.IGNORECASE
+)
 
 _PROFILE_REGISTRY = {
     ("greenhouse", "stripe"): "stripe",

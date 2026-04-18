@@ -111,6 +111,36 @@ class TestStripeCommaParsing:
         assert normalize_location_value("  ", profile="stripe") == []
 
 
+class TestPipeBulletSplitting:
+    def test_pipe_separated(self):
+        assert normalize_location_value("San Francisco, CA | New York City, NY") == [
+            "San Francisco, CA",
+            "New York City, NY",
+        ]
+
+    def test_bullet_separated(self):
+        assert normalize_location_value("San Francisco, CA • New York, NY") == [
+            "San Francisco, CA",
+            "New York, NY",
+        ]
+
+    def test_pipe_with_remote_prefix(self):
+        result = normalize_location_value(
+            "Remote-Friendly (Travel-Required) | San Francisco, CA | Seattle, WA"
+        )
+        assert result == [
+            "Remote-Friendly (Travel-Required)",
+            "San Francisco, CA",
+            "Seattle, WA",
+        ]
+
+    def test_middle_dot_separated(self):
+        assert normalize_location_value("Sydney, Australia · Melbourne, Australia") == [
+            "Sydney, Australia",
+            "Melbourne, Australia",
+        ]
+
+
 class TestNonStripeRegression:
     def test_pinterest_city_state_country_not_split(self):
         assert normalize_location_value(
