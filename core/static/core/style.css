@@ -921,12 +921,16 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
 }
 
 #jobs-grid .tabulator-row.tabulator-row-seen,
-#jobs-grid .tabulator-row.tabulator-row-seen.tabulator-row-even {
-  background-color: rgba(196, 181, 253, 0.04) !important;
+#jobs-grid .tabulator-row.tabulator-row-seen.tabulator-row-even,
+#jobs-grid .tabulator-row.tabulator-row-seen.tabulator-selectable,
+#jobs-grid .tabulator-row.tabulator-row-seen.tabulator-selected {
+  background-color: #16151f !important;
 }
 
-#jobs-grid .tabulator-row.tabulator-row-seen:hover {
-  background-color: rgba(196, 181, 253, 0.08) !important;
+#jobs-grid .tabulator-row.tabulator-row-seen:hover,
+#jobs-grid .tabulator-row.tabulator-row-seen.tabulator-selectable:hover,
+#jobs-grid .tabulator-row.tabulator-row-seen.tabulator-selected:hover {
+  background-color: #1c1b28 !important;
 }
 
 #jobs-grid .tabulator-cell {
