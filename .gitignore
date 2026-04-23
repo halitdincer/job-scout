@@ -26,3 +26,7 @@ media/
 # OS
 .DS_Store
 .coverage
+
+# Node / Vitest
+node_modules/
+coverage/
