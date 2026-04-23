@@ -22,6 +22,7 @@ import {
   DATE_RANGE_PRESETS,
 } from "./constants.js";
 import {
+  selectDisplayTotalPages,
   selectFilterPills,
   selectIsDirty,
   selectSavedViewPayload,
@@ -1390,7 +1391,7 @@ export function initJobsPage() {
   function renderPaginationBar() {
     const state = store.getState();
     const { page, size } = state.pagination;
-    const totalPages = Math.max(state.data.totalPages, 1);
+    const totalPages = selectDisplayTotalPages(state);
     // Keep the size selector in sync with state.
     if (String(pageSizeSelect.value) !== String(size)) {
       pageSizeSelect.value = String(size);
@@ -1409,8 +1410,9 @@ export function initJobsPage() {
     if (page > 1) store.dispatch(A.setPage(page - 1));
   });
   pageNextBtn.addEventListener("click", () => {
-    const { page } = store.getState().pagination;
-    const total = Math.max(store.getState().data.totalPages, 1);
+    const state = store.getState();
+    const { page } = state.pagination;
+    const total = selectDisplayTotalPages(state);
     if (page < total) store.dispatch(A.setPage(page + 1));
   });
 

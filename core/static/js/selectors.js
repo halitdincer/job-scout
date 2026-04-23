@@ -15,6 +15,16 @@ export function selectSortQueryParam(state) {
 }
 
 /**
+ * Pagination-bar label source. Clamps to >= 1 so the "Page X of Y" label
+ * never reads "Page 1 of NaN" or "Page 1 of 0" before the first fetch has
+ * settled or if the server ever returns a malformed envelope.
+ */
+export function selectDisplayTotalPages(state) {
+  const total = state.data && state.data.totalPages;
+  return Number.isFinite(total) && total > 0 ? total : 1;
+}
+
+/**
  * Deep-equal comparison against `view.snapshot`.
  * Returns false when no view is loaded (nothing to be dirty against).
  */

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  selectDisplayTotalPages,
   selectExpressionForServer,
   selectFilterPills,
   selectFilterRulesRenderable,
@@ -547,5 +548,36 @@ describe("selectSavedViewPayload", () => {
   it("preserves the provided name verbatim (does not trim or mutate)", () => {
     const state = baseState();
     expect(selectSavedViewPayload(state, "  Spaced  ").name).toBe("  Spaced  ");
+  });
+});
+
+describe("selectDisplayTotalPages", () => {
+  // The pagination bar reads totalPages via this selector so a malformed
+  // or pre-fetch value (undefined, NaN, 0, negative) never leaks into the
+  // "Page X of Y" label as "NaN" or "0". The server always reports
+  // total_pages >= 1 for any non-empty envelope, so the clamp to 1 is the
+  // right "nothing known yet" fallback.
+  function dataState(totalPages) {
+    return { data: { totalPages } };
+  }
+
+  it("returns the stored totalPages when it is a positive finite integer", () => {
+    expect(selectDisplayTotalPages(dataState(6))).toBe(6);
+  });
+
+  it("returns 1 when totalPages is undefined (pre-fetch / malformed payload)", () => {
+    expect(selectDisplayTotalPages(dataState(undefined))).toBe(1);
+  });
+
+  it("returns 1 when totalPages is NaN", () => {
+    expect(selectDisplayTotalPages(dataState(NaN))).toBe(1);
+  });
+
+  it("returns 1 when totalPages is 0 (empty result set)", () => {
+    expect(selectDisplayTotalPages(dataState(0))).toBe(1);
+  });
+
+  it("returns 1 when totalPages is negative (defensive, should never happen)", () => {
+    expect(selectDisplayTotalPages(dataState(-3))).toBe(1);
   });
 });

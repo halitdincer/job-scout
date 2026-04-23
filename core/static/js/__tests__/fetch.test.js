@@ -240,4 +240,45 @@ describe("attachFetchEffect", () => {
     const [url] = fetchImpl.mock.calls[0];
     expect(url).toMatch(/^\/api\/other\/\?/);
   });
+
+  it("dispatches FETCH_ERROR when the response body is a bare array (pre-envelope backend)", async () => {
+    const store = mkStore();
+    // Simulate an older backend returning a flat list instead of the
+    // {results, count, total_pages, ...} envelope.
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(settledResponse([{ id: 1 }, { id: 2 }]));
+    attachFetchEffect({ store, fetchImpl });
+    store.dispatch(A.setPage(2));
+    await flushMicrotasks();
+    expect(store.getState().data.error).toBeInstanceOf(Error);
+    expect(store.getState().data.error.message).toContain("non-envelope");
+    // Success path must NOT have been taken — totalPages stays at initial.
+    expect(store.getState().data.totalPages).toBe(0);
+    expect(store.getState().data.results).toEqual([]);
+  });
+
+  it("dispatches FETCH_ERROR when total_pages is missing from the payload", async () => {
+    const store = mkStore();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(settledResponse({ results: [], count: 0 }));
+    attachFetchEffect({ store, fetchImpl });
+    store.dispatch(A.setPage(2));
+    await flushMicrotasks();
+    expect(store.getState().data.error).toBeInstanceOf(Error);
+    expect(store.getState().data.error.message).toContain("non-envelope");
+  });
+
+  it("dispatches FETCH_ERROR when results is missing from the payload", async () => {
+    const store = mkStore();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(settledResponse({ count: 0, total_pages: 0 }));
+    attachFetchEffect({ store, fetchImpl });
+    store.dispatch(A.setPage(2));
+    await flushMicrotasks();
+    expect(store.getState().data.error).toBeInstanceOf(Error);
+    expect(store.getState().data.error.message).toContain("non-envelope");
+  });
 });

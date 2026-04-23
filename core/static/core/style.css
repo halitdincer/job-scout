@@ -1150,3 +1150,98 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
 
   .side-panel { padding: 0.75rem; }
 }
+
+/* ── Pagination bar ─────────────────────────────────────────── */
+.pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  padding: 8px 12px;
+  gap: 12px;
+  border-bottom-left-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.pagination-left,
+.pagination-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.pagination-size-select {
+  background: var(--bg-surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 24px 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none'%3E%3Cpath d='M2.5 4L5 6.5 7.5 4' stroke='%23888898' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  transition: border-color 0.15s;
+}
+
+.pagination-size-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pagination-size-select option {
+  background: var(--bg-surface);
+  color: var(--text);
+}
+
+.pagination-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.pagination-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.pagination-btn:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.pagination-btn:disabled:hover {
+  color: var(--text-dim);
+  background: transparent;
+  border-color: var(--border);
+}
+
+.pagination-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+  min-width: 96px;
+  text-align: center;
+}

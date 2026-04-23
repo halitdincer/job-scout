@@ -87,6 +87,27 @@ export function attachFetchEffect({ store, fetchImpl, endpoint = "/api/jobs/" })
         return;
       }
       const payload = await response.json();
+      if (
+        !payload ||
+        typeof payload !== "object" ||
+        Array.isArray(payload) ||
+        !Array.isArray(payload.results) ||
+        typeof payload.total_pages !== "number"
+      ) {
+        // Defensive: if the deployed backend is a revision older than the
+        // envelope rollout it returns a flat array (or a partial object).
+        // Surface a specific error instead of letting `undefined` reach the
+        // reducer and render "Page 1 of NaN" in the pagination bar.
+        store.dispatch(
+          fetchError(
+            new Error(
+              "/api/jobs/ returned a non-envelope response. The backend may be running an older revision."
+            ),
+            requestId
+          )
+        );
+        return;
+      }
       store.dispatch(fetchSuccess(payload, requestId));
     } catch (err) {
       if (err && err.name === "AbortError") return;
