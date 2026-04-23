@@ -579,7 +579,7 @@ class TestSavedViewsAPI:
         defaults = {
             "name": "US Remote",
             "columns": [{"field": "title", "visible": True}],
-            "sort": [{"column": "first_seen_at", "dir": "desc"}],
+            "sort": [{"field": "first_seen_at", "dir": "desc"}],
         }
         defaults.update(overrides)
         return defaults

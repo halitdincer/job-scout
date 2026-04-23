@@ -419,6 +419,72 @@ def _serialize_view(view):
     }
 
 
+class _SavedViewValidationError(ValueError):
+    """Raised when a saved-view payload fails shape validation."""
+
+
+def _validate_saved_view_sort(raw):
+    if not isinstance(raw, list):
+        raise _SavedViewValidationError("sort must be a list")
+    for item in raw:
+        if not isinstance(item, dict):
+            raise _SavedViewValidationError(
+                "sort items must be objects of shape {field, dir}"
+            )
+        field = item.get("field")
+        direction = item.get("dir")
+        if not isinstance(field, str) or field not in SORT_FIELD_TO_DB:
+            raise _SavedViewValidationError(
+                f"sort item has invalid field {field!r}. "
+                f"Valid fields: {', '.join(SORT_FIELDS)}."
+            )
+        if direction not in ("asc", "desc"):
+            raise _SavedViewValidationError(
+                f"sort item for {field!r} has invalid dir {direction!r}; "
+                f"must be 'asc' or 'desc'."
+            )
+    return raw
+
+
+def _validate_saved_view_columns(raw):
+    if not isinstance(raw, list):
+        raise _SavedViewValidationError("columns must be a list")
+    for item in raw:
+        if not isinstance(item, dict):
+            raise _SavedViewValidationError(
+                "columns items must be objects of shape {field, visible?}"
+            )
+        field = item.get("field")
+        if not isinstance(field, str) or not field:
+            raise _SavedViewValidationError(
+                "columns item missing string 'field'"
+            )
+        if "visible" in item and not isinstance(item["visible"], bool):
+            raise _SavedViewValidationError(
+                f"columns item {field!r} has non-bool 'visible'"
+            )
+    return raw
+
+
+def _validate_saved_view_config(raw):
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise _SavedViewValidationError("config must be an object")
+    if "page_size" in raw:
+        size = raw["page_size"]
+        if not isinstance(size, int) or isinstance(size, bool):
+            raise _SavedViewValidationError(
+                f"config.page_size must be an integer; got {type(size).__name__}."
+            )
+        if size not in PAGE_SIZE_ALLOWLIST:
+            raise _SavedViewValidationError(
+                f"config.page_size must be one of {list(PAGE_SIZE_ALLOWLIST)}; "
+                f"got {size}."
+            )
+    return raw
+
+
 @csrf_exempt
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -436,13 +502,16 @@ def saved_views_list(request):
     if not name:
         return JsonResponse({"error": "name is required"}, status=400)
 
-    columns = body.get("columns")
-    if not isinstance(columns, list):
+    if "columns" not in body:
         return JsonResponse({"error": "columns must be a list"}, status=400)
-
-    sort = body.get("sort")
-    if not isinstance(sort, list):
+    if "sort" not in body:
         return JsonResponse({"error": "sort must be a list"}, status=400)
+    try:
+        columns = _validate_saved_view_columns(body["columns"])
+        sort = _validate_saved_view_sort(body["sort"])
+        config = _validate_saved_view_config(body.get("config"))
+    except _SavedViewValidationError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
 
     filter_expression = body.get("filter_expression")
     if filter_expression is not None:
@@ -460,6 +529,7 @@ def saved_views_list(request):
             filter_expression=filter_expression,
             columns=columns,
             sort=sort,
+            config=config,
         )
     except Exception:
         return JsonResponse(
@@ -491,13 +561,16 @@ def saved_view_detail(request, view_id):
     if not name:
         return JsonResponse({"error": "name is required"}, status=400)
 
-    columns = body.get("columns")
-    if not isinstance(columns, list):
+    if "columns" not in body:
         return JsonResponse({"error": "columns must be a list"}, status=400)
-
-    sort = body.get("sort")
-    if not isinstance(sort, list):
+    if "sort" not in body:
         return JsonResponse({"error": "sort must be a list"}, status=400)
+    try:
+        columns = _validate_saved_view_columns(body["columns"])
+        sort = _validate_saved_view_sort(body["sort"])
+        config = _validate_saved_view_config(body.get("config"))
+    except _SavedViewValidationError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
 
     filter_expression = body.get("filter_expression")
     if filter_expression is not None:
@@ -512,6 +585,7 @@ def saved_view_detail(request, view_id):
     view.filter_expression = filter_expression
     view.columns = columns
     view.sort = sort
+    view.config = config
     view.save()
 
     return JsonResponse(_serialize_view(view))
