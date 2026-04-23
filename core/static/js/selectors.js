@@ -59,6 +59,26 @@ export function selectFilterSummary(state) {
  * historical UX: pills represent AND-of-predicates. Non-renderable
  * expressions return []. Predicate order follows rule order.
  */
+/**
+ * Build the JSON body for POST/PUT `/api/views/`. Shape must match the
+ * server-side validators in `core/views.py::_validate_saved_view_*`:
+ *   - sort: [{ field, dir }]  (never the legacy { column, dir } shape)
+ *   - columns: [{ field, visible }]  (visible defaults to true)
+ *   - config: { page_size }
+ */
+export function selectSavedViewPayload(state, name) {
+  return {
+    name,
+    filter_expression: state.filter.expression,
+    columns: state.columns.order.map((field) => ({
+      field,
+      visible: state.columns.visibility[field] !== false,
+    })),
+    sort: state.sort.map((s) => ({ field: s.field, dir: s.dir })),
+    config: { page_size: state.pagination.size },
+  };
+}
+
 export function selectFilterPills(state) {
   if (!state.filter.renderable) return [];
   const expr = rulesToExpression(state.filter.rules);

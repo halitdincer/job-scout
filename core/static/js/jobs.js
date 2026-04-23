@@ -21,7 +21,12 @@ import {
   EMPTY_SENTINEL,
   DATE_RANGE_PRESETS,
 } from "./constants.js";
-import { selectFilterPills, selectIsDirty } from "./selectors.js";
+import {
+  selectFilterPills,
+  selectIsDirty,
+  selectSavedViewPayload,
+} from "./selectors.js";
+import { attachFetchEffect } from "./effects/fetch.js";
 
 // ---------------------------------------------------------------------------
 // Formatters and helpers
@@ -535,13 +540,12 @@ export function initJobsPage() {
   const PILL_COLLAPSE_LIMIT = 3;
 
   // Tabulator instance (created below, used by renderers).
+  // Server owns pagination and sort — Tabulator is a presentation-only grid.
   const table = new Tabulator("#jobs-grid", {
     height: "100%",
     layout: "fitColumns",
     movableColumns: true,
-    pagination: true,
-    paginationSize: 50,
-    paginationSizeSelector: [25, 50, 100],
+    pagination: false,
     placeholder: "No jobs found",
     columns: applyColumnOrderToDefs(COLUMN_DEFS, initialOrder),
     initialSort: [{ column: "first_seen_at", dir: "desc" }],
@@ -552,27 +556,12 @@ export function initJobsPage() {
   });
 
   // -------------------------------------------------------------------------
-  // Fetch
+  // Fetch effect — reactive; dispatches FETCH_* as filter/sort/pagination
+  // move in the store. Replaces the imperative `fetchJobs()` of earlier
+  // drafts.
   // -------------------------------------------------------------------------
 
-  function fetchJobs() {
-    const state = store.getState();
-    const expr = state.filter.expression;
-    const params = new URLSearchParams();
-    if (expr) params.set("filter", JSON.stringify(expr));
-    const url = `/api/jobs/${params.toString() ? `?${params.toString()}` : ""}`;
-    return fetch(url)
-      .then((r) =>
-        r.ok
-          ? r.json()
-          : r.json().then((p) => {
-              throw new Error(p.error || "Failed to load jobs");
-            })
-      )
-      .then((data) => {
-        table.setData(mapApiRows(data.results || []));
-      });
-  }
+  const fetchEffect = attachFetchEffect({ store, fetchImpl: fetch });
 
   function markListingSeen(listingId, attempt) {
     return fetch(`/api/jobs/${listingId}/seen/`, { method: "POST" })
@@ -1067,10 +1056,9 @@ export function initJobsPage() {
   function applyFilters() {
     store.dispatch(A.commitFilter());
     syncTabulatorHeaderFiltersFromRules();
-    fetchJobs().then(() => {
-      renderFilterPills();
-      renderDirtyBadge();
-    }).catch((err) => window.alert(err.message));
+    // Fetch effect fires automatically on filter.expression change.
+    renderFilterPills();
+    renderDirtyBadge();
   }
 
   function clearAllFilters() {
@@ -1078,10 +1066,8 @@ export function initJobsPage() {
     syncTabulatorHeaderFiltersFromRules();
     renderColumnFilterSections();
     closePopover();
-    fetchJobs().then(() => {
-      renderFilterPills();
-      renderDirtyBadge();
-    });
+    renderFilterPills();
+    renderDirtyBadge();
   }
 
   function removePillByPredicate(pred) {
@@ -1095,10 +1081,8 @@ export function initJobsPage() {
     store.dispatch(A.commitFilter());
     syncTabulatorHeaderFiltersFromRules();
     renderColumnFilterSections();
-    fetchJobs().then(() => {
-      renderFilterPills();
-      renderDirtyBadge();
-    });
+    renderFilterPills();
+    renderDirtyBadge();
   }
 
   // -------------------------------------------------------------------------
@@ -1157,7 +1141,7 @@ export function initJobsPage() {
     if (filtersPanel.classList.contains("open")) {
       renderColumnFilterSections();
     }
-    fetchJobs().then(renderDirtyBadge);
+    renderDirtyBadge();
   }
 
   // -------------------------------------------------------------------------
@@ -1182,7 +1166,7 @@ export function initJobsPage() {
     renderColumnsBadge();
     renderFilterPills();
     renderViewsSelect();
-    fetchJobs().then(renderDirtyBadge);
+    renderDirtyBadge();
   }
 
   function clearViewSelection() {
@@ -1301,29 +1285,13 @@ export function initJobsPage() {
     }
   });
 
-  function captureColumnsForServer() {
-    const state = store.getState();
-    return state.columns.order.map((field) => ({
-      field,
-      visible: state.columns.visibility[field] !== false,
-    }));
-  }
-  function captureSortForServer() {
-    return store.getState().sort.map((s) => ({ column: s.field, dir: s.dir }));
-  }
-
   saveOverwrite.addEventListener("click", () => {
     saveMenu.style.display = "none";
     const activeId = store.getState().view.id;
     if (!activeId) return;
     const view = savedViews.find((v) => v.id === activeId);
     if (!view) return;
-    const payload = {
-      name: view.name,
-      filter_expression: store.getState().filter.expression,
-      columns: captureColumnsForServer(),
-      sort: captureSortForServer(),
-    };
+    const payload = selectSavedViewPayload(store.getState(), view.name);
     fetch(`/api/views/${activeId}/`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -1359,12 +1327,7 @@ export function initJobsPage() {
     e.preventDefault();
     const name = saveDialogName.value.trim();
     if (!name) return;
-    const payload = {
-      name,
-      filter_expression: store.getState().filter.expression,
-      columns: captureColumnsForServer(),
-      sort: captureSortForServer(),
-    };
+    const payload = selectSavedViewPayload(store.getState(), name);
     fetch("/api/views/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1416,13 +1379,77 @@ export function initJobsPage() {
   });
 
   // -------------------------------------------------------------------------
+  // Pagination bar + data subscriber
+  // -------------------------------------------------------------------------
+
+  const pageSizeSelect = document.getElementById("page-size-select");
+  const pagePrevBtn = document.getElementById("page-prev");
+  const pageNextBtn = document.getElementById("page-next");
+  const pageInfo = document.getElementById("page-info");
+
+  function renderPaginationBar() {
+    const state = store.getState();
+    const { page, size } = state.pagination;
+    const totalPages = Math.max(state.data.totalPages, 1);
+    // Keep the size selector in sync with state.
+    if (String(pageSizeSelect.value) !== String(size)) {
+      pageSizeSelect.value = String(size);
+    }
+    pageInfo.textContent = `Page ${page} of ${totalPages}`;
+    pagePrevBtn.disabled = page <= 1;
+    pageNextBtn.disabled = page >= totalPages;
+  }
+
+  pageSizeSelect.addEventListener("change", () => {
+    const size = parseInt(pageSizeSelect.value, 10);
+    if (!Number.isNaN(size)) store.dispatch(A.setPageSize(size));
+  });
+  pagePrevBtn.addEventListener("click", () => {
+    const { page } = store.getState().pagination;
+    if (page > 1) store.dispatch(A.setPage(page - 1));
+  });
+  pageNextBtn.addEventListener("click", () => {
+    const { page } = store.getState().pagination;
+    const total = Math.max(store.getState().data.totalPages, 1);
+    if (page < total) store.dispatch(A.setPage(page + 1));
+  });
+
+  // Render table rows and pagination whenever data/pagination change.
+  let lastResults = null;
+  let lastTotalPages = -1;
+  let lastPage = -1;
+  let lastSize = -1;
+  store.subscribe(() => {
+    const state = store.getState();
+    if (state.data.results !== lastResults) {
+      lastResults = state.data.results;
+      withSuppressedEvents(() => {
+        table.setData(mapApiRows(state.data.results || []));
+      });
+    }
+    if (
+      state.data.totalPages !== lastTotalPages ||
+      state.pagination.page !== lastPage ||
+      state.pagination.size !== lastSize
+    ) {
+      lastTotalPages = state.data.totalPages;
+      lastPage = state.pagination.page;
+      lastSize = state.pagination.size;
+      renderPaginationBar();
+    }
+    // Keep dirty-state in sync across every move.
+    renderDirtyBadge();
+  });
+
+  // -------------------------------------------------------------------------
   // Initial paint
   // -------------------------------------------------------------------------
 
   renderColumnFilterSections();
   renderFilterPills();
   renderColumnsBadge();
-  fetchJobs();
+  renderPaginationBar();
+  fetchEffect.triggerNow();
   fetchViews();
 
   // Expose for debugging / Playwright.

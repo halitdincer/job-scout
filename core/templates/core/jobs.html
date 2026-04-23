@@ -28,6 +28,23 @@
 
 <div id="jobs-grid"></div>
 
+<div id="pagination-bar" class="pagination-bar">
+  <div class="pagination-left">
+    <label for="page-size-select" class="pagination-label">Rows per page</label>
+    <select id="page-size-select" class="pagination-size-select">
+      <option value="25">25</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+      <option value="250">250</option>
+    </select>
+  </div>
+  <div class="pagination-right">
+    <button type="button" id="page-prev" class="pagination-btn">Prev</button>
+    <span id="page-info" class="pagination-info">Page 1 of 1</span>
+    <button type="button" id="page-next" class="pagination-btn">Next</button>
+  </div>
+</div>
+
 <div id="panel-backdrop" class="panel-backdrop"></div>
 
 <aside id="columns-side-panel" class="side-panel" aria-hidden="true">

@@ -6,6 +6,7 @@ import {
   selectFilterRulesRenderable,
   selectFilterSummary,
   selectIsDirty,
+  selectSavedViewPayload,
   selectSortQueryParam,
 } from "../selectors.js";
 import { resetRuleIdSequenceForTesting } from "../filterExpression.js";
@@ -468,5 +469,83 @@ describe("selectFilterPills", () => {
       { field: "title", operator: "contains", value: "x" },
       { field: "status", operator: "eq", value: "active" },
     ]);
+  });
+});
+
+describe("selectSavedViewPayload", () => {
+  it("serializes name, filter expression, columns, sort, and config.page_size", () => {
+    const state = baseState({
+      filter: {
+        expression: { field: "title", operator: "contains", value: "eng" },
+        rules: [],
+        renderable: true,
+      },
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      columns: {
+        order: ["title", "status"],
+        visibility: { title: true, status: false },
+      },
+      pagination: { page: 1, size: 100 },
+    });
+    expect(selectSavedViewPayload(state, "US Remote")).toEqual({
+      name: "US Remote",
+      filter_expression: {
+        field: "title",
+        operator: "contains",
+        value: "eng",
+      },
+      columns: [
+        { field: "title", visible: true },
+        { field: "status", visible: false },
+      ],
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      config: { page_size: 100 },
+    });
+  });
+
+  it("emits sort using the new {field, dir} shape (never legacy {column, dir})", () => {
+    const state = baseState({
+      sort: [
+        { field: "status", dir: "asc" },
+        { field: "title", dir: "desc" },
+      ],
+    });
+    const payload = selectSavedViewPayload(state, "V");
+    expect(payload.sort).toEqual([
+      { field: "status", dir: "asc" },
+      { field: "title", dir: "desc" },
+    ]);
+    // No legacy key should appear.
+    payload.sort.forEach((item) => {
+      expect(item).not.toHaveProperty("column");
+    });
+  });
+
+  it("emits columns with visible=true when visibility is absent (undefined is visible by default)", () => {
+    const state = baseState({
+      columns: { order: ["title", "team"], visibility: { title: true } },
+    });
+    const payload = selectSavedViewPayload(state, "V");
+    expect(payload.columns).toEqual([
+      { field: "title", visible: true },
+      { field: "team", visible: true },
+    ]);
+  });
+
+  it("emits filter_expression=null when no filter is active", () => {
+    const state = baseState();
+    const payload = selectSavedViewPayload(state, "V");
+    expect(payload.filter_expression).toBe(null);
+  });
+
+  it("emits config.page_size from current pagination size", () => {
+    const state = baseState({ pagination: { page: 3, size: 250 } });
+    const payload = selectSavedViewPayload(state, "V");
+    expect(payload.config).toEqual({ page_size: 250 });
+  });
+
+  it("preserves the provided name verbatim (does not trim or mutate)", () => {
+    const state = baseState();
+    expect(selectSavedViewPayload(state, "  Spaced  ").name).toBe("  Spaced  ");
   });
 });

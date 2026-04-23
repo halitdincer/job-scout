@@ -100,6 +100,21 @@ class TestJobsPage:
         assert b'id="reset-columns"' in response.content
         assert b">Reset<" in response.content
 
+    def test_contains_pagination_bar(self):
+        client = self._authenticated_client()
+        response = client.get("/")
+        assert b'id="pagination-bar"' in response.content
+        assert b'id="page-size-select"' in response.content
+        assert b'id="page-prev"' in response.content
+        assert b'id="page-next"' in response.content
+        assert b'id="page-info"' in response.content
+
+    def test_pagination_size_selector_allowlist(self):
+        client = self._authenticated_client()
+        response = client.get("/")
+        for size in (25, 50, 100, 250):
+            assert f'value="{size}"'.encode() in response.content
+
 
 @pytest.mark.django_db
 class TestSourcesPage:
