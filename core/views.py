@@ -1,7 +1,9 @@
 import json
+import math
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db.models import BooleanField, Exists, Min, OuterRef, Value
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
@@ -12,6 +14,119 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from core.filter_expression import build_filter_q, validate_filter_expression
 from core.ingestion import ingest_sources
 from core.models import JobListing, LocationTag, Run, SavedView, SeenListing, Source
+
+
+SORT_FIELD_TO_DB = {
+    "title": "title",
+    "department": "department",
+    "team": "team",
+    "status": "status",
+    "employment_type": "employment_type",
+    "workplace_type": "workplace_type",
+    "source_name": "source__name",
+    "published_at": "published_at",
+    "first_seen_at": "first_seen_at",
+    "last_seen_at": "last_seen_at",
+    "updated_at_source": "updated_at_source",
+    "expired_at": "expired_at",
+    "country": "__sort_country",
+    "region": "__sort_region",
+    "city": "__sort_city",
+    "seen": "__sort_seen",
+}
+SORT_FIELDS = tuple(SORT_FIELD_TO_DB.keys())
+DEFAULT_SORT = [{"field": "first_seen_at", "dir": "desc"}]
+PAGE_SIZE_ALLOWLIST = (25, 50, 100, 250)
+DEFAULT_PAGE_SIZE = 50
+
+
+class _ParamError(ValueError):
+    """Raised when a query-string parameter is malformed."""
+
+
+def _parse_sort(raw):
+    if raw is None or raw == "":
+        return list(DEFAULT_SORT)
+    sort_specs = []
+    for token in raw.split(","):
+        token = token.strip()
+        if ":" not in token:
+            raise _ParamError(
+                f"Invalid sort token '{token}'. Expected 'field:dir'. "
+                f"Valid fields: {', '.join(SORT_FIELDS)}."
+            )
+        field, _, direction = token.partition(":")
+        field = field.strip()
+        direction = direction.strip().lower()
+        if field not in SORT_FIELD_TO_DB:
+            raise _ParamError(
+                f"Invalid sort field '{field}'. "
+                f"Valid fields: {', '.join(SORT_FIELDS)}."
+            )
+        if direction not in ("asc", "desc"):
+            raise _ParamError(
+                f"Invalid sort direction '{direction}' for field '{field}'. "
+                f"Must be 'asc' or 'desc'."
+            )
+        sort_specs.append({"field": field, "dir": direction})
+    return sort_specs
+
+
+def _parse_page_size(raw):
+    if raw is None or raw == "":
+        return DEFAULT_PAGE_SIZE
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise _ParamError(f"page_size must be an integer: {exc}") from exc
+    if value not in PAGE_SIZE_ALLOWLIST:
+        raise _ParamError(
+            f"page_size must be one of {list(PAGE_SIZE_ALLOWLIST)}; got {value}."
+        )
+    return value
+
+
+def _parse_page(raw):
+    if raw is None or raw == "":
+        return 1
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise _ParamError(f"page must be an integer: {exc}") from exc
+    if value < 1:
+        raise _ParamError(f"page must be >= 1; got {value}.")
+    return value
+
+
+def _sort_annotations(user, fields):
+    annots = {}
+    if "country" in fields:
+        annots["__sort_country"] = Min("locations__country_code")
+    if "region" in fields:
+        annots["__sort_region"] = Min("locations__region_code")
+    if "city" in fields:
+        annots["__sort_city"] = Min("locations__city")
+    if "seen" in fields:
+        if user.is_authenticated:
+            annots["__sort_seen"] = Exists(
+                SeenListing.objects.filter(user=user, listing=OuterRef("pk"))
+            )
+        else:
+            annots["__sort_seen"] = Value(False, output_field=BooleanField())
+    return annots
+
+
+def _apply_sort(qs, sort_specs, user):
+    fields_used = {s["field"] for s in sort_specs}
+    annots = _sort_annotations(user, fields_used)
+    if annots:
+        qs = qs.annotate(**annots)
+    order_by = []
+    for spec in sort_specs:
+        db_col = SORT_FIELD_TO_DB[spec["field"]]
+        order_by.append(f"-{db_col}" if spec["dir"] == "desc" else db_col)
+    order_by.append("id")  # stable tiebreaker for pagination
+    return qs.order_by(*order_by)
 
 
 @login_required
@@ -65,8 +180,38 @@ def list_jobs(request):
         except (json.JSONDecodeError, ValueError) as exc:
             return JsonResponse({"error": f"Invalid filter: {exc}"}, status=400)
 
+    try:
+        sort_specs = _parse_sort(request.GET.get("sort"))
+        page_size = _parse_page_size(request.GET.get("page_size"))
+        page = _parse_page(request.GET.get("page"))
+    except _ParamError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
     qs = qs.prefetch_related("locations").distinct()
-    listings = list(qs)
+    qs = _apply_sort(qs, sort_specs, request.user)
+
+    count = qs.count()
+    total_pages = math.ceil(count / page_size) if count else 0
+
+    if count == 0:
+        if page != 1:
+            return JsonResponse(
+                {"error": f"page {page} is out of range (no results)."},
+                status=400,
+            )
+    elif page > total_pages:
+        return JsonResponse(
+            {
+                "error": (
+                    f"page {page} is out of range; total_pages is {total_pages}."
+                )
+            },
+            status=400,
+        )
+
+    offset = (page - 1) * page_size
+    listings = list(qs[offset : offset + page_size])
+
     seen_listing_ids = set()
     if request.user.is_authenticated:
         listing_ids = [listing.id for listing in listings]
@@ -78,7 +223,7 @@ def list_jobs(request):
                 ).values_list("listing_id", flat=True)
             )
 
-    data = []
+    results = []
     for listing in listings:
         tags = listing.locations.all()
         locations = [
@@ -100,7 +245,7 @@ def list_jobs(request):
         cities = sorted(
             {tag.city for tag in tags if tag.city}
         )
-        data.append({
+        results.append({
             "id": listing.id,
             "source_id": listing.source_id,
             "source_name": listing.source.name,
@@ -123,7 +268,17 @@ def list_jobs(request):
             "last_seen_at": listing.last_seen_at.isoformat(),
             "seen": listing.id in seen_listing_ids,
         })
-    return JsonResponse(data, safe=False)
+
+    return JsonResponse(
+        {
+            "results": results,
+            "count": count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "sort": sort_specs,
+        }
+    )
 
 
 @csrf_exempt

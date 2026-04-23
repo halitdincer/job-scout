@@ -79,7 +79,7 @@ class TestJobsAPI:
         client = Client()
         response = client.get("/api/jobs/")
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         assert len(data) == 2
         assert "source_name" in data[0]
         assert "source_id" in data[0]
@@ -89,7 +89,7 @@ class TestJobsAPI:
         self._create_source_with_listings()
         client = Client()
         response = client.get("/api/jobs/")
-        data = response.json()
+        data = response.json()["results"]
         engineer = next(j for j in data if j["title"] == "Engineer")
         assert engineer["locations"] == [
             {
@@ -129,7 +129,7 @@ class TestJobsAPI:
         listing.locations.add(tag1, tag2)
         client = Client()
         response = client.get("/api/jobs/")
-        data = response.json()
+        data = response.json()["results"]
         job = next(j for j in data if j["title"] == "Multi-loc")
         assert job["country"] == ["CA"]
         assert job["region"] == ["CA-BC", "CA-ON"]
@@ -149,7 +149,7 @@ class TestJobsAPI:
         listing.locations.add(tag)
         client = Client()
         response = client.get("/api/jobs/")
-        data = response.json()
+        data = response.json()["results"]
         job = next(j for j in data if j["title"] == "No-geo")
         assert job["country"] == []
         assert job["region"] == []
@@ -169,7 +169,7 @@ class TestJobsAPI:
         client = Client()
         response = client.get(f"/api/jobs/?source_id={source.pk}")
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         assert len(data) == 2
         assert all(j["source_id"] == source.pk for j in data)
 
@@ -178,7 +178,7 @@ class TestJobsAPI:
         client = Client()
         response = client.get("/api/jobs/?status=active")
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         assert len(data) == 1
         assert data[0]["status"] == "active"
 
@@ -223,7 +223,7 @@ class TestJobsAPI:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         assert [row["title"] for row in data] == ["Software Engineer"]
 
     def test_filter_expression_allows_multiple_predicates_same_field(self):
@@ -264,7 +264,7 @@ class TestJobsAPI:
         response = client.get("/api/jobs/", {"filter": json.dumps(expression)})
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         assert [row["title"] for row in data] == ["Software Engineer"]
 
     def test_filter_expression_supports_array_inclusion(self):
@@ -300,7 +300,7 @@ class TestJobsAPI:
         response = client.get("/api/jobs/", {"filter": json.dumps(expression)})
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         assert [row["title"] for row in data] == ["US Job"]
 
     def test_filter_expression_can_combine_with_legacy_quick_filters(self):
@@ -335,7 +335,7 @@ class TestJobsAPI:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         assert len(data) == 1
         assert data[0]["status"] == "active"
 
@@ -355,7 +355,7 @@ class TestJobsAPI:
         response = client.get("/api/jobs/")
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         assert all(job["seen"] is False for job in data)
 
     def test_list_jobs_includes_seen_status_for_authenticated_user(self):
@@ -380,7 +380,7 @@ class TestJobsAPI:
         response = client.get("/api/jobs/")
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["results"]
         data_by_id = {job["id"]: job for job in data}
         assert data_by_id[seen_listing.id]["seen"] is True
         assert data_by_id[unseen_listing.id]["seen"] is False
