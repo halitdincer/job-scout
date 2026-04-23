@@ -2,7 +2,6 @@
  * Derived reads over the store state. Kept pure so they can be composed
  * freely by renderers without hitting reducer edge cases.
  */
-import { rulesToExpression } from "./filterExpression.js";
 import { DEFAULT_SORT, OPERATOR_LABELS, FILTER_FIELD_DEFS } from "./constants.js";
 
 export function selectExpressionForServer(state) {
@@ -65,11 +64,6 @@ export function selectFilterSummary(state) {
 }
 
 /**
- * Build the predicates array used by the "pills" renderer. Mirrors the
- * historical UX: pills represent AND-of-predicates. Non-renderable
- * expressions return []. Predicate order follows rule order.
- */
-/**
  * Build the JSON body for POST/PUT `/api/views/`. Shape must match the
  * server-side validators in `core/views.py::_validate_saved_view_*`:
  *   - sort: [{ field, dir }]  (never the legacy { column, dir } shape)
@@ -87,16 +81,6 @@ export function selectSavedViewPayload(state, name) {
     sort: state.sort.map((s) => ({ field: s.field, dir: s.dir })),
     config: { page_size: state.pagination.size },
   };
-}
-
-export function selectFilterPills(state) {
-  if (!state.filter.renderable) return [];
-  const expr = rulesToExpression(state.filter.rules);
-  if (!expr) return [];
-  if (expr.op === "and" && Array.isArray(expr.children)) {
-    return expr.children.filter((c) => !c.op);
-  }
-  return [expr];
 }
 
 function deepEqual(a, b) {

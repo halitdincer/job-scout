@@ -362,83 +362,25 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
   margin: 4px 0;
 }
 
-/* ── Filter pills ──────────────────────────────────────────── */
-.filter-pills-bar {
+/* ── Columns & Filters section toggle ─────────────────────── */
+.col-section-toggle {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
   align-items: center;
-  min-height: 0;
-  flex-shrink: 0;
-  padding-bottom: 4px;
-}
-
-.filter-pills-bar:empty {
-  padding-bottom: 0;
-}
-
-.filter-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--accent-dim);
-  color: var(--text);
-  font-size: 12px;
-  padding: 3px 6px 3px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.filter-pill-close {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1;
+  gap: 8px;
+  flex: 1;
   cursor: pointer;
-  padding: 0 2px;
-  border-radius: 50%;
-  transition: color 0.15s;
+  user-select: none;
 }
 
-.filter-pill-close:hover {
+.col-section-toggle input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.col-section-toggle-label {
+  font-size: 13px;
   color: var(--text);
-}
-
-.filter-pills-more {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 11px;
   font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 3px 8px;
-  border-radius: 999px;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.filter-pills-more:hover {
-  color: var(--text);
-  border-color: var(--text-secondary);
-}
-
-.filter-pills-clear {
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 3px 6px;
-  transition: color 0.15s;
-}
-
-.filter-pills-clear:hover {
-  color: var(--text);
 }
 
 /* ── Dialogs ───────────────────────────────────────────────── */
@@ -532,17 +474,6 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
 
 .dialog-danger:hover {
   background: #f43f5e;
-}
-
-/* ── Columns panel footer ──────────────────────────────────── */
-.columns-panel-footer {
-  position: sticky;
-  bottom: 0;
-  background: linear-gradient(180deg, transparent, var(--bg-surface) 40%);
-  padding-top: 1rem;
-  margin-top: 0.75rem;
-  display: flex;
-  gap: 6px;
 }
 
 /* ── Toolbar buttons ────────────────────────────────────────── */
@@ -642,25 +573,6 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
   color: var(--text-dim);
   margin-bottom: 1rem;
 }
-
-/* ── Columns panel ──────────────────────────────────────────── */
-.columns-panel-list {
-  display: grid;
-  gap: 2px;
-}
-
-.columns-panel-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  padding: 7px 6px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.columns-panel-item:hover { background: var(--bg-hover); }
 
 /* ── Filter sections ────────────────────────────────────────── */
 .column-filter-sections {
@@ -793,51 +705,6 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
 }
 
 .panel-primary-btn:hover { background: var(--accent-hover); }
-
-/* ── Column header filter icon ──────────────────────────────── */
-.col-header-with-filter {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-}
-
-.col-filter-icon {
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  font-size: 8px;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  transition: color 0.15s;
-}
-
-.col-filter-icon:hover {
-  color: var(--text);
-  background: var(--bg);
-}
-
-/* ── Column filter popover ──────────────────────────────────── */
-.col-filter-popover {
-  position: fixed;
-  z-index: 300;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  padding: 12px;
-  min-width: 260px;
-  max-width: 340px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-}
-
-.popover-heading {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text);
-}
 
 /* ── Tabulator grid ─────────────────────────────────────────── */
 #jobs-grid {
@@ -1106,10 +973,6 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
     right: 0;
   }
 
-  .filter-pills-bar {
-    gap: 4px;
-  }
-
   .side-panel {
     top: 0;
     width: 100vw;
@@ -1117,12 +980,6 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
     height: 100dvh;
     border-left: none;
     padding: 1rem;
-  }
-
-  .col-filter-popover {
-    left: 8px !important;
-    right: 8px;
-    max-width: none;
   }
 
   .filter-rule-top {

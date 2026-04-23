@@ -18,12 +18,12 @@ import {
   OPERATOR_LABELS,
   FILTER_FIELD_DEFS,
   FIELD_ORDER,
+  COLUMN_TO_FILTER,
   EMPTY_SENTINEL,
   DATE_RANGE_PRESETS,
 } from "./constants.js";
 import {
   selectDisplayTotalPages,
-  selectFilterPills,
   selectIsDirty,
   selectSavedViewPayload,
 } from "./selectors.js";
@@ -385,7 +385,7 @@ const dateFilterParams = { values: DATE_RANGE_PRESETS, clearable: true };
 
 const COLUMN_DEFS = [
   { title: "Company", field: "source_name", headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: false }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: false }, minWidth: 120, widthGrow: 1 },
-  { title: "Title", field: "title", formatter: titleFormatter, formatterParams: { allowHtml: true }, minWidth: 250, widthGrow: 3 },
+  { title: "Title", field: "title", formatter: titleFormatter, formatterParams: { allowHtml: true }, headerFilter: "input", headerFilterLiveFilter: false, minWidth: 250, widthGrow: 3 },
   { title: "Country", field: "country", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 80 },
   { title: "City", field: "city", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 100 },
   { title: "Published At", field: "published_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120 },
@@ -477,6 +477,15 @@ function headerFilterToPredicates(headerField, headerValue) {
       if (!normalized) return [];
       return [{ field, operator: "in_last_days", value: normalized }];
     }
+    // Plain text header (e.g. Title): emit a `contains` rule.
+    if (def.type === "text") {
+      const val =
+        typeof headerValue === "string"
+          ? headerValue.trim()
+          : (headerValue || "").toString().trim();
+      if (!val) return [];
+      return [{ field, operator: "contains", value: val }];
+    }
     const vals = normalizeMultiSelectValue(headerValue);
     const hasEmpty = vals.indexOf(EMPTY_SENTINEL) !== -1;
     const realVals = vals
@@ -500,15 +509,10 @@ function headerFilterToPredicates(headerField, headerValue) {
 
 export function initJobsPage() {
   // DOM references
-  const summaryNode = document.getElementById("advanced-filter-summary");
   const columnFilterSections = document.getElementById("column-filter-sections");
-  const columnsPanelList = document.getElementById("columns-panel-list");
   const panelBackdrop = document.getElementById("panel-backdrop");
-  const openColumnsPanelBtn = document.getElementById("open-columns-panel");
   const openFiltersPanelBtn = document.getElementById("open-filters-panel");
-  const columnsSidePanel = document.getElementById("columns-side-panel");
   const filtersPanel = document.getElementById("filters-panel");
-  const popoverEl = document.getElementById("col-filter-popover");
   const viewsSelect = document.getElementById("views-select");
   const viewModifiedBadge = document.getElementById("view-modified");
   const saveTrigger = document.getElementById("save-trigger");
@@ -537,8 +541,6 @@ export function initJobsPage() {
   // Savedviews list lives outside the store because it's not UI state — it's
   // remote data consumed by the view selector renderer.
   let savedViews = [];
-  let filterPillsExpanded = false;
-  const PILL_COLLAPSE_LIMIT = 3;
 
   // Tabulator instance (created below, used by renderers).
   // Server owns pagination and sort — Tabulator is a presentation-only grid.
@@ -593,89 +595,6 @@ export function initJobsPage() {
   // Renderers (read from store state, write to DOM)
   // -------------------------------------------------------------------------
 
-  function renderFilterPills() {
-    const state = store.getState();
-    summaryNode.innerHTML = "";
-    if (!state.filter.renderable) {
-      const hint = document.createElement("span");
-      hint.className = "filter-pill-custom";
-      hint.textContent = "Custom filter (open panel to edit)";
-      summaryNode.appendChild(hint);
-      renderFiltersBadge();
-      return;
-    }
-    const predicates = selectFilterPills(state);
-    if (!predicates.length) {
-      filterPillsExpanded = false;
-      renderFiltersBadge();
-      return;
-    }
-    const shouldCollapse =
-      predicates.length > PILL_COLLAPSE_LIMIT && !filterPillsExpanded;
-    const visiblePreds = shouldCollapse
-      ? predicates.slice(0, PILL_COLLAPSE_LIMIT)
-      : predicates;
-
-    visiblePreds.forEach((pred) => {
-      const pill = document.createElement("span");
-      pill.className = "filter-pill";
-      const fieldLabel = FILTER_FIELD_DEFS[pred.field]
-        ? FILTER_FIELD_DEFS[pred.field].label
-        : pred.field;
-      const opLabel = OPERATOR_LABELS[pred.operator] || pred.operator;
-      let text = `${fieldLabel} ${opLabel}`;
-      if (
-        pred.value !== undefined &&
-        pred.operator !== "is_empty" &&
-        pred.operator !== "is_not_empty"
-      ) {
-        text += ` ${Array.isArray(pred.value) ? pred.value.join(", ") : pred.value}`;
-      }
-      pill.appendChild(document.createTextNode(text));
-      const close = document.createElement("button");
-      close.type = "button";
-      close.className = "filter-pill-close";
-      close.textContent = "\u00d7";
-      close.addEventListener("click", () => {
-        removePillByPredicate(pred);
-      });
-      pill.appendChild(close);
-      summaryNode.appendChild(pill);
-    });
-
-    if (shouldCollapse) {
-      const moreBtn = document.createElement("button");
-      moreBtn.type = "button";
-      moreBtn.className = "filter-pills-more";
-      moreBtn.textContent = `+${predicates.length - PILL_COLLAPSE_LIMIT} more`;
-      moreBtn.addEventListener("click", () => {
-        filterPillsExpanded = true;
-        renderFilterPills();
-      });
-      summaryNode.appendChild(moreBtn);
-    } else if (predicates.length > PILL_COLLAPSE_LIMIT) {
-      const lessBtn = document.createElement("button");
-      lessBtn.type = "button";
-      lessBtn.className = "filter-pills-more";
-      lessBtn.textContent = "Show less";
-      lessBtn.addEventListener("click", () => {
-        filterPillsExpanded = false;
-        renderFilterPills();
-      });
-      summaryNode.appendChild(lessBtn);
-    }
-
-    if (predicates.length > 1) {
-      const clearBtn = document.createElement("button");
-      clearBtn.type = "button";
-      clearBtn.className = "filter-pills-clear";
-      clearBtn.textContent = "Clear all";
-      clearBtn.addEventListener("click", clearAllFilters);
-      summaryNode.appendChild(clearBtn);
-    }
-    renderFiltersBadge();
-  }
-
   function renderFiltersBadge() {
     const count = store.getState().filter.rules.length;
     const existing = openFiltersPanelBtn.querySelector(".toolbar-badge");
@@ -685,19 +604,6 @@ export function initJobsPage() {
       badge.className = "toolbar-badge";
       badge.textContent = String(count);
       openFiltersPanelBtn.appendChild(badge);
-    }
-  }
-
-  function renderColumnsBadge() {
-    const { visibility } = store.getState().columns;
-    const hidden = Object.keys(visibility).filter((k) => !visibility[k]).length;
-    const existing = openColumnsPanelBtn.querySelector(".toolbar-badge");
-    if (existing) existing.remove();
-    if (hidden > 0) {
-      const badge = document.createElement("span");
-      badge.className = "toolbar-badge";
-      badge.textContent = String(hidden);
-      openColumnsPanelBtn.appendChild(badge);
     }
   }
 
@@ -778,118 +684,100 @@ export function initJobsPage() {
     container.appendChild(row);
   }
 
+  /**
+   * Render the merged "Columns & Filters" panel. Each row represents one
+   * grid column, in the user's current column order. Every row carries:
+   *   - a visibility checkbox (left-most)
+   *   - the column label + a rule-count badge if rules exist
+   *   - rule controls on the body, but only for columns that map to a
+   *     filter field in FILTER_FIELD_DEFS (non-filterable columns show
+   *     only the toggle).
+   *
+   * Invariants enforced here:
+   *   - Adding / editing a rule for a hidden column flips visibility on
+   *     first, so the user always sees the column a rule targets.
+   *   - Un-checking visibility for a column that currently holds rules
+   *     removes those rules first, commits, then hides the column, so we
+   *     never persist a filter the user can't see.
+   */
   function renderColumnFilterSections() {
     columnFilterSections.innerHTML = "";
-    FIELD_ORDER.forEach((field) => {
-      const fieldRules = rulesForField(field);
+    const state = store.getState();
+    state.columns.order.forEach((columnField) => {
+      const colDef = COLUMN_DEFS.find((c) => c.field === columnField);
+      if (!colDef) return;
+      const filterField = COLUMN_TO_FILTER[columnField] || null;
+      const fieldRules = filterField ? rulesForField(filterField) : [];
+      const visible = state.columns.visibility[columnField] !== false;
+
       const section = document.createElement("div");
       section.className = "col-filter-section";
-      section.setAttribute("data-filter-section", field);
+      section.setAttribute("data-filter-section", columnField);
 
       const header = document.createElement("div");
       header.className = "col-filter-section-header";
-      const label = document.createElement("span");
-      label.className = "col-filter-section-label";
-      label.textContent = FILTER_FIELD_DEFS[field].label;
+
+      const toggleLabel = document.createElement("label");
+      toggleLabel.className = "col-section-toggle";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = visible;
+      cb.addEventListener("change", () => {
+        // If hiding a column with active rules, clear them first.
+        if (!cb.checked && filterField && fieldRules.length) {
+          fieldRules.forEach((r) => store.dispatch(A.removeRule(r.id)));
+          store.dispatch(A.commitFilter());
+        }
+        store.dispatch(A.toggleColumnVisibility(columnField));
+      });
+      toggleLabel.appendChild(cb);
+      const labelText = document.createElement("span");
+      labelText.className = "col-section-toggle-label";
+      labelText.textContent = colDef.title || columnField;
+      toggleLabel.appendChild(labelText);
       if (fieldRules.length) {
         const badge = document.createElement("span");
         badge.className = "col-filter-count";
         badge.textContent = String(fieldRules.length);
-        label.appendChild(badge);
+        toggleLabel.appendChild(badge);
       }
-      header.appendChild(label);
+      header.appendChild(toggleLabel);
 
-      const addBtn = document.createElement("button");
-      addBtn.type = "button";
-      addBtn.className = "chip-btn";
-      addBtn.textContent = "+ Rule";
-      addBtn.addEventListener("click", () => {
-        store.dispatch(A.addRule(field));
-        renderColumnFilterSections();
-        renderPopoverForField(field);
-      });
-      header.appendChild(addBtn);
+      if (filterField) {
+        const addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "chip-btn";
+        addBtn.textContent = "+ Rule";
+        addBtn.addEventListener("click", () => {
+          // Adding a rule on a hidden column auto-reveals it, per the
+          // "filtered column is always visible" invariant.
+          if (!visible) {
+            store.dispatch(A.toggleColumnVisibility(columnField));
+          }
+          store.dispatch(A.addRule(filterField));
+        });
+        header.appendChild(addBtn);
+      }
+
       section.appendChild(header);
 
-      if (fieldRules.length) {
+      if (filterField && fieldRules.length) {
         const body = document.createElement("div");
         body.className = "col-filter-section-body";
         fieldRules.forEach((rule) => {
           renderRuleRow(rule, body, () => {
-            renderColumnFilterSections();
-            renderPopoverForField(rule.field);
+            // Subscriber will re-render; explicit re-render here is a
+            // no-op safety net for synchronous UI feedback before the
+            // dispatched action settles into a state change.
+            if (!visible) {
+              store.dispatch(A.toggleColumnVisibility(columnField));
+            }
           });
         });
         section.appendChild(body);
       }
 
       columnFilterSections.appendChild(section);
-    });
-  }
-
-  function closePopover() {
-    popoverEl.style.display = "none";
-    popoverEl.innerHTML = "";
-    popoverEl.removeAttribute("data-field");
-  }
-
-  function renderPopoverForField(field) {
-    if (popoverEl.getAttribute("data-field") !== field) return;
-    renderPopoverContent(field);
-  }
-
-  function renderPopoverContent(field) {
-    popoverEl.innerHTML = "";
-    const def = FILTER_FIELD_DEFS[field];
-    const heading = document.createElement("div");
-    heading.className = "popover-heading";
-    heading.textContent = `${def.label} Filters`;
-    popoverEl.appendChild(heading);
-
-    const fieldRules = rulesForField(field);
-    if (!fieldRules.length) {
-      const empty = document.createElement("p");
-      empty.className = "filter-empty";
-      empty.textContent = "No rules for this column";
-      popoverEl.appendChild(empty);
-    } else {
-      fieldRules.forEach((rule) => {
-        renderRuleRow(rule, popoverEl, () => {
-          renderPopoverContent(field);
-          renderColumnFilterSections();
-        });
-      });
-    }
-
-    const addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.className = "chip-btn";
-    addBtn.textContent = "+ Add Rule";
-    addBtn.addEventListener("click", () => {
-      store.dispatch(A.addRule(field));
-      renderPopoverContent(field);
-      renderColumnFilterSections();
-    });
-    popoverEl.appendChild(addBtn);
-  }
-
-  function renderColumnsPanel() {
-    columnsPanelList.innerHTML = "";
-    const state = store.getState();
-    state.columns.order.forEach((field) => {
-      const def = COLUMN_DEFS.find((c) => c.field === field);
-      if (!def) return;
-      const label = document.createElement("label");
-      label.className = "columns-panel-item";
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = state.columns.visibility[field] !== false;
-      cb.addEventListener("change", () => {
-        store.dispatch(A.toggleColumnVisibility(field));
-      });
-      label.appendChild(cb);
-      label.appendChild(document.createTextNode(def.title || field));
-      columnsPanelList.appendChild(label);
     });
   }
 
@@ -991,6 +879,15 @@ export function initJobsPage() {
           table.setHeaderFilterValue(def.headerField, value);
           return;
         }
+        // Plain text header (e.g. Title) — only paint `contains` rules;
+        // other operators have no header representation.
+        if (def.type === "text") {
+          if (rule.operator !== "contains") return;
+          const value = (rule.value || "").toString();
+          if (!value) return;
+          table.setHeaderFilterValue(def.headerField, value);
+          return;
+        }
         if (!headerValues[def.headerField]) headerValues[def.headerField] = [];
         if (rule.operator === "is_empty") {
           headerValues[def.headerField].push(EMPTY_SENTINEL);
@@ -1039,7 +936,6 @@ export function initJobsPage() {
 
   function openPanel(panelId) {
     closePanels();
-    closePopover();
     const panel = document.getElementById(panelId);
     panel.classList.add("open");
     panel.setAttribute("aria-hidden", "false");
@@ -1047,42 +943,19 @@ export function initJobsPage() {
   }
 
   function closePanels() {
-    [columnsSidePanel, filtersPanel].forEach((panel) => {
-      panel.classList.remove("open");
-      panel.setAttribute("aria-hidden", "true");
-    });
+    filtersPanel.classList.remove("open");
+    filtersPanel.setAttribute("aria-hidden", "true");
     panelBackdrop.classList.remove("open");
   }
 
   function applyFilters() {
     store.dispatch(A.commitFilter());
-    syncTabulatorHeaderFiltersFromRules();
-    // Fetch effect fires automatically on filter.expression change.
-    renderFilterPills();
+    // Subscriber syncs Tabulator header filters + re-renders panel.
     renderDirtyBadge();
   }
 
   function clearAllFilters() {
     store.dispatch(A.clearRules());
-    syncTabulatorHeaderFiltersFromRules();
-    renderColumnFilterSections();
-    closePopover();
-    renderFilterPills();
-    renderDirtyBadge();
-  }
-
-  function removePillByPredicate(pred) {
-    const rules = store.getState().filter.rules;
-    for (let i = rules.length - 1; i >= 0; i -= 1) {
-      if (rules[i].field === pred.field && rules[i].operator === pred.operator) {
-        store.dispatch(A.removeRule(rules[i].id));
-        break;
-      }
-    }
-    store.dispatch(A.commitFilter());
-    syncTabulatorHeaderFiltersFromRules();
-    renderColumnFilterSections();
-    renderFilterPills();
     renderDirtyBadge();
   }
 
@@ -1098,7 +971,7 @@ export function initJobsPage() {
       activeHeaderFields[f.field] = f.value;
     });
 
-    const headerOps = ["eq", "in", "in_last_days", "is_empty"];
+    const headerOps = ["eq", "in", "in_last_days", "is_empty", "contains"];
     const fieldsWithHeaders = {};
     FIELD_ORDER.forEach((f) => {
       const def = FILTER_FIELD_DEFS[f];
@@ -1108,8 +981,17 @@ export function initJobsPage() {
     Object.keys(fieldsWithHeaders).forEach((headerField) => {
       const filterField = fieldsWithHeaders[headerField];
       let headerValue = activeHeaderFields[headerField];
-      if (FILTER_FIELD_DEFS[filterField].type === "date") {
+      const filterType = FILTER_FIELD_DEFS[filterField].type;
+      if (filterType === "date") {
         headerValue = normalizeDateHeaderValue(headerValue);
+      } else if (filterType === "text") {
+        // Plain text header (Title): pass the raw string through.
+        headerValue =
+          typeof headerValue === "string"
+            ? headerValue
+            : headerValue == null
+            ? ""
+            : String(headerValue);
       } else {
         headerValue = normalizeMultiSelectValue(headerValue);
       }
@@ -1138,10 +1020,19 @@ export function initJobsPage() {
     });
 
     store.dispatch(A.commitFilter());
-    renderFilterPills();
-    if (filtersPanel.classList.contains("open")) {
-      renderColumnFilterSections();
-    }
+    // Ensure any rule-bearing columns become visible, upholding the
+    // "filtered column is always visible" invariant when rules arrive
+    // via Tabulator header interactions.
+    const stateAfter = store.getState();
+    stateAfter.filter.rules.forEach((r) => {
+      // Map rule.field back to column field via FILTER_FIELD_DEFS; if
+      // the filter field isn't a column (shouldn't happen), skip.
+      const def = FILTER_FIELD_DEFS[r.field];
+      if (!def || !def.headerField) return;
+      if (stateAfter.columns.visibility[def.headerField] === false) {
+        store.dispatch(A.toggleColumnVisibility(def.headerField));
+      }
+    });
     renderDirtyBadge();
   }
 
@@ -1152,20 +1043,31 @@ export function initJobsPage() {
   function applyView(view) {
     // Load into store — this takes its own snapshot.
     store.dispatch(A.loadView(view));
+    // Reconcile: if a saved view persisted a rule for a column that was
+    // also persisted as hidden, force that column visible so the user
+    // can always see which filter is in effect. Must happen before we
+    // sync Tabulator.
+    const loaded = store.getState();
+    const fieldsToReveal = new Set();
+    loaded.filter.rules.forEach((rule) => {
+      const def = FILTER_FIELD_DEFS[rule.field];
+      if (def && def.headerField) fieldsToReveal.add(def.headerField);
+    });
+    fieldsToReveal.forEach((columnField) => {
+      if (loaded.columns.visibility[columnField] === false) {
+        store.dispatch(A.toggleColumnVisibility(columnField));
+      }
+    });
     // Update persisted column order to match the view.
     const state = store.getState();
     localStorage.setItem(
       COLUMN_ORDER_KEY,
       JSON.stringify(state.columns.order)
     );
-    // Write Tabulator state from store.
+    // Write Tabulator columns + sort from store. Header filters + panel
+    // re-render via the filter/column subscriber.
     syncTabulatorColumnsFromState();
     syncTabulatorSortFromState();
-    syncTabulatorHeaderFiltersFromRules();
-    renderColumnFilterSections();
-    renderColumnsPanel();
-    renderColumnsBadge();
-    renderFilterPills();
     renderViewsSelect();
     renderDirtyBadge();
   }
@@ -1179,12 +1081,7 @@ export function initJobsPage() {
   // DOM event wiring
   // -------------------------------------------------------------------------
 
-  openColumnsPanelBtn.addEventListener("click", () => {
-    renderColumnsPanel();
-    openPanel("columns-side-panel");
-  });
   openFiltersPanelBtn.addEventListener("click", () => {
-    renderColumnFilterSections();
     openPanel("filters-panel");
   });
   document.getElementById("reset-columns").addEventListener("click", () => {
@@ -1193,13 +1090,10 @@ export function initJobsPage() {
     );
     localStorage.removeItem(COLUMN_ORDER_KEY);
     syncTabulatorColumnsFromState();
-    renderColumnsPanel();
-    renderColumnsBadge();
     renderDirtyBadge();
   });
   panelBackdrop.addEventListener("click", () => {
     closePanels();
-    closePopover();
   });
   document.querySelectorAll("[data-close-panel]").forEach((btn) => {
     btn.addEventListener("click", closePanels);
@@ -1207,16 +1101,6 @@ export function initJobsPage() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closePanels();
-      closePopover();
-    }
-  });
-  document.addEventListener("click", (e) => {
-    if (
-      popoverEl.style.display !== "none" &&
-      !popoverEl.contains(e.target) &&
-      !e.target.classList.contains("col-filter-icon")
-    ) {
-      closePopover();
     }
   });
 
@@ -1255,7 +1139,6 @@ export function initJobsPage() {
     if (currentVisibility !== visible) {
       store.dispatch(A.toggleColumnVisibility(field));
     }
-    renderColumnsBadge();
     renderDirtyBadge();
   });
 
@@ -1443,13 +1326,42 @@ export function initJobsPage() {
     renderDirtyBadge();
   });
 
+  // Reactive subscriber for filter + column state. Keeps the merged
+  // "Columns & Filters" panel, the toolbar badge, and the Tabulator
+  // header filter inputs in sync with the store. Eliminates the
+  // class of bug where a dispatch path forgot to invoke one of the
+  // imperative renderers and the UI drifted out of sync.
+  let lastExpr = store.getState().filter.expression;
+  let lastRules = store.getState().filter.rules;
+  let lastRenderable = store.getState().filter.renderable;
+  let lastVis = store.getState().columns.visibility;
+  let lastOrder = store.getState().columns.order;
+  store.subscribe(() => {
+    const s = store.getState();
+    if (
+      s.filter.expression !== lastExpr ||
+      s.filter.rules !== lastRules ||
+      s.filter.renderable !== lastRenderable ||
+      s.columns.visibility !== lastVis ||
+      s.columns.order !== lastOrder
+    ) {
+      lastExpr = s.filter.expression;
+      lastRules = s.filter.rules;
+      lastRenderable = s.filter.renderable;
+      lastVis = s.columns.visibility;
+      lastOrder = s.columns.order;
+      renderColumnFilterSections();
+      renderFiltersBadge();
+      syncTabulatorHeaderFiltersFromRules();
+    }
+  });
+
   // -------------------------------------------------------------------------
   // Initial paint
   // -------------------------------------------------------------------------
 
   renderColumnFilterSections();
-  renderFilterPills();
-  renderColumnsBadge();
+  renderFiltersBadge();
   renderPaginationBar();
   fetchEffect.triggerNow();
   fetchViews();

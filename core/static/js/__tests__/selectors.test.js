@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   selectDisplayTotalPages,
   selectExpressionForServer,
-  selectFilterPills,
   selectFilterRulesRenderable,
   selectFilterSummary,
   selectIsDirty,
   selectSavedViewPayload,
   selectSortQueryParam,
 } from "../selectors.js";
+import { COLUMN_TO_FILTER, FILTER_FIELD_DEFS } from "../constants.js";
 import { resetRuleIdSequenceForTesting } from "../filterExpression.js";
 
 beforeEach(() => {
@@ -425,51 +425,29 @@ describe("selectFilterSummary", () => {
   });
 });
 
-describe("selectFilterPills", () => {
-  it("returns [] when non-renderable", () => {
-    expect(
-      selectFilterPills(
-        baseState({
-          filter: { expression: null, rules: [], renderable: false },
-        })
-      )
-    ).toEqual([]);
-  });
-
-  it("returns [] when no rules", () => {
-    expect(selectFilterPills(baseState())).toEqual([]);
-  });
-
-  it("returns single predicate for one rule", () => {
-    const state = baseState({
-      filter: {
-        expression: null,
-        renderable: true,
-        rules: [
-          { id: "r1", field: "title", operator: "contains", value: "x" },
-        ],
-      },
+describe("COLUMN_TO_FILTER", () => {
+  // COLUMN_TO_FILTER is the reverse lookup used by the merged Columns &
+  // Filters panel to resolve which filter-field a grid column maps to.
+  // Every entry must mirror a FILTER_FIELD_DEFS[filterField].headerField
+  // value, and non-filterable columns (which have no headerField) must
+  // have no entry.
+  it("maps every headerField to its logical filter field", () => {
+    Object.keys(FILTER_FIELD_DEFS).forEach((filterField) => {
+      const def = FILTER_FIELD_DEFS[filterField];
+      if (def.headerField) {
+        expect(COLUMN_TO_FILTER[def.headerField]).toBe(filterField);
+      }
     });
-    expect(selectFilterPills(state)).toEqual([
-      { field: "title", operator: "contains", value: "x" },
-    ]);
   });
 
-  it("returns AND children (predicates only) for multiple rules", () => {
-    const state = baseState({
-      filter: {
-        expression: null,
-        renderable: true,
-        rules: [
-          { id: "r1", field: "title", operator: "contains", value: "x" },
-          { id: "r2", field: "status", operator: "eq", value: "active" },
-        ],
-      },
-    });
-    expect(selectFilterPills(state)).toEqual([
-      { field: "title", operator: "contains", value: "x" },
-      { field: "status", operator: "eq", value: "active" },
-    ]);
+  it("omits filter fields that have no headerField (e.g. department/team)", () => {
+    // department + team are intentionally not header-filterable.
+    expect(COLUMN_TO_FILTER.department).toBeUndefined();
+    expect(COLUMN_TO_FILTER.team).toBeUndefined();
+  });
+
+  it("includes title — added when the Title header filter was introduced", () => {
+    expect(COLUMN_TO_FILTER.title).toBe("title");
   });
 });
 

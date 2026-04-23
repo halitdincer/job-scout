@@ -56,24 +56,35 @@ class TestJobsPage:
         response = client.get("/")
         assert b'class="full-bleed"' in response.content
 
-    def test_contains_filters_panel_controls(self):
+    def test_contains_merged_columns_and_filters_panel(self):
         client = self._authenticated_client()
         response = client.get("/")
+        # The old Columns panel and pill summary bar were merged into a
+        # single "Columns & Filters" side panel on the filter refactor.
         assert b'id="open-filters-panel"' in response.content
         assert b'id="filters-panel"' in response.content
-        assert b'id="advanced-filter-summary"' in response.content
+        assert b"Columns &amp; Filters" in response.content
 
     def test_contains_per_column_filter_sections(self):
         client = self._authenticated_client()
         response = client.get("/")
         assert b'id="column-filter-sections"' in response.content
-        assert b"Per-column filter rules" in response.content
+        assert b"Toggle visibility and set per-column filter rules" in response.content
 
-    def test_contains_columns_side_panel_controls(self):
+    def test_does_not_render_legacy_columns_panel(self):
         client = self._authenticated_client()
         response = client.get("/")
-        assert b'id="open-columns-panel"' in response.content
-        assert b'id="columns-side-panel"' in response.content
+        # The dedicated Columns side panel was removed — everything now
+        # lives in #filters-panel.
+        assert b'id="open-columns-panel"' not in response.content
+        assert b'id="columns-side-panel"' not in response.content
+
+    def test_does_not_render_filter_pills_summary(self):
+        client = self._authenticated_client()
+        response = client.get("/")
+        # Pills were replaced by inline header filter inputs + the
+        # merged panel; the old summary bar must be gone.
+        assert b'id="advanced-filter-summary"' not in response.content
 
     def test_does_not_render_legacy_column_dropdown(self):
         client = self._authenticated_client()
@@ -89,14 +100,16 @@ class TestJobsPage:
         assert b"Add Group" not in response.content
         assert b"Advanced Logic" not in response.content
 
-    def test_contains_column_filter_popover_element(self):
+    def test_does_not_contain_legacy_column_filter_popover(self):
         client = self._authenticated_client()
         response = client.get("/")
-        assert b'id="col-filter-popover"' in response.content
+        # Popover element was dead code and was removed.
+        assert b'id="col-filter-popover"' not in response.content
 
     def test_contains_reset_columns_button(self):
         client = self._authenticated_client()
         response = client.get("/")
+        # Reset button now lives inside the merged Columns & Filters panel.
         assert b'id="reset-columns"' in response.content
         assert b">Reset<" in response.content
 

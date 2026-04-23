@@ -40,7 +40,7 @@ export const FILTER_FIELD_DEFS = {
     label: "Title",
     type: "text",
     operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"],
-    headerField: null,
+    headerField: "title",
   },
   source_name: {
     label: "Company",
@@ -129,6 +129,22 @@ export const FILTER_FIELD_DEFS = {
 };
 
 export const FIELD_ORDER = Object.keys(FILTER_FIELD_DEFS);
+
+/**
+ * Maps a Tabulator column `field` (the key used in grid column defs) to the
+ * logical filter field in `FILTER_FIELD_DEFS`. Derived from each filter
+ * field's `headerField`. Non-filterable columns simply have no entry.
+ * Used by the merged "Columns & Filters" panel to look up rule defs for a
+ * column row.
+ */
+export const COLUMN_TO_FILTER = (() => {
+  const out = {};
+  FIELD_ORDER.forEach((filterField) => {
+    const def = FILTER_FIELD_DEFS[filterField];
+    if (def.headerField) out[def.headerField] = filterField;
+  });
+  return out;
+})();
 
 export const EMPTY_SENTINEL = "__EMPTY__";
 

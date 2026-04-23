@@ -108,4 +108,46 @@ test.describe("Jobs saved views", () => {
     await waitForRows(page);
     await expect(page.locator("#view-modified")).toBeHidden();
   });
+
+  test("loading a view with a Title filter populates the Title header input", async ({
+    page,
+  }) => {
+    const viewName = `title view ${Date.now()}`;
+
+    // Apply a Title contains rule via the merged Columns & Filters panel.
+    await page.locator("#open-filters-panel").click();
+    const titleSection = page.locator('[data-filter-section="title"]');
+    await titleSection.locator("button", { hasText: "+ Rule" }).click();
+    await titleSection
+      .locator(".filter-rule-value input")
+      .first()
+      .fill("Listing 001");
+
+    const apply = page.waitForResponse((r) =>
+      r.url().includes("/api/jobs/") && r.url().includes("filter=")
+    );
+    await page.locator("#apply-filters").click();
+    await apply;
+
+    // Save it.
+    await page.locator("#save-trigger").click();
+    await page.locator("#save-as-new").click();
+    await page.locator("#save-dialog-name").fill(viewName);
+    await page.locator("#save-dialog button[type='submit']").click();
+    await expect(page.locator("#view-modified")).toBeHidden();
+
+    // Hard reload + load the view from the dropdown. The Title header
+    // filter input should reflect the persisted rule value — this is
+    // the regression the filter refactor was intended to fix, where
+    // the header input would drift out of sync with store state.
+    await page.reload();
+    await waitForRows(page);
+    await page.locator("#views-select").selectOption({ label: viewName });
+
+    await expect(
+      page.locator(
+        '.tabulator-col[tabulator-field="title"] .tabulator-header-filter input'
+      )
+    ).toHaveValue("Listing 001");
+  });
 });

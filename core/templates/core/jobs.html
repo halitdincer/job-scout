@@ -7,8 +7,7 @@
 
 {% block content %}
 <div class="jobs-toolbar">
-  <button class="toolbar-btn" id="open-columns-panel">Columns</button>
-  <button class="toolbar-btn" id="open-filters-panel">Filters</button>
+  <button class="toolbar-btn" id="open-filters-panel">Columns &amp; Filters</button>
   <div class="toolbar-spacer"></div>
   <select id="views-select" class="views-select views-placeholder">
     <option value="">Select a view...</option>
@@ -24,7 +23,6 @@
     </div>
   </div>
 </div>
-<div id="advanced-filter-summary" class="filter-pills-bar"></div>
 
 <div id="jobs-grid"></div>
 
@@ -47,34 +45,21 @@
 
 <div id="panel-backdrop" class="panel-backdrop"></div>
 
-<aside id="columns-side-panel" class="side-panel" aria-hidden="true">
-  <div class="side-panel-header">
-    <h2>Columns</h2>
-    <button type="button" class="panel-close" data-close-panel="columns-side-panel">x</button>
-  </div>
-  <p class="side-panel-subtitle">Show or hide columns.</p>
-  <div id="columns-panel-list" class="columns-panel-list"></div>
-  <div class="columns-panel-footer">
-    <button type="button" id="reset-columns" class="chip-btn">Reset</button>
-  </div>
-</aside>
-
 <aside id="filters-panel" class="side-panel" aria-hidden="true">
   <div class="side-panel-header">
-    <h2>Filters</h2>
+    <h2>Columns &amp; Filters</h2>
     <button type="button" class="panel-close" data-close-panel="filters-panel">x</button>
   </div>
-  <p class="side-panel-subtitle">Per-column filter rules. All rules combine with AND.</p>
+  <p class="side-panel-subtitle">Toggle visibility and set per-column filter rules.</p>
 
   <div id="column-filter-sections" class="column-filter-sections"></div>
 
   <div class="filter-panel-actions">
-    <button type="button" id="clear-all-filters" class="col-chooser-btn">Clear All</button>
+    <button type="button" id="reset-columns" class="col-chooser-btn">Reset</button>
+    <button type="button" id="clear-all-filters" class="col-chooser-btn">Clear Filters</button>
     <button type="button" id="apply-filters" class="panel-primary-btn">Apply</button>
   </div>
 </aside>
-
-<div id="col-filter-popover" class="col-filter-popover" style="display:none;"></div>
 
 <dialog id="save-dialog" class="view-dialog">
   <form method="dialog">
