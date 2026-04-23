@@ -30,3 +30,9 @@ media/
 # Node / Vitest
 node_modules/
 coverage/
+
+# Playwright
+/e2e.sqlite3
+/playwright-report/
+/test-results/
+/.playwright/

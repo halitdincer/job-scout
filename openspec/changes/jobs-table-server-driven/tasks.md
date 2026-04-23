@@ -41,4 +41,4 @@
 
 - [x] 6.1 `pytest --cov --cov-fail-under=100` green on the full suite.
 - [x] 6.2 `npx vitest run --coverage` green on all JS unit tests.
-- [ ] 6.3 Manual smoke: create a view, reload, load the view, confirm filter/columns/sort/page size round-trip; verify multi-column sort spans all pages via DevTools Network.
+- [x] 6.3 `npx playwright test` green: sort spans all 6 pages; pagination bar drives server paging; saved-view round-trip restores filter/columns/sort/page_size and dirty badge tracks drift.
