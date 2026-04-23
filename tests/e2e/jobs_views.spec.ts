@@ -39,7 +39,13 @@ test.describe("Jobs saved views", () => {
       resp.url().includes("/api/jobs/") &&
       resp.url().includes("sort=title%3Aasc")
     );
-    await page.locator('.tabulator-col[tabulator-field="title"]').click();
+    // The Title column header now carries a filter widget on the bottom
+    // row; click the title label area specifically so Tabulator's sort
+    // handler fires (center-clicking the whole column lands on the
+    // filter input).
+    await page
+      .locator('.tabulator-col[tabulator-field="title"] .tabulator-col-title')
+      .click();
     await sortResp;
     await waitForRows(page);
 
@@ -88,6 +94,9 @@ test.describe("Jobs saved views", () => {
     await page
       .locator("#save-dialog button[type='submit']")
       .click();
+    // Wait for the POST to settle AND the dialog to close — otherwise the
+    // modal overlay can still block the page-size select below.
+    await expect(page.locator("#save-dialog")).not.toBeVisible();
     await expect(page.locator("#view-modified")).toBeHidden();
 
     // Change page size → dirty.
@@ -128,6 +137,11 @@ test.describe("Jobs saved views", () => {
     );
     await page.locator("#apply-filters").click();
     await apply;
+
+    // Close the filters panel — it overlays the toolbar, so #save-trigger
+    // is not clickable while open.
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#filters-panel")).not.toHaveClass(/open/);
 
     // Save it.
     await page.locator("#save-trigger").click();

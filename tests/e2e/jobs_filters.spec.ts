@@ -59,6 +59,80 @@ test.describe("Jobs merged Columns & Filters panel", () => {
     await expect(badge).toHaveText("1");
   });
 
+  test("Title header input keeps focus per keystroke (no mid-type steal)", async ({
+    page,
+  }) => {
+    // Regression: the Tabulator built-in `"input"` headerFilter used to
+    // fire `headerFilterChanged` on each keystroke, and the reactive
+    // store subscriber re-rendered the input mid-type, stealing focus.
+    // The custom `textHeaderFilter` widget commits only on blur/Enter,
+    // and `syncTabulatorHeaderFiltersFromRules` skips when the user is
+    // focused inside a header input. So typing should keep focus on the
+    // same input element across every character.
+    const titleHeader = page.locator(
+      '.tabulator-col[tabulator-field="title"] .tabulator-header-filter input'
+    );
+    await titleHeader.click();
+    // Type character-by-character and assert focus is retained after
+    // each keystroke. If the reactive subscriber re-renders the input
+    // mid-type, `toBeFocused` will fail on the next character.
+    for (const ch of "List") {
+      await page.keyboard.type(ch);
+      await expect(titleHeader).toBeFocused();
+    }
+    await expect(titleHeader).toHaveValue("List");
+  });
+
+  test("Title funnel icon opens a popover with non-header operators", async ({
+    page,
+  }) => {
+    // The popover is the user-facing answer to "I want to add a
+    // not_contains rule on Title". The existing text header input only
+    // supports `contains`; the funnel icon opens a full rule editor.
+    const iconBtn = page.locator(
+      '.tabulator-col[tabulator-field="title"] .text-header-filter-icon'
+    );
+    await iconBtn.click();
+
+    const popover = page.locator(".col-filter-popover");
+    await expect(popover).toBeVisible();
+    await expect(popover).toContainText(/Title/i);
+
+    // Add a not_contains rule from the popover.
+    await popover.locator("button", { hasText: "+ Rule" }).click();
+    // The rule row renders a <select> with operator options.
+    await popover.locator(".filter-rule-row select").selectOption("not_contains");
+    await popover
+      .locator(".filter-rule-row .filter-rule-value input")
+      .fill("archive");
+
+    const apply = page.waitForResponse(
+      (r) =>
+        r.url().includes("/api/jobs/") &&
+        r.url().includes("filter=")
+    );
+    await popover.locator("button", { hasText: "Apply" }).click();
+    await apply;
+
+    // The store should now carry the not_contains rule, and the icon
+    // should show the `is-active` class so the user can see extra
+    // filter logic lives behind it.
+    const rules = await page.evaluate(
+      () => window.__STORE__.getState().filter.rules
+    );
+    const notContains = rules.find(
+      (r: any) => r.field === "title" && r.operator === "not_contains"
+    );
+    expect(notContains).toBeTruthy();
+    expect(notContains.value).toBe("archive");
+
+    await expect(iconBtn).toHaveClass(/is-active/);
+
+    // Pressing Escape closes the popover.
+    await page.keyboard.press("Escape");
+    await expect(popover).toBeHidden();
+  });
+
   test("un-checking a filtered column's visibility clears its rules", async ({
     page,
   }) => {

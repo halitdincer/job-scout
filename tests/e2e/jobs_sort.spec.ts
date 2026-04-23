@@ -17,7 +17,9 @@ test.describe("Jobs table server-side sort", () => {
     const page1 = await captureJobsResponse(
       page,
       async () => {
-        await page.locator('.tabulator-col[tabulator-field="title"]').click();
+        await page
+          .locator('.tabulator-col[tabulator-field="title"] .tabulator-col-title')
+          .click();
       },
       (url) => url.includes("sort=title%3Aasc"),
     );
@@ -57,7 +59,9 @@ test.describe("Jobs table server-side sort", () => {
     await captureJobsResponse(
       page,
       async () => {
-        await page.locator('.tabulator-col[tabulator-field="title"]').click();
+        await page
+          .locator('.tabulator-col[tabulator-field="title"] .tabulator-col-title')
+          .click();
       },
       (url) => url.includes("sort=title%3Aasc"),
     );
@@ -65,7 +69,9 @@ test.describe("Jobs table server-side sort", () => {
     const desc = await captureJobsResponse(
       page,
       async () => {
-        await page.locator('.tabulator-col[tabulator-field="title"]').click();
+        await page
+          .locator('.tabulator-col[tabulator-field="title"] .tabulator-col-title')
+          .click();
       },
       (url) => url.includes("sort=title%3Adesc"),
     );

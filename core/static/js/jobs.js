@@ -378,6 +378,133 @@ function multiSelectHeaderFilter(cell, onRendered, success, cancel, editorParams
 }
 
 // ---------------------------------------------------------------------------
+// Text header filter widget (input + filter icon + rule-count badge)
+// ---------------------------------------------------------------------------
+
+/**
+ * Module-level hook registered by `initJobsPage`. Lets the Tabulator
+ * custom header filter (created before `initJobsPage` runs, during
+ * COLUMN_DEFS evaluation) open the popover owned by the closure inside
+ * `initJobsPage`.
+ */
+let popoverController = null;
+
+/**
+ * Custom Tabulator `headerFilter` for text-type columns (currently just
+ * Title). Provides three things the built-in `"input"` headerFilter
+ * can't:
+ *   - commit on blur/Enter only, never on keystroke — avoids the
+ *     "focus flickers on every character" bug where the built-in
+ *     fires `headerFilterChanged` per-keystroke and the reactive
+ *     store subscriber then overwrites the input mid-type.
+ *   - a filter icon next to the input that opens a popover with the
+ *     full rule editor, so the user can add `not_contains` / `eq` /
+ *     multiple rules without leaving the grid.
+ *   - a small rule-count badge on the icon when ≥1 rules exist.
+ *
+ * The returned container exposes:
+ *   - `container.setValue(v)` — external callers sync the input
+ *     without going through `table.setHeaderFilterValue` (which
+ *     re-renders the DOM and steals focus).
+ *   - `container.setRuleCount(n)` — update the badge.
+ */
+function textHeaderFilter(cell, onRendered, success) {
+  const columnField = cell.getColumn().getField();
+  const filterField = COLUMN_TO_FILTER[columnField] || columnField;
+
+  const container = document.createElement("div");
+  container.className = "text-header-filter";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "text-header-filter-input";
+  input.placeholder = "Filter...";
+  container.appendChild(input);
+
+  const iconBtn = document.createElement("button");
+  iconBtn.type = "button";
+  iconBtn.className = "text-header-filter-icon";
+  iconBtn.setAttribute("aria-label", "Filter options");
+  iconBtn.title = "Filter options";
+  // Funnel-like glyph; kept as a plain character for dependency-free
+  // rendering.
+  iconBtn.innerHTML = "&#9776;";
+  container.appendChild(iconBtn);
+
+  const badge = document.createElement("span");
+  badge.className = "text-header-filter-badge";
+  badge.style.display = "none";
+  iconBtn.appendChild(badge);
+
+  // Prevent the icon click from stealing focus from the input and also
+  // from bubbling up to Tabulator's sort-header click handler.
+  iconBtn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+  });
+  iconBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (popoverController) {
+      popoverController.toggle(filterField, iconBtn);
+    }
+  });
+
+  function commit() {
+    const val = input.value.trim();
+    // `success(undefined)` clears the Tabulator header value; any truthy
+    // value sets it. We pass the raw string — `syncRulesFromHeaderState`
+    // then folds it into the store as a `contains` rule.
+    success(val === "" ? undefined : val);
+  }
+
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commit();
+    }
+  });
+
+  // External sync hook: set the input value without triggering a
+  // keystroke, and only when the DOM actually differs. This avoids the
+  // mid-type DOM churn that caused focus loss before.
+  container.setValue = (val) => {
+    const next = val == null ? "" : String(val);
+    if (input.value !== next) input.value = next;
+  };
+  container.setRuleCount = (total, highlight) => {
+    // Badge = total rule count when >1 (input itself represents one).
+    if (total > 1) {
+      badge.textContent = String(total);
+      badge.style.display = "";
+    } else {
+      badge.style.display = "none";
+    }
+    // Highlight whenever a rule exists that the header input can't show
+    // (e.g. `not_contains`). Signals to the user that more filter logic
+    // lives behind the icon than the visible input reveals — the whole
+    // point of the popover.
+    if (highlight) iconBtn.classList.add("is-active");
+    else iconBtn.classList.remove("is-active");
+  };
+  container.getIconEl = () => iconBtn;
+  container.dataset.filterField = filterField;
+
+  onRendered(() => {
+    const initial = cell.getValue();
+    if (initial != null) input.value = String(initial);
+  });
+
+  return container;
+}
+
+// Server owns filtering; Tabulator's in-memory match is redundant (all
+// loaded rows already match the server filter). A pass-through keeps
+// the grid from hiding rows while a new fetch is in flight.
+function textHeaderFilterFunc() {
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Column definitions
 // ---------------------------------------------------------------------------
 
@@ -385,7 +512,7 @@ const dateFilterParams = { values: DATE_RANGE_PRESETS, clearable: true };
 
 const COLUMN_DEFS = [
   { title: "Company", field: "source_name", headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: false }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: false }, minWidth: 120, widthGrow: 1 },
-  { title: "Title", field: "title", formatter: titleFormatter, formatterParams: { allowHtml: true }, headerFilter: "input", headerFilterLiveFilter: false, minWidth: 250, widthGrow: 3 },
+  { title: "Title", field: "title", formatter: titleFormatter, formatterParams: { allowHtml: true }, headerFilter: textHeaderFilter, headerFilterFunc: textHeaderFilterFunc, headerFilterLiveFilter: false, minWidth: 250, widthGrow: 3 },
   { title: "Country", field: "country", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 80 },
   { title: "City", field: "city", formatter: arrayJoinFormatter, headerFilter: multiSelectHeaderFilter, headerFilterParams: { isArrayField: true }, headerFilterFunc: multiSelectFilter, headerFilterFuncParams: { isArrayField: true }, minWidth: 100 },
   { title: "Published At", field: "published_at", formatter: timeAgoFormatter, tooltip: timeAgoTooltip, sorter: isoDateSorter, headerFilter: "list", headerFilterParams: dateFilterParams, headerFilterFunc: dateRangeFilter, minWidth: 120 },
@@ -865,32 +992,54 @@ export function initJobsPage() {
   }
 
   function syncTabulatorHeaderFiltersFromRules() {
+    // Don't clobber a header input the user is actively typing into.
+    // The blur/Enter commit path will converge the store on their next
+    // dispatch — we can safely skip this round.
+    const active = document.activeElement;
+    if (
+      active &&
+      active.tagName === "INPUT" &&
+      active.closest(".tabulator-header-filter")
+    ) {
+      return;
+    }
     const rules = store.getState().filter.rules;
     withSuppressedEvents(() => {
-      table.clearHeaderFilter();
-      const headerValues = {};
+      // Bucket rules per headerField by type.
+      const byHeader = {};
+      Object.keys(FILTER_FIELD_DEFS).forEach((filterField) => {
+        const def = FILTER_FIELD_DEFS[filterField];
+        if (def.headerField) {
+          byHeader[def.headerField] = {
+            type: def.type,
+            filterField,
+            values: [],
+          };
+        }
+      });
       rules.forEach((rule) => {
         const def = FILTER_FIELD_DEFS[rule.field];
         if (!def || !def.headerField) return;
-        if (def.type === "date") {
+        const bucket = byHeader[def.headerField];
+        if (!bucket) return;
+        if (bucket.type === "date") {
           if (rule.operator !== "in_last_days") return;
           const value = (rule.value || "").toString().trim();
-          if (!value) return;
-          table.setHeaderFilterValue(def.headerField, value);
+          if (value) bucket.values.push(value);
           return;
         }
-        // Plain text header (e.g. Title) — only paint `contains` rules;
-        // other operators have no header representation.
-        if (def.type === "text") {
+        if (bucket.type === "text") {
+          // Only the single `contains` rule has a header representation;
+          // other operators (not_contains, eq, neq, ...) only live in the
+          // popover and the merged panel.
           if (rule.operator !== "contains") return;
           const value = (rule.value || "").toString();
-          if (!value) return;
-          table.setHeaderFilterValue(def.headerField, value);
+          if (value) bucket.values.push(value);
           return;
         }
-        if (!headerValues[def.headerField]) headerValues[def.headerField] = [];
+        // enum / array → multi-select header
         if (rule.operator === "is_empty") {
-          headerValues[def.headerField].push(EMPTY_SENTINEL);
+          bucket.values.push(EMPTY_SENTINEL);
         } else if (rule.operator === "eq") {
           let val = (rule.value || "").trim();
           if (!val) return;
@@ -898,7 +1047,7 @@ export function initJobsPage() {
             val = EMPLOYMENT_LABELS[val] || val;
           if (rule.field === "workplace_type")
             val = WORKPLACE_LABELS[val] || val;
-          headerValues[def.headerField].push(val);
+          bucket.values.push(val);
         } else if (rule.operator === "in") {
           const rawVal = rule.value || "";
           const items =
@@ -913,14 +1062,47 @@ export function initJobsPage() {
               mapped = EMPLOYMENT_LABELS[mapped] || mapped;
             if (rule.field === "workplace_type")
               mapped = WORKPLACE_LABELS[mapped] || mapped;
-            headerValues[def.headerField].push(mapped);
+            bucket.values.push(mapped);
           });
         }
       });
-      Object.keys(headerValues).forEach((headerField) => {
-        const vals = headerValues[headerField];
-        if (!vals.length) return;
-        table.setHeaderFilterValue(headerField, vals);
+      Object.keys(byHeader).forEach((headerField) => {
+        const bucket = byHeader[headerField];
+        if (bucket.type === "text") {
+          // Custom widget API — no Tabulator re-render, preserves focus.
+          const col = table.getColumn(headerField);
+          if (!col) return;
+          const widget = col
+            .getElement()
+            .querySelector(".text-header-filter");
+          if (widget) {
+            if (widget.setValue) widget.setValue(bucket.values[0] || "");
+            if (widget.setRuleCount) {
+              const fieldRules = rulesForField(bucket.filterField);
+              const nonHeader = fieldRules.filter(
+                (r) => r.operator !== "contains"
+              ).length;
+              widget.setRuleCount(
+                fieldRules.length,
+                nonHeader > 0 || fieldRules.length > 1
+              );
+            }
+          }
+          return;
+        }
+        if (bucket.type === "date") {
+          table.setHeaderFilterValue(
+            headerField,
+            bucket.values[0] || undefined
+          );
+          return;
+        }
+        // multi-select
+        const vals = bucket.values;
+        table.setHeaderFilterValue(
+          headerField,
+          vals.length ? vals : undefined
+        );
         const col = table.getColumn(headerField);
         if (col) {
           const el = col.getElement().querySelector(".ms-header-filter");
@@ -971,7 +1153,19 @@ export function initJobsPage() {
       activeHeaderFields[f.field] = f.value;
     });
 
-    const headerOps = ["eq", "in", "in_last_days", "is_empty", "contains"];
+    // Header-sourced operators depend on the filter field's type.
+    // Text headers (Title) produce `contains`; date headers produce
+    // `in_last_days`; enum/array headers produce `eq`/`in`/`is_empty`.
+    // Keeping this type-scoped matters because the popover can now add
+    // rules with non-header operators (e.g. `not_contains`), and those
+    // must NOT be wiped when the header input changes.
+    function headerOpsFor(filterField) {
+      const def = FILTER_FIELD_DEFS[filterField];
+      if (!def) return [];
+      if (def.type === "date") return ["in_last_days"];
+      if (def.type === "text") return ["contains"];
+      return ["eq", "in", "is_empty"];
+    }
     const fieldsWithHeaders = {};
     FIELD_ORDER.forEach((f) => {
       const def = FILTER_FIELD_DEFS[f];
@@ -1000,8 +1194,10 @@ export function initJobsPage() {
         headerValue === "" ||
         (Array.isArray(headerValue) && headerValue.length === 0);
 
-      // Remove any existing header-sourced rules for this field.
+      // Remove only the header-sourced rules for this field. Popover-
+      // added rules (other operators) survive.
       const currentRules = store.getState().filter.rules;
+      const headerOps = headerOpsFor(filterField);
       currentRules
         .filter(
           (r) => r.field === filterField && headerOps.indexOf(r.operator) !== -1
@@ -1309,7 +1505,12 @@ export function initJobsPage() {
     if (state.data.results !== lastResults) {
       lastResults = state.data.results;
       withSuppressedEvents(() => {
-        table.setData(mapApiRows(state.data.results || []));
+        // `replaceData` swaps rows in place without tearing down Tabulator's
+        // header filter DOM — important because our custom Title widget
+        // holds focus state that `setData` would blow away.
+        const rows = mapApiRows(state.data.results || []);
+        const replace = table.replaceData || table.setData;
+        replace.call(table, rows);
       });
     }
     if (
@@ -1325,6 +1526,149 @@ export function initJobsPage() {
     // Keep dirty-state in sync across every move.
     renderDirtyBadge();
   });
+
+  // -------------------------------------------------------------------------
+  // Per-column filter popover (ag-grid style). Opens from the funnel icon
+  // rendered by `textHeaderFilter` and lets the user add any rule operator
+  // (not_contains, eq, neq, is_empty, ...) — operators that don't fit in a
+  // single text input. Rules added here flow through the normal reducer
+  // path; the reactive subscriber keeps the widget badge, the merged
+  // panel, and the popover body itself in sync.
+  // -------------------------------------------------------------------------
+
+  let popoverState = null;
+
+  function reverseColumnForFilter(filterField) {
+    const entry = Object.keys(COLUMN_TO_FILTER).find(
+      (col) => COLUMN_TO_FILTER[col] === filterField
+    );
+    return entry || filterField;
+  }
+
+  function renderPopoverBody(container, filterField) {
+    container.innerHTML = "";
+    const def = FILTER_FIELD_DEFS[filterField];
+
+    const heading = document.createElement("div");
+    heading.className = "col-filter-popover-heading";
+    heading.textContent = `Filters · ${def ? def.label : filterField}`;
+    container.appendChild(heading);
+
+    const body = document.createElement("div");
+    body.className = "col-filter-popover-body";
+    const fieldRules = rulesForField(filterField);
+    if (fieldRules.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "col-filter-popover-empty";
+      empty.textContent = "No rules yet.";
+      body.appendChild(empty);
+    } else {
+      fieldRules.forEach((rule) => {
+        renderRuleRow(rule, body, () => {});
+      });
+    }
+    container.appendChild(body);
+
+    const footer = document.createElement("div");
+    footer.className = "col-filter-popover-footer";
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "chip-btn";
+    addBtn.textContent = "+ Rule";
+    addBtn.addEventListener("click", () => {
+      const columnField = reverseColumnForFilter(filterField);
+      const visible =
+        store.getState().columns.visibility[columnField] !== false;
+      if (!visible) {
+        store.dispatch(A.toggleColumnVisibility(columnField));
+      }
+      store.dispatch(A.addRule(filterField));
+    });
+    footer.appendChild(addBtn);
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.className = "chip-btn primary";
+    applyBtn.textContent = "Apply";
+    applyBtn.addEventListener("click", () => {
+      store.dispatch(A.commitFilter());
+    });
+    footer.appendChild(applyBtn);
+    container.appendChild(footer);
+  }
+
+  function positionPopover(container, anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    const width = 320;
+    let left = rect.right - width;
+    if (left < 8) left = 8;
+    const maxLeft = window.innerWidth - width - 8;
+    if (left > maxLeft) left = maxLeft;
+    container.style.position = "fixed";
+    container.style.top = `${rect.bottom + 4}px`;
+    container.style.left = `${left}px`;
+    container.style.width = `${width}px`;
+    container.style.zIndex = "9999";
+  }
+
+  function openFieldPopover(filterField, anchorEl) {
+    closeFieldPopover();
+    const container = document.createElement("div");
+    container.className = "col-filter-popover";
+    document.body.appendChild(container);
+    renderPopoverBody(container, filterField);
+    positionPopover(container, anchorEl);
+
+    const onDocClick = (e) => {
+      if (container.contains(e.target)) return;
+      if (anchorEl.contains(e.target)) return;
+      closeFieldPopover();
+    };
+    const onKeydown = (e) => {
+      if (e.key === "Escape") closeFieldPopover();
+    };
+    // Defer so the click that opened the popover doesn't close it.
+    setTimeout(() => {
+      document.addEventListener("mousedown", onDocClick, true);
+      document.addEventListener("keydown", onKeydown);
+    }, 0);
+
+    popoverState = {
+      filterField,
+      anchorEl,
+      container,
+      onDocClick,
+      onKeydown,
+    };
+  }
+
+  function closeFieldPopover() {
+    if (!popoverState) return;
+    const { container, onDocClick, onKeydown } = popoverState;
+    document.removeEventListener("mousedown", onDocClick, true);
+    document.removeEventListener("keydown", onKeydown);
+    if (container && container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
+    popoverState = null;
+  }
+
+  function togglePopover(filterField, anchorEl) {
+    if (popoverState && popoverState.filterField === filterField) {
+      closeFieldPopover();
+    } else {
+      openFieldPopover(filterField, anchorEl);
+    }
+  }
+
+  // Register the controller so `textHeaderFilter` (created at module scope,
+  // before initJobsPage runs) can open/close the popover.
+  popoverController = {
+    toggle: togglePopover,
+    open: openFieldPopover,
+    close: closeFieldPopover,
+    isOpenFor: (ff) => !!popoverState && popoverState.filterField === ff,
+  };
 
   // Reactive subscriber for filter + column state. Keeps the merged
   // "Columns & Filters" panel, the toolbar badge, and the Tabulator
@@ -1353,6 +1697,18 @@ export function initJobsPage() {
       renderColumnFilterSections();
       renderFiltersBadge();
       syncTabulatorHeaderFiltersFromRules();
+      if (popoverState) {
+        // Close the popover if its column got hidden; otherwise re-render
+        // the body so rule rows reflect the latest state.
+        const columnField = reverseColumnForFilter(popoverState.filterField);
+        const stillVisible =
+          s.columns.visibility[columnField] !== false;
+        if (!stillVisible) {
+          closeFieldPopover();
+        } else {
+          renderPopoverBody(popoverState.container, popoverState.filterField);
+        }
+      }
     }
   });
 

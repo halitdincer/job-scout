@@ -930,6 +930,125 @@ td a:hover { color: var(--accent-hover); text-decoration: underline; }
 .ms-dropdown::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 .ms-dropdown::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
+/* ── Text header filter widget (Title et al.) ───────────────── */
+.text-header-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 24px;
+}
+
+.text-header-filter-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+
+.text-header-filter-input:focus {
+  outline: none;
+  border-color: var(--border-strong);
+}
+
+.text-header-filter-icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.text-header-filter-icon:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.text-header-filter-icon.is-active {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.text-header-filter-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  color: var(--bg);
+  background: var(--text);
+  border-radius: 7px;
+  text-align: center;
+}
+
+/* ── Per-column filter popover (opens from funnel icon) ─────── */
+.col-filter-popover {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60vh;
+  overflow: hidden;
+}
+
+.col-filter-popover-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+
+.col-filter-popover-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: 40vh;
+}
+
+.col-filter-popover-empty {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.col-filter-popover-footer {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
 /* ── Responsive: tablet ─────────────────────────────────────── */
 @media (max-width: 768px) {
   :root { --nav-h: 48px; }
