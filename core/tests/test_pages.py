@@ -221,6 +221,20 @@ class TestAuthenticationPages:
         assert b'name="username"' in response.content
         assert b'name="password"' in response.content
 
+    def test_login_page_links_stylesheet(self):
+        # Prevents a future refactor from silently shipping an unstyled
+        # login page — the app's theme tokens live in core/style.css.
+        client = Client()
+        response = client.get("/accounts/login/")
+        assert b"core/style.css" in response.content
+
+    def test_login_page_has_viewport_meta(self):
+        # Mobile responsiveness baseline: without the viewport meta,
+        # phones render the page at desktop width and zoom out.
+        client = Client()
+        response = client.get("/accounts/login/")
+        assert b'name="viewport"' in response.content
+
     def test_valid_credentials_create_session(self):
         user = get_user_model().objects.create_user(
             username="admin-created-user",
