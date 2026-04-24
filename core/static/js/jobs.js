@@ -456,8 +456,23 @@ function textHeaderFilter(cell, onRendered, success) {
     success(val === "" ? undefined : val);
   }
 
+  // CRITICAL: stop every input event from reaching Tabulator's delegated
+  // handlers on `.tabulator-header-filter`. Tabulator 6 attaches listeners
+  // to the filter row that react to `input`/`change` on any descendant
+  // input — it would treat our keystrokes as filter changes, fire
+  // `dataFiltered` / `headerFilterChanged`, and re-render the header DOM,
+  // which tears down this widget and loses focus mid-word. Commit happens
+  // ONLY via our explicit `success()` call in `commit()`.
+  const swallow = (e) => e.stopPropagation();
+  input.addEventListener("input", swallow);
+  input.addEventListener("change", swallow);
+  input.addEventListener("keyup", swallow);
+  input.addEventListener("mousedown", swallow);
+  input.addEventListener("click", swallow);
+
   input.addEventListener("blur", commit);
   input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
     if (e.key === "Enter") {
       e.preventDefault();
       commit();
