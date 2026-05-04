@@ -1709,6 +1709,7 @@ export function initJobsPage() {
       lastRenderable = s.filter.renderable;
       lastVis = s.columns.visibility;
       lastOrder = s.columns.order;
+      syncTabulatorColumnsFromState();
       renderColumnFilterSections();
       renderFiltersBadge();
       syncTabulatorHeaderFiltersFromRules();
