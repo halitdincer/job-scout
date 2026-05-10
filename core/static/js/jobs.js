@@ -1697,46 +1697,57 @@ export function initJobsPage() {
   let lastOrder = store.getState().columns.order;
   store.subscribe(() => {
     const s = store.getState();
-    if (
+    const filterChanged =
       s.filter.expression !== lastExpr ||
       s.filter.rules !== lastRules ||
-      s.filter.renderable !== lastRenderable ||
-      s.columns.visibility !== lastVis ||
-      s.columns.order !== lastOrder
-    ) {
-      lastExpr = s.filter.expression;
-      lastRules = s.filter.rules;
-      lastRenderable = s.filter.renderable;
-      lastVis = s.columns.visibility;
-      lastOrder = s.columns.order;
-      // Skip the rule-editor re-renders while the user is typing into a
-      // rule value input. `renderColumnFilterSections` and
-      // `renderPopoverBody` rebuild their containers via innerHTML="",
-      // which destroys the focused input mid-keystroke. The input's
-      // value is already in sync with the store (we dispatched on
-      // `input`), so there's nothing visible left to update.
-      const active = document.activeElement;
-      const typingInRuleEditor =
-        !!active &&
-        active.tagName === "INPUT" &&
-        !!active.closest(".filter-rule-value");
+      s.filter.renderable !== lastRenderable;
+    const columnsChanged =
+      s.columns.visibility !== lastVis || s.columns.order !== lastOrder;
+    if (!filterChanged && !columnsChanged) return;
+    const rulesChanged = s.filter.rules !== lastRules;
+    lastExpr = s.filter.expression;
+    lastRules = s.filter.rules;
+    lastRenderable = s.filter.renderable;
+    lastVis = s.columns.visibility;
+    lastOrder = s.columns.order;
+    // Skip the rule-editor re-renders while the user is typing into a
+    // rule value input. `renderColumnFilterSections` and
+    // `renderPopoverBody` rebuild their containers via innerHTML="",
+    // which destroys the focused input mid-keystroke. The input's
+    // value is already in sync with the store (we dispatched on
+    // `input`), so there's nothing visible left to update.
+    const active = document.activeElement;
+    const typingInRuleEditor =
+      !!active &&
+      active.tagName === "INPUT" &&
+      !!active.closest(".filter-rule-value");
+    // Each side effect runs only when its slice actually changed.
+    // Per-keystroke `UPDATE_RULE_VALUE` only mutates `filter.rules`, so
+    // we must NOT call `syncTabulatorColumnsFromState` (which invokes
+    // `table.moveColumn` for every column and reflows the grid header)
+    // or push values into Tabulator's date / multi-select header
+    // filters on every character — that's the source of typing lag.
+    if (columnsChanged) {
       syncTabulatorColumnsFromState();
-      if (!typingInRuleEditor) {
-        renderColumnFilterSections();
-      }
+    }
+    if (filterChanged) {
       renderFiltersBadge();
-      syncTabulatorHeaderFiltersFromRules();
-      if (popoverState) {
-        // Close the popover if its column got hidden; otherwise re-render
-        // the body so rule rows reflect the latest state.
-        const columnField = reverseColumnForFilter(popoverState.filterField);
-        const stillVisible =
-          s.columns.visibility[columnField] !== false;
-        if (!stillVisible) {
-          closeFieldPopover();
-        } else if (!typingInRuleEditor) {
-          renderPopoverBody(popoverState.container, popoverState.filterField);
-        }
+      if (!typingInRuleEditor) {
+        syncTabulatorHeaderFiltersFromRules();
+      }
+    }
+    if (!typingInRuleEditor) {
+      renderColumnFilterSections();
+    }
+    if (popoverState) {
+      // Close the popover if its column got hidden; otherwise re-render
+      // the body so rule rows reflect the latest state.
+      const columnField = reverseColumnForFilter(popoverState.filterField);
+      const stillVisible = s.columns.visibility[columnField] !== false;
+      if (!stillVisible) {
+        closeFieldPopover();
+      } else if (!typingInRuleEditor && (rulesChanged || columnsChanged)) {
+        renderPopoverBody(popoverState.container, popoverState.filterField);
       }
     }
   });
