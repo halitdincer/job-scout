@@ -37,6 +37,12 @@ EXPECTED_PHENOM_SOURCES = {
 }
 
 
+EXPECTED_JIBE_WORKDAY_SOURCES = {
+    ("AON", "jibe", "jobs.aon.com"),
+    ("S&P Global", "workday", "spgi:wd5:SPGI_Careers"),
+}
+
+
 EXPECTED_WORKDAY_BAMBOOHR_SOURCES = {
     ("TMX", "workday", "tmx:wd3:TMX_Careers"),
     ("HOOPP", "workday", "hoopp:wd10:HOOPP"),
@@ -185,3 +191,51 @@ class TestSeedCompaniesPhenomMigration:
                 board_id for _, _, board_id in EXPECTED_PHENOM_SOURCES
             ]
         ).count() == len(EXPECTED_PHENOM_SOURCES)
+
+
+@pytest.mark.django_db
+class TestSeedCompaniesJibeWorkdayMigration:
+    def test_seed_creates_expected_sources(self):
+        migration = importlib.import_module(
+            "core.migrations.0013_seed_companies_jibe_workday"
+        )
+
+        Source.objects.filter(
+            board_id__in=[
+                board_id for _, _, board_id in EXPECTED_JIBE_WORKDAY_SOURCES
+            ]
+        ).delete()
+
+        migration.seed_sources(django_apps, None)
+
+        actual = set(Source.objects.values_list("name", "platform", "board_id"))
+        assert EXPECTED_JIBE_WORKDAY_SOURCES.issubset(actual)
+        assert Source.objects.filter(
+            board_id__in=[
+                board_id for _, _, board_id in EXPECTED_JIBE_WORKDAY_SOURCES
+            ]
+        ).count() == len(EXPECTED_JIBE_WORKDAY_SOURCES)
+
+    def test_seed_is_idempotent_and_skips_existing_sources(self):
+        migration = importlib.import_module(
+            "core.migrations.0013_seed_companies_jibe_workday"
+        )
+        existing = Source.objects.get(platform="jibe", board_id="jobs.aon.com")
+        existing.name = "Existing AON"
+        existing.is_active = False
+        existing.save(update_fields=["name", "is_active", "updated_at"])
+
+        migration.seed_sources(django_apps, None)
+        migration.seed_sources(django_apps, None)
+
+        existing.refresh_from_db()
+        assert existing.name == "Existing AON"
+        assert existing.is_active is False
+        assert Source.objects.filter(
+            platform="jibe", board_id="jobs.aon.com"
+        ).count() == 1
+        assert Source.objects.filter(
+            board_id__in=[
+                board_id for _, _, board_id in EXPECTED_JIBE_WORKDAY_SOURCES
+            ]
+        ).count() == len(EXPECTED_JIBE_WORKDAY_SOURCES)

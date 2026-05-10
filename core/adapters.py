@@ -381,6 +381,91 @@ class PhenomAdapter:
         return listings
 
 
+class JibeAdapter:
+    PAGE_SIZE = 10
+
+    @staticmethod
+    def _validate_board_id(board_id):
+        if not board_id or not board_id.strip():
+            raise ValueError("Invalid Jibe board_id: expected careers hostname")
+        return (
+            board_id.strip()
+            .removeprefix("https://")
+            .removeprefix("http://")
+            .rstrip("/")
+        )
+
+    @staticmethod
+    def _locations(job):
+        full_location = job.get("full_location")
+        if isinstance(full_location, str) and full_location.strip():
+            return [part.strip() for part in full_location.split(";") if part.strip()]
+        return []
+
+    @staticmethod
+    def _department(job):
+        category = job.get("category") or []
+        if category:
+            value = str(category[0]).strip()
+            return value or None
+        categories = job.get("categories") or []
+        if categories and isinstance(categories[0], dict):
+            value = str(categories[0].get("name") or "").strip()
+            return value or None
+        return None
+
+    @staticmethod
+    def _url(host, job):
+        meta_data = job.get("meta_data") or {}
+        canonical_url = meta_data.get("canonical_url")
+        if canonical_url:
+            return canonical_url
+        req_id = job.get("req_id")
+        language = job.get("language") or "en-us"
+        return f"https://{host}/jobs/{req_id}?lang={language}"
+
+    def fetch_listings(self, board_id):
+        host = self._validate_board_id(board_id)
+        listings = []
+        offset = 0
+        while True:
+            response = requests.get(
+                f"https://{host}/api/jobs",
+                params={"from": offset, "size": self.PAGE_SIZE},
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+            jobs = data.get("jobs") or []
+            if not jobs:
+                break
+            for wrapper in jobs:
+                job = wrapper.get("data") or wrapper
+                employment_type = job.get("employment_type")
+                if isinstance(employment_type, str):
+                    employment_type = employment_type.replace("_", " ")
+                listings.append({
+                    "external_id": str(job["req_id"]),
+                    "title": job.get("title"),
+                    "department": self._department(job),
+                    "locations": self._locations(job),
+                    "url": self._url(host, job),
+                    "team": None,
+                    "employment_type": normalize_employment_type(employment_type),
+                    "workplace_type": "unknown",
+                    "country": job.get("country"),
+                    "published_at": job.get("posted_date"),
+                    "updated_at_source": job.get("update_date"),
+                    "is_listed": None,
+                })
+            offset += len(jobs)
+            total = data.get("totalCount") or data.get("count")
+            if total is not None and offset >= total:
+                break
+        return listings
+
+
 _REGISTRY = {
     "greenhouse": GreenhouseAdapter,
     "lever": LeverAdapter,
@@ -388,6 +473,7 @@ _REGISTRY = {
     "workday": WorkdayAdapter,
     "bamboohr": BambooHRAdapter,
     "phenom": PhenomAdapter,
+    "jibe": JibeAdapter,
 }
 
 

@@ -7,6 +7,7 @@ from core.adapters import (
     AshbyAdapter,
     BambooHRAdapter,
     GreenhouseAdapter,
+    JibeAdapter,
     LeverAdapter,
     PhenomAdapter,
     WorkdayAdapter,
@@ -81,6 +82,10 @@ class TestAdapterRegistry:
     def test_get_phenom_adapter(self):
         adapter = get_adapter("phenom")
         assert isinstance(adapter, PhenomAdapter)
+
+    def test_get_jibe_adapter(self):
+        adapter = get_adapter("jibe")
+        assert isinstance(adapter, JibeAdapter)
 
     def test_unknown_platform_raises_value_error(self):
         with pytest.raises(ValueError, match="Unknown platform"):
@@ -933,3 +938,130 @@ class TestPhenomAdapter:
         adapter = PhenomAdapter()
         with pytest.raises(requests.HTTPError):
             adapter.fetch_listings("jobs.rbc.com/ca/en:RBCAA0088")
+
+
+class TestJibeAdapter:
+    @patch("core.adapters.requests.get")
+    def test_fetch_listings(self, mock_get):
+        mock_get.side_effect = [
+            _mock_response({
+                "jobs": [
+                    {
+                        "data": {
+                            "req_id": 101883,
+                            "title": "Epic Lead Expert",
+                            "category": [" IT Global Technology Leadership"],
+                            "full_location": "Virtual, Colorado",
+                            "employment_type": "FULL_TIME",
+                            "country": "United States",
+                            "posted_date": "2026-05-06T20:27:00+0000",
+                            "update_date": "2026-05-06T20:29:03+0000",
+                            "language": "en-us",
+                            "meta_data": {
+                                "canonical_url": "https://jobs.aon.com/jobs/101883",
+                            },
+                        }
+                    }
+                ],
+            }),
+            _mock_response({"jobs": []}),
+        ]
+        adapter = JibeAdapter()
+        listings = adapter.fetch_listings("jobs.aon.com")
+        assert len(listings) == 1
+        listing = listings[0]
+        assert listing["external_id"] == "101883"
+        assert listing["title"] == "Epic Lead Expert"
+        assert listing["department"] == "IT Global Technology Leadership"
+        assert listing["locations"] == ["Virtual, Colorado"]
+        assert listing["url"] == "https://jobs.aon.com/jobs/101883"
+        assert listing["team"] is None
+        assert listing["employment_type"] == "full_time"
+        assert listing["workplace_type"] == "unknown"
+        assert listing["country"] == "United States"
+        assert listing["published_at"] == "2026-05-06T20:27:00+0000"
+        assert listing["updated_at_source"] == "2026-05-06T20:29:03+0000"
+        assert listing["is_listed"] is None
+        assert mock_get.call_count == 2
+        assert mock_get.call_args_list[0].args[0] == "https://jobs.aon.com/api/jobs"
+        assert mock_get.call_args_list[0].kwargs["params"] == {"from": 0, "size": 10}
+        assert mock_get.call_args_list[1].kwargs["params"] == {"from": 1, "size": 10}
+
+    @patch("core.adapters.requests.get")
+    def test_stops_when_total_count_reached(self, mock_get):
+        mock_get.return_value = _mock_response({
+            "totalCount": 1,
+            "jobs": [
+                {
+                    "data": {
+                        "req_id": "1",
+                        "title": "Engineer",
+                    }
+                }
+            ],
+        })
+        adapter = JibeAdapter()
+        listings = adapter.fetch_listings("jobs.aon.com")
+        assert len(listings) == 1
+        assert mock_get.call_count == 1
+
+    @patch("core.adapters.requests.get")
+    def test_fallback_url_and_categories_department(self, mock_get):
+        mock_get.side_effect = [
+            _mock_response({
+                "jobs": [
+                    {
+                        "data": {
+                            "req_id": "SPGI-123",
+                            "title": "Analyst",
+                            "categories": [{"name": "Technology"}],
+                            "language": "en-us",
+                        }
+                    }
+                ],
+            }),
+            _mock_response({"jobs": []}),
+        ]
+        adapter = JibeAdapter()
+        listings = adapter.fetch_listings("careers.spglobal.com")
+        assert listings[0]["department"] == "Technology"
+        assert listings[0]["locations"] == []
+        assert listings[0]["url"] == (
+            "https://careers.spglobal.com/jobs/SPGI-123?lang=en-us"
+        )
+        assert listings[0]["employment_type"] == "unknown"
+
+    @patch("core.adapters.requests.get")
+    def test_splits_multi_location_full_location(self, mock_get):
+        mock_get.side_effect = [
+            _mock_response({
+                "jobs": [
+                    {
+                        "data": {
+                            "req_id": "1",
+                            "title": "Engineer",
+                            "full_location": "New York, New York; Chicago, Illinois",
+                        }
+                    }
+                ],
+            }),
+            _mock_response({"jobs": []}),
+        ]
+        adapter = JibeAdapter()
+        listings = adapter.fetch_listings("jobs.aon.com")
+        assert listings[0]["locations"] == [
+            "New York, New York",
+            "Chicago, Illinois",
+        ]
+
+    @patch("core.adapters.requests.get")
+    def test_http_error(self, mock_get):
+        mock_get.return_value = _mock_response({}, status_code=500)
+        adapter = JibeAdapter()
+        with pytest.raises(requests.HTTPError):
+            adapter.fetch_listings("jobs.aon.com")
+
+    def test_invalid_board_id_raises(self):
+        adapter = JibeAdapter()
+        with pytest.raises(ValueError, match="board_id"):
+            adapter.fetch_listings("")
