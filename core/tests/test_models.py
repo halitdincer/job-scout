@@ -25,7 +25,7 @@ class TestSourceModel:
         assert str(source) == "Airbnb (greenhouse)"
 
     def test_platform_choices(self):
-        source = Source(name="Test", platform="workday", board_id="test")
+        source = Source(name="Test", platform="taleo", board_id="test")
         with pytest.raises(Exception):
             source.full_clean()
 

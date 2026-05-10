@@ -168,10 +168,152 @@ class AshbyAdapter:
         return listings
 
 
+class WorkdayAdapter:
+    PAGE_SIZE = 20
+
+    @staticmethod
+    def _parse_board_id(board_id):
+        parts = board_id.split(":")
+        if len(parts) != 3 or not all(parts):
+            raise ValueError(
+                f"Invalid Workday board_id {board_id!r}: expected 'tenant:cluster:site'"
+            )
+        return parts
+
+    def fetch_listings(self, board_id):
+        tenant, cluster, site = self._parse_board_id(board_id)
+        url = (
+            f"https://{tenant}.{cluster}.myworkdayjobs.com"
+            f"/wday/cxs/{tenant}/{site}/jobs"
+        )
+        host = f"https://{tenant}.{cluster}.myworkdayjobs.com"
+        listings = []
+        offset = 0
+        while True:
+            response = requests.post(
+                url,
+                json={
+                    "appliedFacets": {},
+                    "limit": self.PAGE_SIZE,
+                    "offset": offset,
+                    "searchText": "",
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+            postings = data.get("jobPostings") or []
+            if not postings:
+                break
+            for posting in postings:
+                bullet_fields = posting.get("bulletFields") or []
+                external_path = posting.get("externalPath") or ""
+                if bullet_fields:
+                    external_id = str(bullet_fields[0])
+                else:
+                    external_id = external_path.rsplit("/", 1)[-1]
+                locations_text = posting.get("locationsText")
+                listings.append({
+                    "external_id": external_id,
+                    "title": posting.get("title"),
+                    "department": None,
+                    "locations": [locations_text] if locations_text else [],
+                    "url": f"{host}{external_path}",
+                    "team": None,
+                    "employment_type": normalize_employment_type(
+                        posting.get("timeType")
+                    ),
+                    "workplace_type": "unknown",
+                    "country": None,
+                    "published_at": None,
+                    "updated_at_source": None,
+                    "is_listed": None,
+                })
+            offset += self.PAGE_SIZE
+            total = data.get("total") or 0
+            if offset >= total:
+                break
+        return listings
+
+
+class BambooHRAdapter:
+    @staticmethod
+    def _workplace_type(is_remote, location_type):
+        if is_remote is True:
+            return "remote"
+        if location_type == "1":
+            return "remote"
+        if location_type == "2":
+            return "on_site"
+        if location_type == "3":
+            return "hybrid"
+        return "unknown"
+
+    @staticmethod
+    def _locations(location, ats_location):
+        location = location or {}
+        ats_location = ats_location or {}
+        city = location.get("city")
+        state = location.get("state")
+        if city and state:
+            return [f"{city}, {state}"]
+        if city:
+            return [city]
+        if state:
+            return [state]
+        ats_city = ats_location.get("city")
+        ats_state = ats_location.get("state") or ats_location.get("province")
+        ats_country = ats_location.get("country")
+        if ats_city and ats_state:
+            return [f"{ats_city}, {ats_state}"]
+        if ats_city:
+            return [ats_city]
+        if ats_state:
+            return [ats_state]
+        if ats_country:
+            return [ats_country]
+        return []
+
+    def fetch_listings(self, board_id):
+        response = requests.get(
+            f"https://{board_id}.bamboohr.com/careers/list",
+            headers={"Accept": "application/json"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        listings = []
+        for job in data.get("result") or []:
+            job_id = str(job["id"])
+            listings.append({
+                "external_id": job_id,
+                "title": job.get("jobOpeningName"),
+                "department": job.get("departmentLabel"),
+                "locations": self._locations(
+                    job.get("location"), job.get("atsLocation")
+                ),
+                "url": f"https://{board_id}.bamboohr.com/careers/{job_id}",
+                "team": None,
+                "employment_type": normalize_employment_type(
+                    job.get("employmentStatusLabel")
+                ),
+                "workplace_type": self._workplace_type(
+                    job.get("isRemote"), job.get("locationType")
+                ),
+                "country": None,
+                "published_at": None,
+                "updated_at_source": None,
+                "is_listed": None,
+            })
+        return listings
+
+
 _REGISTRY = {
     "greenhouse": GreenhouseAdapter,
     "lever": LeverAdapter,
     "ashby": AshbyAdapter,
+    "workday": WorkdayAdapter,
+    "bamboohr": BambooHRAdapter,
 }
 
 

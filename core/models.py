@@ -7,6 +7,8 @@ class Source(models.Model):
         ("greenhouse", "Greenhouse"),
         ("lever", "Lever"),
         ("ashby", "Ashby"),
+        ("workday", "Workday"),
+        ("bamboohr", "BambooHR"),
     ]
 
     name = models.CharField(max_length=255)
