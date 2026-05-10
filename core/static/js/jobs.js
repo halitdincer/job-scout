@@ -1709,8 +1709,21 @@ export function initJobsPage() {
       lastRenderable = s.filter.renderable;
       lastVis = s.columns.visibility;
       lastOrder = s.columns.order;
+      // Skip the rule-editor re-renders while the user is typing into a
+      // rule value input. `renderColumnFilterSections` and
+      // `renderPopoverBody` rebuild their containers via innerHTML="",
+      // which destroys the focused input mid-keystroke. The input's
+      // value is already in sync with the store (we dispatched on
+      // `input`), so there's nothing visible left to update.
+      const active = document.activeElement;
+      const typingInRuleEditor =
+        !!active &&
+        active.tagName === "INPUT" &&
+        !!active.closest(".filter-rule-value");
       syncTabulatorColumnsFromState();
-      renderColumnFilterSections();
+      if (!typingInRuleEditor) {
+        renderColumnFilterSections();
+      }
       renderFiltersBadge();
       syncTabulatorHeaderFiltersFromRules();
       if (popoverState) {
@@ -1721,7 +1734,7 @@ export function initJobsPage() {
           s.columns.visibility[columnField] !== false;
         if (!stillVisible) {
           closeFieldPopover();
-        } else {
+        } else if (!typingInRuleEditor) {
           renderPopoverBody(popoverState.container, popoverState.filterField);
         }
       }

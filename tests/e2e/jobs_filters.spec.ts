@@ -83,6 +83,29 @@ test.describe("Jobs merged Columns & Filters panel", () => {
     await expect(titleHeader).toHaveValue("List");
   });
 
+  test("Panel rule input keeps focus per keystroke (no mid-type re-render)", async ({
+    page,
+  }) => {
+    // Regression: typing into a `.filter-rule-value input` in the merged
+    // Columns & Filters panel dispatched `updateRuleValue` per keystroke,
+    // and the store subscriber re-ran `renderColumnFilterSections()`
+    // which wipes `#column-filter-sections` via innerHTML="". The new
+    // input element replaced the focused one mid-type, forcing the user
+    // to re-click after every character. The subscriber must skip the
+    // panel re-render while a rule input owns focus — the input's value
+    // is already in sync with the store, so no DOM churn is needed.
+    await page.locator("#open-filters-panel").click();
+    const titleSection = page.locator('[data-filter-section="title"]');
+    await titleSection.locator("button", { hasText: "+ Rule" }).click();
+    const ruleInput = titleSection.locator(".filter-rule-value input").first();
+    await ruleInput.click();
+    for (const ch of "List") {
+      await page.keyboard.type(ch);
+      await expect(ruleInput).toBeFocused();
+    }
+    await expect(ruleInput).toHaveValue("List");
+  });
+
   test("Title funnel icon opens a popover with non-header operators", async ({
     page,
   }) => {
