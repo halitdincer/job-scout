@@ -8,6 +8,7 @@ from core.adapters import (
     BambooHRAdapter,
     GreenhouseAdapter,
     LeverAdapter,
+    PhenomAdapter,
     WorkdayAdapter,
     get_adapter,
     normalize_employment_type,
@@ -76,6 +77,10 @@ class TestAdapterRegistry:
     def test_get_bamboohr_adapter(self):
         adapter = get_adapter("bamboohr")
         assert isinstance(adapter, BambooHRAdapter)
+
+    def test_get_phenom_adapter(self):
+        adapter = get_adapter("phenom")
+        assert isinstance(adapter, PhenomAdapter)
 
     def test_unknown_platform_raises_value_error(self):
         with pytest.raises(ValueError, match="Unknown platform"):
@@ -758,3 +763,173 @@ class TestBambooHRAdapter:
         adapter = BambooHRAdapter()
         with pytest.raises(requests.HTTPError):
             adapter.fetch_listings("nonexistent")
+
+
+class TestPhenomAdapter:
+    @patch("core.adapters.requests.post")
+    def test_fetch_listings(self, mock_post):
+        mock_post.return_value = _mock_response({
+            "refineSearch": {
+                "status": 200,
+                "hits": 1,
+                "totalHits": 1,
+                "data": {
+                    "jobs": [
+                        {
+                            "jobId": "R-0000140512",
+                            "title": "Reconciliation Administrator",
+                            "category": "Operations",
+                            "subCategory": "Operations and Business Management",
+                            "type": "Full time",
+                            "country": "Malaysia",
+                            "location": "Putrajaya, Wilayah Persekutuan Kuala Lumpur, Malaysia",
+                            "multi_location": [
+                                "Putrajaya, Wilayah Persekutuan Kuala Lumpur, Malaysia"
+                            ],
+                            "postedDate": "2025-10-28T00:00:00.000+0000",
+                            "dateCreated": "2025-09-11T11:44:01.101+0000",
+                        }
+                    ],
+                },
+            },
+        })
+        adapter = PhenomAdapter()
+        listings = adapter.fetch_listings("jobs.rbc.com/ca/en:RBCAA0088")
+        assert len(listings) == 1
+        listing = listings[0]
+        assert listing["external_id"] == "R-0000140512"
+        assert listing["title"] == "Reconciliation Administrator"
+        assert listing["department"] == "Operations"
+        assert listing["locations"] == [
+            "Putrajaya, Wilayah Persekutuan Kuala Lumpur, Malaysia"
+        ]
+        assert listing["url"] == (
+            "https://jobs.rbc.com/ca/en/job/R-0000140512"
+        )
+        assert listing["team"] is None
+        assert listing["employment_type"] == "full_time"
+        assert listing["workplace_type"] == "unknown"
+        assert listing["country"] == "Malaysia"
+        assert listing["published_at"] == "2025-10-28T00:00:00.000+0000"
+        assert listing["updated_at_source"] == "2025-09-11T11:44:01.101+0000"
+        assert listing["is_listed"] is None
+        mock_post.assert_called_once()
+        call = mock_post.call_args
+        assert call.args[0] == "https://jobs.rbc.com/widgets"
+        body = call.kwargs["json"]
+        assert body["refNum"] == "RBCAA0088"
+        assert body["ddoKey"] == "refineSearch"
+        assert body["from"] == 0
+        assert body["jobs"] is True
+        assert body["counts"] is True
+        assert call.kwargs["timeout"] == 30
+
+    @patch("core.adapters.requests.post")
+    def test_paginates_until_total_reached(self, mock_post):
+        # totalHits=25, page size 20 → two POSTs at from=0 and from=20
+        page1 = _mock_response({
+            "refineSearch": {
+                "totalHits": 25,
+                "data": {
+                    "jobs": [
+                        {
+                            "jobId": f"J{i}",
+                            "title": f"Job {i}",
+                            "type": "Full time",
+                            "multi_location": ["Toronto"],
+                        }
+                        for i in range(20)
+                    ],
+                },
+            },
+        })
+        page2 = _mock_response({
+            "refineSearch": {
+                "totalHits": 25,
+                "data": {
+                    "jobs": [
+                        {
+                            "jobId": f"J{i}",
+                            "title": f"Job {i}",
+                            "type": "Full time",
+                            "multi_location": ["Toronto"],
+                        }
+                        for i in range(20, 25)
+                    ],
+                },
+            },
+        })
+        mock_post.side_effect = [page1, page2]
+        adapter = PhenomAdapter()
+        listings = adapter.fetch_listings("jobs.rbc.com/ca/en:RBCAA0088")
+        assert len(listings) == 25
+        assert mock_post.call_count == 2
+        assert mock_post.call_args_list[0].kwargs["json"]["from"] == 0
+        assert mock_post.call_args_list[1].kwargs["json"]["from"] == 20
+
+    @patch("core.adapters.requests.post")
+    def test_falls_back_to_location_when_multi_location_missing(self, mock_post):
+        mock_post.return_value = _mock_response({
+            "refineSearch": {
+                "totalHits": 1,
+                "data": {
+                    "jobs": [
+                        {
+                            "jobId": "X1",
+                            "title": "Engineer",
+                            "location": "Toronto, ON, Canada",
+                        }
+                    ],
+                },
+            },
+        })
+        adapter = PhenomAdapter()
+        listings = adapter.fetch_listings("jobs.rbc.com/ca/en:RBCAA0088")
+        assert listings[0]["locations"] == ["Toronto, ON, Canada"]
+        assert listings[0]["employment_type"] == "unknown"
+
+    @patch("core.adapters.requests.post")
+    def test_no_locations_when_neither_field_present(self, mock_post):
+        mock_post.return_value = _mock_response({
+            "refineSearch": {
+                "totalHits": 1,
+                "data": {
+                    "jobs": [
+                        {
+                            "jobId": "X2",
+                            "title": "Engineer",
+                        }
+                    ],
+                },
+            },
+        })
+        adapter = PhenomAdapter()
+        listings = adapter.fetch_listings("jobs.rbc.com/ca/en:RBCAA0088")
+        assert listings[0]["locations"] == []
+
+    @patch("core.adapters.requests.post")
+    def test_empty_jobs_terminates_pagination(self, mock_post):
+        mock_post.return_value = _mock_response({
+            "refineSearch": {"totalHits": 100, "data": {"jobs": []}}
+        })
+        adapter = PhenomAdapter()
+        listings = adapter.fetch_listings("jobs.rbc.com/ca/en:RBCAA0088")
+        assert listings == []
+        assert mock_post.call_count == 1
+
+    def test_invalid_board_id_raises(self):
+        adapter = PhenomAdapter()
+        with pytest.raises(ValueError, match="board_id"):
+            adapter.fetch_listings("missing-colon")
+
+    def test_invalid_board_id_too_many_segments_raises(self):
+        adapter = PhenomAdapter()
+        with pytest.raises(ValueError, match="board_id"):
+            adapter.fetch_listings("a:b:c")
+
+    @patch("core.adapters.requests.post")
+    def test_http_error(self, mock_post):
+        mock_post.return_value = _mock_response({}, status_code=500)
+        adapter = PhenomAdapter()
+        with pytest.raises(requests.HTTPError):
+            adapter.fetch_listings("jobs.rbc.com/ca/en:RBCAA0088")

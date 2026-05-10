@@ -30,6 +30,13 @@ EXPECTED_NEW_SOURCES = {
 }
 
 
+EXPECTED_PHENOM_SOURCES = {
+    ("RBC", "phenom", "jobs.rbc.com/ca/en:RBCAA0088"),
+    ("BMO", "phenom", "jobs.bmo.com/ca/en:BOMOGLOBAL"),
+    ("OMERS", "phenom", "careers.omers.com/ca/en:OMEOMECA"),
+}
+
+
 EXPECTED_WORKDAY_BAMBOOHR_SOURCES = {
     ("TMX", "workday", "tmx:wd3:TMX_Careers"),
     ("HOOPP", "workday", "hoopp:wd10:HOOPP"),
@@ -128,3 +135,53 @@ class TestSeedCompaniesWorkdayBambooHRMigration:
                 board_id for _, _, board_id in EXPECTED_WORKDAY_BAMBOOHR_SOURCES
             ]
         ).count() == len(EXPECTED_WORKDAY_BAMBOOHR_SOURCES)
+
+
+@pytest.mark.django_db
+class TestSeedCompaniesPhenomMigration:
+    def test_seed_creates_expected_sources(self):
+        migration = importlib.import_module(
+            "core.migrations.0011_seed_companies_phenom"
+        )
+
+        Source.objects.filter(
+            board_id__in=[
+                board_id for _, _, board_id in EXPECTED_PHENOM_SOURCES
+            ]
+        ).delete()
+
+        migration.seed_sources(django_apps, None)
+
+        actual = set(Source.objects.values_list("name", "platform", "board_id"))
+        assert EXPECTED_PHENOM_SOURCES.issubset(actual)
+        assert Source.objects.filter(
+            board_id__in=[
+                board_id for _, _, board_id in EXPECTED_PHENOM_SOURCES
+            ]
+        ).count() == len(EXPECTED_PHENOM_SOURCES)
+
+    def test_seed_is_idempotent_and_skips_existing_sources(self):
+        migration = importlib.import_module(
+            "core.migrations.0011_seed_companies_phenom"
+        )
+        existing = Source.objects.get(
+            platform="phenom", board_id="jobs.rbc.com/ca/en:RBCAA0088"
+        )
+        existing.name = "Existing RBC"
+        existing.is_active = False
+        existing.save(update_fields=["name", "is_active", "updated_at"])
+
+        migration.seed_sources(django_apps, None)
+        migration.seed_sources(django_apps, None)
+
+        existing.refresh_from_db()
+        assert existing.name == "Existing RBC"
+        assert existing.is_active is False
+        assert Source.objects.filter(
+            platform="phenom", board_id="jobs.rbc.com/ca/en:RBCAA0088"
+        ).count() == 1
+        assert Source.objects.filter(
+            board_id__in=[
+                board_id for _, _, board_id in EXPECTED_PHENOM_SOURCES
+            ]
+        ).count() == len(EXPECTED_PHENOM_SOURCES)

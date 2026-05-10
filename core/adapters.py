@@ -308,12 +308,86 @@ class BambooHRAdapter:
         return listings
 
 
+class PhenomAdapter:
+    PAGE_SIZE = 20
+
+    @staticmethod
+    def _parse_board_id(board_id):
+        parts = board_id.split(":")
+        if len(parts) != 2 or not all(parts):
+            raise ValueError(
+                f"Invalid Phenom board_id {board_id!r}: expected 'base_path:refNum'"
+            )
+        return parts[0], parts[1]
+
+    def fetch_listings(self, board_id):
+        base_path, ref_num = self._parse_board_id(board_id)
+        domain = base_path.split("/", 1)[0]
+        url = f"https://{domain}/widgets"
+        listings = []
+        offset = 0
+        while True:
+            response = requests.post(
+                url,
+                json={
+                    "lang": "en_global",
+                    "deviceType": "desktop",
+                    "country": "global",
+                    "pageName": "search-results",
+                    "ddoKey": "refineSearch",
+                    "refNum": ref_num,
+                    "size": self.PAGE_SIZE,
+                    "from": offset,
+                    "jobs": True,
+                    "counts": True,
+                    "keywords": "",
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            payload = response.json().get("refineSearch") or {}
+            data = payload.get("data") or {}
+            jobs = data.get("jobs") or []
+            if not jobs:
+                break
+            for job in jobs:
+                multi_location = job.get("multi_location")
+                if multi_location:
+                    locations = list(multi_location)
+                elif job.get("location"):
+                    locations = [job["location"]]
+                else:
+                    locations = []
+                listings.append({
+                    "external_id": str(job["jobId"]),
+                    "title": job.get("title"),
+                    "department": job.get("category"),
+                    "locations": locations,
+                    "url": f"https://{base_path}/job/{job['jobId']}",
+                    "team": None,
+                    "employment_type": normalize_employment_type(
+                        job.get("type")
+                    ),
+                    "workplace_type": "unknown",
+                    "country": job.get("country"),
+                    "published_at": job.get("postedDate"),
+                    "updated_at_source": job.get("dateCreated"),
+                    "is_listed": None,
+                })
+            offset += self.PAGE_SIZE
+            total = payload.get("totalHits") or 0
+            if offset >= total:
+                break
+        return listings
+
+
 _REGISTRY = {
     "greenhouse": GreenhouseAdapter,
     "lever": LeverAdapter,
     "ashby": AshbyAdapter,
     "workday": WorkdayAdapter,
     "bamboohr": BambooHRAdapter,
+    "phenom": PhenomAdapter,
 }
 
 
