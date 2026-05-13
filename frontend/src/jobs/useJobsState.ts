@@ -1,8 +1,6 @@
 /**
- * Typed reducer for the filter rule list on the jobs page.
- *
- * Mirrors the filter slice of `core/static/js/reducer.js`. Pagination + sort
- * stay in their own `useState` hooks at the call site for now.
+ * Typed reducer for the filter rule list on the jobs page. Pagination + sort
+ * stay in their own `useState` hooks at the call site.
  */
 import { useReducer } from "react";
 

@@ -4,7 +4,7 @@ from django.urls import path
 from . import views, views_spa
 
 urlpatterns = [
-    path("", views.jobs_page, name="jobs"),
+    path("", login_required(views_spa.spa_index), name="jobs"),
     path("sources/", login_required(views_spa.spa_index), name="sources"),
     path("runs/", login_required(views_spa.spa_index), name="runs"),
     path("api/health", views.health),

@@ -7,7 +7,6 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import BooleanField, Exists, Min, OuterRef, Value
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -15,7 +14,6 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from core.filter_expression import build_filter_q, validate_filter_expression
 from core.ingestion import ingest_sources
 from core.models import JobListing, LocationTag, Run, SavedView, SeenListing, Source
-from core.views_spa import spa_index
 
 
 SORT_FIELD_TO_DB = {
@@ -129,13 +127,6 @@ def _apply_sort(qs, sort_specs, user):
         order_by.append(f"-{db_col}" if spec["dir"] == "desc" else db_col)
     order_by.append("id")  # stable tiebreaker for pagination
     return qs.order_by(*order_by)
-
-
-@login_required
-def jobs_page(request):
-    if request.GET.get("legacy") == "1":
-        return render(request, "core/jobs.html")
-    return spa_index(request)
 
 
 def health(request):
