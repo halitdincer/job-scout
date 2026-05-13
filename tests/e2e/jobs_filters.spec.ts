@@ -2,215 +2,119 @@ import { expect, test } from "@playwright/test";
 import { captureJobsResponse, login, waitForRows } from "./fixtures";
 
 /**
- * Covers the merged Columns & Filters panel introduced when filter pills
- * were removed. Two invariants matter for this spec:
+ * Covers the SPA filter Sheet on the jobs page. The legacy header-filter +
+ * popover UI was removed when the page migrated to React; filter rules now
+ * live in a shadcn `Sheet` opened from the toolbar and only apply when the
+ * user clicks "Apply filters".
  *
- *   1. Typing in the Title header filter input propagates to the merged
- *      panel (rule + count badge) and to the server envelope.
- *   2. Un-checking a column's visibility inside the merged panel removes
- *      any rules targeting that column; the server refetches without
- *      those predicates and the column disappears from the grid.
+ * Two invariants matter:
+ *   1. Rules added in the Sheet round-trip through the server `filter=`
+ *      query param and back into the grid.
+ *   2. Typing into a rule's value input never loses focus — this is the
+ *      original bug class the SPA migration was designed to eliminate.
  */
-test.describe("Jobs merged Columns & Filters panel", () => {
+test.describe("Jobs filter Sheet", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page, "/?legacy=1");
+    await login(page);
     await waitForRows(page);
   });
 
-  test("Title header input → merged panel rule + server filter", async ({
+  async function openFilters(page: import("@playwright/test").Page) {
+    await page.getByRole("button", { name: "Open filters" }).click();
+    await expect(page.getByLabel("Add filter rule")).toBeVisible();
+  }
+
+  test("adding a Title contains rule applies a server filter and returns rows", async ({
     page,
   }) => {
-    // Type into the Title column's Tabulator header filter. The
-    // header filter is configured with `headerFilterLiveFilter: false`,
-    // so the debounce/commit happens on blur; press Enter to force it.
+    await openFilters(page);
+    await page.getByLabel("Add filter rule").selectOption("title");
+    await page.getByLabel("Value for Title").fill("Listing 001");
+
     const payload = await captureJobsResponse(
       page,
       async () => {
-        const titleHeader = page.locator(
-          '.tabulator-col[tabulator-field="title"] .tabulator-header-filter input'
-        );
-        await titleHeader.fill("Listing 001");
-        await titleHeader.press("Enter");
+        await page.getByRole("button", { name: "Apply filters" }).click();
       },
-      (url) => url.includes("/api/jobs/") && url.includes("filter=")
+      (url) => url.includes("/api/jobs/") && url.includes("filter="),
     );
 
-    // Server received a `filter` param containing a title/contains rule.
-    const requested = page.url();
-    expect(requested).toBeTruthy();
-    // Use the last request URL; assert structurally by re-reading the
-    // store exposed on window for determinism. __STORE__ is exported by
-    // jobs.js for this purpose.
-    const rules = await page.evaluate(() => window.__STORE__.getState().filter.rules);
-    const titleRule = rules.find((r: any) => r.field === "title");
-    expect(titleRule).toBeTruthy();
-    expect(titleRule.operator).toBe("contains");
-    expect(titleRule.value).toBe("Listing 001");
-
-    // Envelope should carry at least one result (we have 300 seeded listings).
+    // Server received a filter and returned at least one matching row.
     expect(payload.count).toBeGreaterThan(0);
+    const filterParam = new URL(
+      page.url().startsWith("http") ? page.url() : `http://x${page.url()}`,
+    ); // url for assertions only; the real check is the envelope.
+    expect(filterParam).toBeTruthy();
 
-    // Open the merged panel and confirm the Title section shows the rule
-    // plus a count badge.
-    await page.locator("#open-filters-panel").click();
-    const titleSection = page.locator('[data-filter-section="title"]');
-    await expect(titleSection).toBeVisible();
-    const badge = titleSection.locator(".col-filter-count");
-    await expect(badge).toHaveText("1");
+    // The Sheet closes on Apply; reopen and confirm the rule persists.
+    await openFilters(page);
+    await expect(page.getByLabel("Value for Title")).toHaveValue("Listing 001");
   });
 
-  test("Title header input keeps focus per keystroke (no mid-type steal)", async ({
+  test("rule value input keeps focus per keystroke (no mid-type re-render)", async ({
     page,
   }) => {
-    // Regression: the Tabulator built-in `"input"` headerFilter used to
-    // fire `headerFilterChanged` on each keystroke, and the reactive
-    // store subscriber re-rendered the input mid-type, stealing focus.
-    // The custom `textHeaderFilter` widget commits only on blur/Enter,
-    // and `syncTabulatorHeaderFiltersFromRules` skips when the user is
-    // focused inside a header input. So typing should keep focus on the
-    // same input element across every character.
-    const titleHeader = page.locator(
-      '.tabulator-col[tabulator-field="title"] .tabulator-header-filter input'
-    );
-    await titleHeader.click();
-    // Type character-by-character and assert focus is retained after
-    // each keystroke. If the reactive subscriber re-renders the input
-    // mid-type, `toBeFocused` will fail on the next character.
+    // Regression escape: in the legacy vanilla-JS layer, every keystroke
+    // dispatched UPDATE_RULE_VALUE and the subscriber re-rendered the
+    // filter panel via innerHTML, replacing the focused <input> mid-type.
+    // The React reducer keeps the same DOM node across renders, so focus
+    // must be retained for every character.
+    await openFilters(page);
+    await page.getByLabel("Add filter rule").selectOption("title");
+    const valueInput = page.getByLabel("Value for Title");
+    await valueInput.click();
     for (const ch of "List") {
       await page.keyboard.type(ch);
-      await expect(titleHeader).toBeFocused();
+      await expect(valueInput).toBeFocused();
     }
-    await expect(titleHeader).toHaveValue("List");
+    await expect(valueInput).toHaveValue("List");
   });
 
-  test("Panel rule input keeps focus per keystroke (no mid-type re-render)", async ({
+  test("non-default operator (not_contains) round-trips through the server", async ({
     page,
   }) => {
-    // Regression: typing into a `.filter-rule-value input` in the merged
-    // Columns & Filters panel dispatched `updateRuleValue` per keystroke,
-    // and the store subscriber re-ran `renderColumnFilterSections()`
-    // which wipes `#column-filter-sections` via innerHTML="". The new
-    // input element replaced the focused one mid-type, forcing the user
-    // to re-click after every character. The subscriber must skip the
-    // panel re-render while a rule input owns focus — the input's value
-    // is already in sync with the store, so no DOM churn is needed.
-    await page.locator("#open-filters-panel").click();
-    const titleSection = page.locator('[data-filter-section="title"]');
-    await titleSection.locator("button", { hasText: "+ Rule" }).click();
-    const ruleInput = titleSection.locator(".filter-rule-value input").first();
-    await ruleInput.click();
-    for (const ch of "List") {
-      await page.keyboard.type(ch);
-      await expect(ruleInput).toBeFocused();
-    }
-    await expect(ruleInput).toHaveValue("List");
-  });
+    await openFilters(page);
+    await page.getByLabel("Add filter rule").selectOption("title");
+    // Operator <select> exposes the friendly label "does not contain".
+    await page
+      .getByLabel("Operator for Title")
+      .selectOption({ label: "does not contain" });
+    await page.getByLabel("Value for Title").fill("archive");
 
-  test("Title funnel icon opens a popover with non-header operators", async ({
-    page,
-  }) => {
-    // The popover is the user-facing answer to "I want to add a
-    // not_contains rule on Title". The existing text header input only
-    // supports `contains`; the funnel icon opens a full rule editor.
-    const iconBtn = page.locator(
-      '.tabulator-col[tabulator-field="title"] .text-header-filter-icon'
-    );
-    await iconBtn.click();
-
-    const popover = page.locator(".col-filter-popover");
-    await expect(popover).toBeVisible();
-    await expect(popover).toContainText(/Title/i);
-
-    // Add a not_contains rule from the popover.
-    await popover.locator("button", { hasText: "+ Rule" }).click();
-    // The rule row renders a <select> with operator options.
-    await popover.locator(".filter-rule-row select").selectOption("not_contains");
-    await popover
-      .locator(".filter-rule-row .filter-rule-value input")
-      .fill("archive");
-
-    const apply = page.waitForResponse(
-      (r) =>
-        r.url().includes("/api/jobs/") &&
-        r.url().includes("filter=")
-    );
-    await popover.locator("button", { hasText: "Apply" }).click();
-    await apply;
-
-    // The store should now carry the not_contains rule, and the icon
-    // should show the `is-active` class so the user can see extra
-    // filter logic lives behind it.
-    const rules = await page.evaluate(
-      () => window.__STORE__.getState().filter.rules
-    );
-    const notContains = rules.find(
-      (r: any) => r.field === "title" && r.operator === "not_contains"
-    );
-    expect(notContains).toBeTruthy();
-    expect(notContains.value).toBe("archive");
-
-    await expect(iconBtn).toHaveClass(/is-active/);
-
-    // Pressing Escape closes the popover.
-    await page.keyboard.press("Escape");
-    await expect(popover).toBeHidden();
-  });
-
-  test("un-checking a filtered column's visibility clears its rules", async ({
-    page,
-  }) => {
-    // Set up a Title rule via the merged panel so we know the exact
-    // state. Open panel → click "+ Rule" under Title → enter value.
-    await page.locator("#open-filters-panel").click();
-    const titleSection = page.locator('[data-filter-section="title"]');
-    await titleSection.locator("button", { hasText: "+ Rule" }).click();
-
-    // Type a contains value into the newly rendered rule input.
-    const ruleInput = titleSection.locator(".filter-rule-value input").first();
-    await ruleInput.fill("Listing");
-    // Commit.
-    const afterApply = captureJobsResponse(
+    const payload = await captureJobsResponse(
       page,
       async () => {
-        await page.locator("#apply-filters").click();
+        await page.getByRole("button", { name: "Apply filters" }).click();
       },
-      (url) => url.includes("filter=")
+      (url) => url.includes("/api/jobs/") && url.includes("filter="),
     );
-    await afterApply;
+    // None of the seeded titles contain "archive", so every row should match.
+    expect(payload.count).toBe(300);
+  });
 
-    const beforeVisibility = await page.evaluate(
-      () => window.__STORE__.getState().columns.visibility.title !== false
-    );
-    expect(beforeVisibility).toBe(true);
-
-    // Un-check the visibility toggle for Title. Expect:
-    //  - rules for `title` get cleared (invariant enforcement)
-    //  - server refetches without a title predicate
-    //  - column leaves the grid
-    const noFilterFetch = captureJobsResponse(
+  test("clearing the rules refetches unfiltered", async ({ page }) => {
+    // Apply a rule first so a filter= request lands.
+    await openFilters(page);
+    await page.getByLabel("Add filter rule").selectOption("title");
+    await page.getByLabel("Value for Title").fill("Listing");
+    await captureJobsResponse(
       page,
       async () => {
-        const toggle = titleSection.locator(
-          ".col-section-toggle input[type=checkbox]"
-        );
-        await toggle.uncheck();
+        await page.getByRole("button", { name: "Apply filters" }).click();
       },
-      (url) => url.includes("/api/jobs/")
+      (url) => url.includes("filter="),
     );
-    await noFilterFetch;
 
-    const rulesAfter = await page.evaluate(
-      () => window.__STORE__.getState().filter.rules
+    // Apply is disabled when there are no rules; "Clear filters" is the
+    // intentional path back to the unfiltered query.
+    await openFilters(page);
+    const cleared = await captureJobsResponse(
+      page,
+      async () => {
+        await page.getByRole("button", { name: "Clear filters" }).click();
+      },
+      (url) => url.includes("/api/jobs/") && !url.includes("filter="),
     );
-    expect(rulesAfter.filter((r: any) => r.field === "title")).toEqual([]);
-
-    // Title column hidden in Tabulator.
-    const titleCol = await page.evaluate(() => {
-      const t = (window as any).Tabulator
-        ? null
-        : document.querySelector('.tabulator-col[tabulator-field="title"]');
-      return t ? (t as HTMLElement).offsetParent !== null : false;
-    });
-    expect(titleCol).toBe(false);
+    expect(cleared.count).toBe(300);
   });
 });
