@@ -14,3 +14,12 @@ db.sqlite3
 README.md
 docker-compose.yml
 .DS_Store
+# Frontend: keep package.json + src so the build stage can install + build,
+# but skip node_modules (re-installed inside the image) and any local dist
+# (re-built inside the image).
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+node_modules/
+playwright-report/
+test-results/
