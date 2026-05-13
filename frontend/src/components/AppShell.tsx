@@ -14,12 +14,12 @@ export function AppShell() {
           <Link to="/runs" className="text-muted-foreground hover:text-foreground">
             Runs
           </Link>
-          <a
-            href="/sources/"
+          <Link
+            to="/sources"
             className="text-muted-foreground hover:text-foreground"
           >
             Sources
-          </a>
+          </Link>
           <a href="/admin/" className="text-muted-foreground hover:text-foreground">
             Admin
           </a>

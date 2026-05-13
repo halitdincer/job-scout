@@ -18,4 +18,11 @@ describe("router", () => {
     );
     expect(shell).toBeDefined();
   });
+
+  it("routes /sources through the app shell", () => {
+    const shell = router.routes.find((r) =>
+      r.children?.some((child) => child.path === "/sources"),
+    );
+    expect(shell).toBeDefined();
+  });
 });

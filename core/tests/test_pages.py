@@ -3,7 +3,6 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 
 from core import views_spa
-from core.models import Run, Source
 
 
 @pytest.mark.django_db
@@ -132,6 +131,9 @@ class TestJobsPage:
 
 @pytest.mark.django_db
 class TestSourcesPage:
+    """`/sources/` is served by the SPA shell. Source rendering moved to
+    React; Django keeps the login_required gate and serves index.html."""
+
     def _authenticated_client(self):
         user = get_user_model().objects.create_user(
             username="sources-user",
@@ -147,26 +149,20 @@ class TestSourcesPage:
         assert response.status_code == 302
         assert response.url == "/accounts/login/?next=/sources/"
 
-    def test_renders_sources_template(self):
+    def test_serves_spa_shell_for_authenticated_user(
+        self, tmp_path, monkeypatch
+    ):
+        index = tmp_path / "index.html"
+        index.write_text(
+            '<!doctype html><html><body><div id="root"></div></body></html>'
+        )
+        monkeypatch.setattr(views_spa, "_spa_index_path", lambda: index)
         client = self._authenticated_client()
         response = client.get("/sources/")
         assert response.status_code == 200
-        assert "core/sources.html" in [t.name for t in response.templates]
-
-    def test_context_has_sources(self):
-        Source.objects.all().delete()
-        Source.objects.create(
-            name="Airbnb", platform="greenhouse", board_id="airbnb-page"
-        )
-        client = self._authenticated_client()
-        response = client.get("/sources/")
-        assert len(response.context["sources"]) == 1
-
-    def test_empty_state(self):
-        Source.objects.all().delete()
-        client = self._authenticated_client()
-        response = client.get("/sources/")
-        assert b"No sources configured." in response.content
+        assert response["Content-Type"].startswith("text/html")
+        assert b'<div id="root">' in response.content
+        assert response.templates == []
 
 
 @pytest.mark.django_db

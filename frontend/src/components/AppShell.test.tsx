@@ -36,7 +36,7 @@ describe("AppShell", () => {
     );
     expect(screen.getByRole("link", { name: /^sources$/i })).toHaveAttribute(
       "href",
-      "/sources/",
+      "/sources",
     );
     expect(screen.getByRole("link", { name: /^admin$/i })).toHaveAttribute(
       "href",

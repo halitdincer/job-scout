@@ -5,7 +5,7 @@ from . import views, views_spa
 
 urlpatterns = [
     path("", views.jobs_page, name="jobs"),
-    path("sources/", views.sources_page, name="sources"),
+    path("sources/", login_required(views_spa.spa_index), name="sources"),
     path("runs/", login_required(views_spa.spa_index), name="runs"),
     path("api/health", views.health),
     path("api/sources/", views.list_sources),

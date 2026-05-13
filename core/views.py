@@ -135,13 +135,6 @@ def jobs_page(request):
     return render(request, "core/jobs.html")
 
 
-@login_required
-def sources_page(request):
-    return render(request, "core/sources.html", {
-        "sources": Source.objects.all(),
-    })
-
-
 def health(request):
     return JsonResponse({"status": "ok"})
 
