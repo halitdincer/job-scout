@@ -82,11 +82,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-# Vite emits the built SPA into frontend/dist; Django picks it up here so
-# collectstatic + WhiteNoise's manifest storage handle hashing and compression
-# the same way they handle core/static/. Django silently ignores the directory
-# if it doesn't yet exist (e.g. before `npm run build` has run locally).
-STATICFILES_DIRS = [BASE_DIR / "frontend" / "dist"]
+# Vite emits URLs under /static/spa/. The "spa" prefix makes Django's
+# staticfiles finder serve frontend/dist/assets/... at /static/spa/assets/...
+# in local e2e runs and lets collectstatic carry the same layout to WhiteNoise.
+STATICFILES_DIRS = [("spa", BASE_DIR / "frontend" / "dist")]
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",

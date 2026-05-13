@@ -27,7 +27,9 @@ def main() -> None:
 
     from django.contrib.auth import get_user_model
 
-    from core.models import JobListing, SavedView, SeenListing, Source
+    from django.utils import timezone
+
+    from core.models import JobListing, Run, SavedView, SeenListing, Source
 
     User = get_user_model()
 
@@ -36,6 +38,7 @@ def main() -> None:
     SavedView.objects.all().delete()
     SeenListing.objects.all().delete()
     JobListing.objects.all().delete()
+    Run.objects.all().delete()
     Source.objects.all().delete()
     User.objects.filter(username="e2e").delete()
 
@@ -58,6 +61,16 @@ def main() -> None:
             )
             for i in range(300)
         ]
+    )
+
+    Run.objects.create(
+        status="completed",
+        started_at=timezone.now(),
+        finished_at=timezone.now(),
+        sources_processed=1,
+        listings_created=300,
+        listings_updated=0,
+        listings_expired=0,
     )
 
     print(f"Seeded {JobListing.objects.count()} listings for E2E.")

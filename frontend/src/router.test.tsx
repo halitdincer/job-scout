@@ -11,4 +11,11 @@ describe("router", () => {
     const catchAll = router.routes.find((r) => r.path === "*");
     expect(catchAll).toBeDefined();
   });
+
+  it("routes /runs through the app shell", () => {
+    const shell = router.routes.find((r) =>
+      r.children?.some((child) => child.path === "/runs"),
+    );
+    expect(shell).toBeDefined();
+  });
 });

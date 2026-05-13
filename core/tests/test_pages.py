@@ -2,6 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
 
+from core import views_spa
 from core.models import Run, Source
 
 
@@ -170,6 +171,10 @@ class TestSourcesPage:
 
 @pytest.mark.django_db
 class TestRunsPage:
+    """`/runs/` is served by the SPA shell. Data + rendering moved to React;
+    server-side responsibilities here are just (a) login_required gating and
+    (b) returning the built index.html for authenticated users."""
+
     def _authenticated_client(self):
         user = get_user_model().objects.create_user(
             username="runs-user",
@@ -179,37 +184,31 @@ class TestRunsPage:
         client.force_login(user)
         return client
 
+    def _stub_spa_bundle(self, monkeypatch, tmp_path):
+        index = tmp_path / "index.html"
+        index.write_text(
+            '<!doctype html><html><body><div id="root"></div></body></html>'
+        )
+        monkeypatch.setattr(views_spa, "_spa_index_path", lambda: index)
+
     def test_redirects_unauthenticated_user_to_login(self):
         client = Client()
         response = client.get("/runs/")
         assert response.status_code == 302
         assert response.url == "/accounts/login/?next=/runs/"
 
-    def test_renders_runs_template(self):
+    def test_serves_spa_shell_for_authenticated_user(
+        self, tmp_path, monkeypatch
+    ):
+        self._stub_spa_bundle(monkeypatch, tmp_path)
         client = self._authenticated_client()
         response = client.get("/runs/")
         assert response.status_code == 200
-        assert "core/runs.html" in [t.name for t in response.templates]
-
-    def test_context_has_runs_ordered_desc(self):
-        Run.objects.create(status="completed")
-        Run.objects.create(status="pending")
-        client = self._authenticated_client()
-        response = client.get("/runs/")
-        runs = list(response.context["runs"])
-        assert len(runs) == 2
-        assert runs[0].id > runs[1].id
-
-    def test_error_message_shown_for_failed_run(self):
-        Run.objects.create(status="failed", error_message="Connection refused")
-        client = self._authenticated_client()
-        response = client.get("/runs/")
-        assert b"Connection refused" in response.content
-
-    def test_empty_state(self):
-        client = self._authenticated_client()
-        response = client.get("/runs/")
-        assert b"No ingestion runs yet." in response.content
+        assert response["Content-Type"].startswith("text/html")
+        assert b'<div id="root">' in response.content
+        # The page is now rendered by React — no Django template should be
+        # involved in the response.
+        assert response.templates == []
 
 
 @pytest.mark.django_db

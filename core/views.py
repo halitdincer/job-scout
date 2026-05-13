@@ -142,13 +142,6 @@ def sources_page(request):
     })
 
 
-@login_required
-def runs_page(request):
-    return render(request, "core/runs.html", {
-        "runs": Run.objects.order_by("-created_at"),
-    })
-
-
 def health(request):
     return JsonResponse({"status": "ok"})
 

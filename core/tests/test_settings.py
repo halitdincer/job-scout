@@ -21,3 +21,10 @@ def test_secret_key_is_set():
 def test_csrf_trusted_origins_derived_from_allowed_hosts():
     assert "https://localhost" in settings.CSRF_TRUSTED_ORIGINS
     assert "https://127.0.0.1" in settings.CSRF_TRUSTED_ORIGINS
+
+
+def test_spa_staticfiles_dir_matches_vite_base_path():
+    assert (
+        "spa",
+        settings.BASE_DIR / "frontend" / "dist",
+    ) in settings.STATICFILES_DIRS
