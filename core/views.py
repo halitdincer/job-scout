@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from core.filter_expression import build_filter_q, validate_filter_expression
 from core.ingestion import ingest_sources
 from core.models import JobListing, LocationTag, Run, SavedView, SeenListing, Source
+from core.views_spa import spa_index
 
 
 SORT_FIELD_TO_DB = {
@@ -132,7 +133,9 @@ def _apply_sort(qs, sort_specs, user):
 
 @login_required
 def jobs_page(request):
-    return render(request, "core/jobs.html")
+    if request.GET.get("legacy") == "1":
+        return render(request, "core/jobs.html")
+    return spa_index(request)
 
 
 def health(request):

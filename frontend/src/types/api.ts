@@ -49,20 +49,33 @@ export type WorkplaceType = "on_site" | "remote" | "hybrid" | "unknown";
 export type JobListing = {
   id: number;
   source_id: number;
-  source__name: string;
+  source_name: string;
+  external_id: string;
   title: string;
   department: string | null;
+  locations: LocationTag[];
   url: string;
   status: JobStatus;
   team: string | null;
   employment_type: EmploymentType | null;
   workplace_type: WorkplaceType | null;
+  country: string[];
+  region: string[];
+  city: string[];
   expired_at: string | null;
   published_at: string | null;
   updated_at_source: string | null;
   first_seen_at: string;
   last_seen_at: string;
   seen: boolean;
+};
+
+export type LocationTag = {
+  name: string;
+  country_code: string;
+  region_code: string;
+  city: string;
+  geo_key: string;
 };
 
 export type FilterExpression =

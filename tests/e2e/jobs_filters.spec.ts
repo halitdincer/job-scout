@@ -13,7 +13,7 @@ import { captureJobsResponse, login, waitForRows } from "./fixtures";
  */
 test.describe("Jobs merged Columns & Filters panel", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
+    await login(page, "/?legacy=1");
     await waitForRows(page);
   });
 

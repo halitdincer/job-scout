@@ -4,15 +4,15 @@ export const E2E_USER = "e2e";
 export const E2E_PASSWORD = "e2e-pass-123";
 
 /**
- * Log in via the standard Django form. Leaves the page on `/` after the
+ * Log in via the standard Django form. Leaves the page on `next` after the
  * post-login redirect. Safe to call at the top of any spec.
  */
-export async function login(page: Page): Promise<void> {
-  await page.goto("/accounts/login/");
+export async function login(page: Page, next = "/"): Promise<void> {
+  await page.goto(`/accounts/login/?next=${encodeURIComponent(next)}`);
   await page.getByLabel("Username").fill(E2E_USER);
   await page.getByLabel("Password").fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL((url) => url.pathname === "/");
+  await page.waitForURL((url) => `${url.pathname}${url.search}` === next);
 }
 
 /**

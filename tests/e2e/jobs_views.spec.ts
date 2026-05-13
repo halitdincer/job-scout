@@ -7,7 +7,7 @@ import { login, waitForRows } from "./fixtures";
 // and reappears on drift.
 test.describe("Jobs saved views", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
+    await login(page, "/?legacy=1");
     await waitForRows(page);
 
     // Make absolutely sure we start from a clean slate — a previous failed

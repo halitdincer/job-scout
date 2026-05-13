@@ -41,4 +41,8 @@ describe("router", () => {
   it("routes /accounts/login to the login page", () => {
     expect(findRouteByPath(router.routes, "/accounts/login")).toBeDefined();
   });
+
+  it("routes / through the app shell", () => {
+    expect(findRouteByPath(router.routes, "/")).toBeDefined();
+  });
 });
