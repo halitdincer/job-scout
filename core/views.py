@@ -271,7 +271,6 @@ def list_jobs(request):
     )
 
 
-@csrf_exempt
 @login_required
 @require_POST
 def mark_listing_seen(request, listing_id):
@@ -303,6 +302,11 @@ def list_locations(request):
     return JsonResponse(data, safe=False)
 
 
+# `@csrf_exempt` is intentional here: POST /api/runs/ is the cron trigger
+# called by GitHub Actions with `Authorization: Bearer <INGEST_API_KEY>`.
+# There is no browser session, so no CSRF cookie exists. The Bearer check
+# inside `_trigger_run` is the auth boundary. The GET path is a safe method
+# and not subject to CSRF anyway. Tests in TestCSRFRunsExempt cover this.
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
 def runs_view(request):
@@ -476,7 +480,6 @@ def _validate_saved_view_config(raw):
     return raw
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["GET", "POST"])
 def saved_views_list(request):
@@ -530,7 +533,6 @@ def saved_views_list(request):
     return JsonResponse(_serialize_view(view), status=201)
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["GET", "PUT", "DELETE"])
 def saved_view_detail(request, view_id):

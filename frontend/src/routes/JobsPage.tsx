@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import type { Options } from "tabulator-tables";
 
 import { useJobs, type SortSpec } from "@/api/jobs";
+import { DeleteViewDialog } from "@/components/DeleteViewDialog";
 import { FiltersPanel } from "@/components/FiltersPanel";
+import { SaveViewDialog } from "@/components/SaveViewDialog";
+import { SavedViewsMenu } from "@/components/SavedViewsMenu";
 import { Tabulator } from "@/components/Tabulator";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +19,7 @@ import {
 import { DEFAULT_JOB_SORT, getJobColumns, PAGE_SIZES } from "@/jobs/columns";
 import { mapJobRow } from "@/jobs/formatters";
 import { useJobsState } from "@/jobs/useJobsState";
+import type { SavedView } from "@/types/api";
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -32,6 +36,13 @@ export function JobsPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<SortSpec[]>(DEFAULT_JOB_SORT);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [currentViewId, setCurrentViewId] = useState<number | null>(null);
+  const [saveDialog, setSaveDialog] = useState<
+    { mode: "create" } | { mode: "update"; view: SavedView } | null
+  >(null);
+  const [deleteDialogView, setDeleteDialogView] = useState<SavedView | null>(
+    null,
+  );
   const { state: filterState, dispatch: filterDispatch } = useJobsState();
   const previousExpressionRef = useRef(filterState.expression);
 
@@ -91,6 +102,47 @@ export function JobsPage() {
     setFiltersOpen(false);
   }, []);
 
+  const handleLoadView = useCallback(
+    (view: SavedView) => {
+      filterDispatch({
+        type: "SET_FILTER_FROM_EXPRESSION",
+        expression: view.filter_expression,
+      });
+      setSort(normalizeSort(view.sort as SortSpec[]));
+      const nextPageSize = view.config?.page_size ?? DEFAULT_PAGE_SIZE;
+      setPageSize(nextPageSize);
+      setPage(1);
+      setCurrentViewId(view.id);
+    },
+    [filterDispatch],
+  );
+
+  const savedViewPayload = useMemo(
+    () => ({
+      filter_expression: filterState.expression,
+      columns: [],
+      sort,
+      config: { page_size: pageSize },
+    }),
+    [filterState.expression, sort, pageSize],
+  );
+
+  const handleSaveAs = useCallback(() => {
+    setSaveDialog({ mode: "create" });
+  }, []);
+  const handleSaveChanges = useCallback((view: SavedView) => {
+    setSaveDialog({ mode: "update", view });
+  }, []);
+  const handleDelete = useCallback((view: SavedView) => {
+    setDeleteDialogView(view);
+  }, []);
+  const handleSaved = useCallback((view: SavedView) => {
+    setCurrentViewId(view.id);
+  }, []);
+  const handleDeleted = useCallback(() => {
+    setCurrentViewId(null);
+  }, []);
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -102,6 +154,13 @@ export function JobsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <SavedViewsMenu
+            currentViewId={currentViewId}
+            onLoadView={handleLoadView}
+            onSaveAs={handleSaveAs}
+            onSaveChanges={handleSaveChanges}
+            onDelete={handleDelete}
+          />
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
               <Button
@@ -204,6 +263,30 @@ export function JobsPage() {
         options={tableOptions}
         onSortChanged={handleSortChanged}
       />
+
+      {saveDialog ? (
+        <SaveViewDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setSaveDialog(null);
+          }}
+          mode={saveDialog.mode}
+          view={saveDialog.mode === "update" ? saveDialog.view : undefined}
+          payload={savedViewPayload}
+          onSaved={handleSaved}
+        />
+      ) : null}
+
+      {deleteDialogView ? (
+        <DeleteViewDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setDeleteDialogView(null);
+          }}
+          view={deleteDialogView}
+          onDeleted={handleDeleted}
+        />
+      ) : null}
     </section>
   );
 }

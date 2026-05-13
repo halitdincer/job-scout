@@ -25,6 +25,7 @@ export default defineConfig({
         "src/**/*.test.{ts,tsx}",
         "src/components/ui/**",
         "src/hooks/use-toast.ts",
+        "src/types/**",
       ],
       thresholds: {
         lines: 100,

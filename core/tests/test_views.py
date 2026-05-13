@@ -879,3 +879,136 @@ class TestSavedViewsAPI:
         )
         assert response.status_code == 302
 
+
+@pytest.mark.django_db
+class TestCSRFEnforcement:
+    """Once @csrf_exempt is removed, unsafe methods without a valid CSRF
+    token must be rejected with 403. The SPA flows CSRF via the
+    `csrftoken` cookie + `X-CSRFToken` header (see frontend/src/lib/csrf.ts
+    and fetcher.ts). The legacy GitHub Actions cron endpoint keeps
+    @csrf_exempt because it Bearer-authenticates — see TestCSRFRunsExempt
+    below."""
+
+    def _logged_in_csrf_client(self, username):
+        user = get_user_model().objects.create_user(
+            username=username, password="safe-test-password-123"
+        )
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(user)
+        return client, user
+
+    def _seed_listing(self):
+        source = Source.objects.create(
+            name="CSRF Co", platform="greenhouse", board_id="csrf-board"
+        )
+        return JobListing.objects.create(
+            source=source,
+            external_id="csrf-1",
+            title="CSRF Job",
+            url="https://example.com/csrf-1",
+        )
+
+    def test_mark_listing_seen_rejects_post_without_csrf_token(self):
+        listing = self._seed_listing()
+        client, _ = self._logged_in_csrf_client("csrf-mark-no-token")
+        response = client.post(f"/api/jobs/{listing.id}/seen/")
+        assert response.status_code == 403
+
+    def test_mark_listing_seen_accepts_post_with_csrf_token(self):
+        listing = self._seed_listing()
+        client, _ = self._logged_in_csrf_client("csrf-mark-with-token")
+        # Seed the CSRF cookie by visiting any @ensure_csrf_cookie view.
+        client.get("/")  # spa_index (login_required redirects but sets cookie path)
+        # Force a fresh cookie via the dedicated SPA index, which does set
+        # the csrftoken cookie for authenticated users.
+        client.get("/runs/")
+        token = client.cookies["csrftoken"].value
+        response = client.post(
+            f"/api/jobs/{listing.id}/seen/",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert response.status_code == 201
+
+    def test_saved_views_list_rejects_post_without_csrf_token(self):
+        client, _ = self._logged_in_csrf_client("csrf-views-no-token")
+        response = client.post(
+            "/api/views/",
+            json.dumps({"name": "x", "columns": [], "sort": []}),
+            content_type="application/json",
+        )
+        assert response.status_code == 403
+
+    def test_saved_views_list_accepts_post_with_csrf_token(self):
+        client, _ = self._logged_in_csrf_client("csrf-views-with-token")
+        client.get("/runs/")
+        token = client.cookies["csrftoken"].value
+        response = client.post(
+            "/api/views/",
+            json.dumps(
+                {
+                    "name": "CSRF view",
+                    "columns": [{"field": "title", "visible": True}],
+                    "sort": [{"field": "first_seen_at", "dir": "desc"}],
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert response.status_code == 201
+
+    def test_saved_view_detail_rejects_put_without_csrf_token(self):
+        client, user = self._logged_in_csrf_client("csrf-detail-put-no-token")
+        view = SavedView.objects.create(
+            user=user, name="x", columns=[], sort=[]
+        )
+        response = client.put(
+            f"/api/views/{view.id}/",
+            json.dumps({"name": "x", "columns": [], "sort": []}),
+            content_type="application/json",
+        )
+        assert response.status_code == 403
+
+    def test_saved_view_detail_rejects_delete_without_csrf_token(self):
+        client, user = self._logged_in_csrf_client("csrf-detail-del-no-token")
+        view = SavedView.objects.create(
+            user=user, name="x", columns=[], sort=[]
+        )
+        response = client.delete(f"/api/views/{view.id}/")
+        assert response.status_code == 403
+
+    def test_saved_view_detail_accepts_delete_with_csrf_token(self):
+        client, user = self._logged_in_csrf_client("csrf-detail-del-with-token")
+        view = SavedView.objects.create(
+            user=user, name="x", columns=[], sort=[]
+        )
+        client.get("/runs/")
+        token = client.cookies["csrftoken"].value
+        response = client.delete(
+            f"/api/views/{view.id}/",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert response.status_code == 204
+
+
+@pytest.mark.django_db
+class TestCSRFRunsExempt:
+    """`POST /api/runs/` is intentionally CSRF-exempt because it is called by
+    GitHub Actions with Bearer auth — no browser session, no CSRF cookie. The
+    GET path is safe-method by default; CsrfViewMiddleware does not check
+    safe methods so no special handling is needed there."""
+
+    @override_settings(INGEST_API_KEY="test-secret-key")
+    def test_post_runs_without_csrf_token_succeeds_with_valid_bearer(self):
+        client = Client(enforce_csrf_checks=True)
+        with patch("core.views._spawn_run"):
+            response = client.post(
+                "/api/runs/",
+                HTTP_AUTHORIZATION="Bearer test-secret-key",
+            )
+        assert response.status_code == 202
+
+    def test_post_runs_without_csrf_token_rejects_missing_bearer(self):
+        client = Client(enforce_csrf_checks=True)
+        response = client.post("/api/runs/")
+        assert response.status_code == 401
+

@@ -78,24 +78,38 @@ export type LocationTag = {
   geo_key: string;
 };
 
-export type FilterExpression =
-  | {
-      op: "and" | "or";
-      children: FilterExpression[];
-    }
-  | {
-      field: string;
-      op: string;
-      value: unknown;
-    };
+export type { FilterExpression } from "@/jobs/filterExpression";
+import type { FilterExpression } from "@/jobs/filterExpression";
+
+export type SavedViewColumn = {
+  field: string;
+  visible?: boolean;
+};
+
+export type SavedViewSort = {
+  field: string;
+  dir: "asc" | "desc";
+};
+
+export type SavedViewConfig = {
+  page_size?: number;
+};
 
 export type SavedView = {
   id: number;
   name: string;
-  filters: FilterExpression | null;
-  columns: string[] | null;
-  sort: Array<{ field: string; dir: "asc" | "desc" }> | null;
-  page_size: number | null;
+  filter_expression: FilterExpression | null;
+  columns: SavedViewColumn[];
+  sort: SavedViewSort[];
+  config: SavedViewConfig;
   created_at: string;
   updated_at: string;
+};
+
+export type SavedViewPayload = {
+  name: string;
+  filter_expression: FilterExpression | null;
+  columns: SavedViewColumn[];
+  sort: SavedViewSort[];
+  config: SavedViewConfig;
 };

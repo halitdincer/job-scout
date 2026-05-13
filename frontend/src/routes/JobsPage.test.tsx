@@ -1,14 +1,37 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { useJobs } from "@/api/jobs";
+import { createQueryWrapper } from "@/test/queryWrapper";
 
 import { JobsPage } from "./JobsPage";
 
 vi.mock("@/api/jobs", () => ({
   useJobs: vi.fn(),
 }));
+
+function mockSavedViewsList(views: unknown[] = []) {
+  return vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify(views), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+function renderJobs() {
+  const Wrapper = createQueryWrapper();
+  return render(
+    <Wrapper>
+      <JobsPage />
+    </Wrapper>,
+  );
+}
 
 vi.mock("@/components/Tabulator", () => ({
   Tabulator: ({ onSortChanged }: { onSortChanged?: (sort: unknown[]) => void }) => (
@@ -48,7 +71,8 @@ function mockJobsState(overrides: Partial<ReturnType<typeof useJobs>> = {}) {
 describe("JobsPage", () => {
   it("renders chrome, grid, and pagination from the jobs envelope", () => {
     mockJobsState();
-    render(<JobsPage />);
+    mockSavedViewsList();
+    renderJobs();
 
     expect(screen.getByRole("heading", { name: "Jobs" })).toBeInTheDocument();
     expect(screen.getByText("grid")).toBeInTheDocument();
@@ -57,7 +81,8 @@ describe("JobsPage", () => {
 
   it("changes page size and moves pages", async () => {
     mockJobsState();
-    render(<JobsPage />);
+    mockSavedViewsList();
+    renderJobs();
 
     await userEvent.selectOptions(screen.getByLabelText("Page size"), "100");
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
@@ -82,7 +107,8 @@ describe("JobsPage", () => {
         sort: [{ field: "first_seen_at", dir: "desc" }],
       },
     } as Partial<ReturnType<typeof useJobs>>);
-    render(<JobsPage />);
+    mockSavedViewsList();
+    renderJobs();
 
     await userEvent.click(screen.getByText("grid"));
 
@@ -96,7 +122,8 @@ describe("JobsPage", () => {
 
   it("ignores duplicate default sort events from data replacement", async () => {
     mockJobsState();
-    render(<JobsPage />);
+    mockSavedViewsList();
+    renderJobs();
 
     await userEvent.click(screen.getByText("clear sort"));
 
@@ -119,7 +146,8 @@ describe("JobsPage", () => {
         sort: [{ field: "first_seen_at", dir: "desc" }],
       },
     } as Partial<ReturnType<typeof useJobs>>);
-    render(<JobsPage />);
+    mockSavedViewsList();
+    renderJobs();
 
     await userEvent.click(screen.getByRole("button", { name: "Open filters" }));
     await userEvent.selectOptions(
@@ -144,11 +172,274 @@ describe("JobsPage", () => {
 
   it("renders loading and error states", () => {
     mockJobsState({ isLoading: true, data: undefined });
-    const { rerender } = render(<JobsPage />);
+    mockSavedViewsList();
+    const Wrapper = createQueryWrapper();
+    const { rerender } = render(
+      <Wrapper>
+        <JobsPage />
+      </Wrapper>,
+    );
     expect(screen.getByText(/loading jobs/i)).toBeInTheDocument();
 
     mockJobsState({ isError: true, data: undefined });
-    rerender(<JobsPage />);
+    rerender(
+      <Wrapper>
+        <JobsPage />
+      </Wrapper>,
+    );
     expect(screen.getByRole("alert")).toHaveTextContent(/could not load/i);
+  });
+
+  it("completes the Save-as flow: dialog submits and currentView becomes set", async () => {
+    mockJobsState();
+    document.cookie = "csrftoken=t; path=/";
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/views/" && (init?.method ?? "GET") === "GET") {
+        return new Response("[]", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url === "/api/views/" && init?.method === "POST") {
+        const saved = {
+          id: 42,
+          name: "FromDialog",
+          filter_expression: null,
+          columns: [],
+          sort: [{ field: "first_seen_at", dir: "desc" }],
+          config: { page_size: 50 },
+          created_at: "2025-05-01T00:00:00Z",
+          updated_at: "2025-05-01T00:00:00Z",
+        };
+        return new Response(JSON.stringify(saved), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    renderJobs();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText(/Save as new view/i)).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText(/Save as new view/i));
+
+    await user.type(await screen.findByLabelText("Name"), "FromDialog");
+    await user.click(screen.getByRole("button", { name: "Save view" }));
+
+    // Dialog closes once save resolves.
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Save view" })).toBeNull(),
+    );
+  });
+
+  it("completes the Delete flow: dialog submits and currentView resets", async () => {
+    mockJobsState();
+    document.cookie = "csrftoken=t; path=/";
+    const view = {
+      id: 99,
+      name: "ToDelete",
+      filter_expression: null,
+      columns: [],
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      config: { page_size: 50 },
+      created_at: "2025-05-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/views/" && (init?.method ?? "GET") === "GET") {
+        return new Response(JSON.stringify([view]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url === "/api/views/99/" && init?.method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    renderJobs();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText("ToDelete")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("ToDelete"));
+
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText(/Delete view/i)).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText(/Delete view/i));
+
+    await user.click(screen.getByRole("button", { name: "Delete view" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: "Delete view" }),
+      ).toBeNull(),
+    );
+  });
+
+  it("opens the Save-as dialog from the menu and closes it on Cancel", async () => {
+    mockJobsState();
+    mockSavedViewsList();
+    renderJobs();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText(/Save as new view/i)).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText(/Save as new view/i));
+
+    expect(
+      await screen.findByRole("heading", { name: "Save view" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Save view" })).toBeNull(),
+    );
+  });
+
+  it("opens the Delete dialog from the menu and closes it on Cancel", async () => {
+    mockJobsState();
+    const view = {
+      id: 9,
+      name: "DeleteMe",
+      filter_expression: null,
+      columns: [],
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      config: { page_size: 50 },
+      created_at: "2025-05-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+    };
+    mockSavedViewsList([view]);
+    renderJobs();
+    const user = userEvent.setup();
+
+    // Load the view first so currentViewId is set and Delete menu item appears.
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText("DeleteMe")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("DeleteMe"));
+
+    // Reopen menu — Delete item now visible.
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText(/Delete view/i)).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText(/Delete view/i));
+
+    expect(
+      await screen.findByRole("heading", { name: "Delete view" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Delete view" })).toBeNull(),
+    );
+  });
+
+  it("opens Save-changes dialog with the current view name prefilled", async () => {
+    mockJobsState();
+    const view = {
+      id: 11,
+      name: "Renamable",
+      filter_expression: null,
+      columns: [],
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      config: { page_size: 50 },
+      created_at: "2025-05-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+    };
+    mockSavedViewsList([view]);
+    renderJobs();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText("Renamable")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("Renamable"));
+
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText(/Save changes to/i)).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText(/Save changes to/i));
+
+    const nameInput = (await screen.findByLabelText("Name")) as HTMLInputElement;
+    expect(nameInput.value).toBe("Renamable");
+  });
+
+  it("loads a saved view: applies its filter, sort, and page size", async () => {
+    mockJobsState();
+    const view = {
+      id: 1,
+      name: "Eng",
+      filter_expression: { field: "title", op: "contains", value: "engineer" },
+      columns: [],
+      sort: [{ field: "title", dir: "asc" }],
+      config: { page_size: 100 },
+      created_at: "2025-05-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+    };
+    mockSavedViewsList([view]);
+    renderJobs();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() => expect(screen.getByText("Eng")).toBeInTheDocument());
+    await user.click(screen.getByText("Eng"));
+
+    await waitFor(() =>
+      expect(mockUseJobs).toHaveBeenLastCalledWith({
+        page: 1,
+        pageSize: 100,
+        sort: [{ field: "title", dir: "asc" }],
+        filter: { field: "title", op: "contains", value: "engineer" },
+      }),
+    );
+  });
+
+  it("falls back to default page size when a saved view has no page_size", async () => {
+    mockJobsState();
+    const view = {
+      id: 2,
+      name: "NoSize",
+      filter_expression: null,
+      columns: [],
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      config: {},
+      created_at: "2025-05-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+    };
+    mockSavedViewsList([view]);
+    renderJobs();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() => expect(screen.getByText("NoSize")).toBeInTheDocument());
+    await user.click(screen.getByText("NoSize"));
+
+    await waitFor(() =>
+      expect(mockUseJobs).toHaveBeenLastCalledWith({
+        page: 1,
+        pageSize: 50,
+        sort: [{ field: "first_seen_at", dir: "desc" }],
+        filter: null,
+      }),
+    );
   });
 });
