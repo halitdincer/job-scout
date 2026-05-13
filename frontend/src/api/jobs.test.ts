@@ -45,6 +45,61 @@ describe("useJobs", () => {
     );
   });
 
+  it("includes a JSON-stringified filter param when filter is provided", async () => {
+    const spy = mockOk({
+      results: [],
+      count: 0,
+      page: 1,
+      page_size: 50,
+      total_pages: 0,
+      sort: [],
+    });
+
+    const filter = { field: "title", operator: "contains", value: "engineer" };
+    renderHook(
+      () =>
+        useJobs({
+          page: 1,
+          pageSize: 50,
+          sort: [],
+          filter,
+        }),
+      { wrapper: createQueryWrapper() },
+    );
+
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    const calledUrl = spy.mock.calls[0][0] as string;
+    expect(calledUrl).toContain(
+      `filter=${encodeURIComponent(JSON.stringify(filter))}`,
+    );
+  });
+
+  it("omits the filter param when filter is null", async () => {
+    const spy = mockOk({
+      results: [],
+      count: 0,
+      page: 1,
+      page_size: 50,
+      total_pages: 0,
+      sort: [],
+    });
+
+    renderHook(
+      () =>
+        useJobs({
+          page: 1,
+          pageSize: 50,
+          sort: [],
+          filter: null,
+        }),
+      { wrapper: createQueryWrapper() },
+    );
+
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    const calledUrl = spy.mock.calls[0][0] as string;
+    expect(calledUrl).not.toContain("filter=");
+  });
+
   it("surfaces fetch errors via isError", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("oops", { status: 500 }),

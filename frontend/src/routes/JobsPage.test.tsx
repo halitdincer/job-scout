@@ -67,6 +67,7 @@ describe("JobsPage", () => {
       page: 1,
       pageSize: 100,
       sort: [{ field: "first_seen_at", dir: "desc" }],
+      filter: null,
     });
   });
 
@@ -89,6 +90,7 @@ describe("JobsPage", () => {
       page: 1,
       pageSize: 50,
       sort: [{ field: "title", dir: "asc" }],
+      filter: null,
     });
   });
 
@@ -102,6 +104,41 @@ describe("JobsPage", () => {
       page: 1,
       pageSize: 50,
       sort: [{ field: "first_seen_at", dir: "desc" }],
+      filter: null,
+    });
+  });
+
+  it("opens the filters sheet, applies a rule, and refetches with the new filter on page 1", async () => {
+    mockJobsState({
+      data: {
+        results: [],
+        count: 0,
+        page: 3,
+        page_size: 50,
+        total_pages: 6,
+        sort: [{ field: "first_seen_at", dir: "desc" }],
+      },
+    } as Partial<ReturnType<typeof useJobs>>);
+    render(<JobsPage />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Open filters" }));
+    await userEvent.selectOptions(
+      await screen.findByLabelText("Add filter rule"),
+      "title",
+    );
+    await userEvent.type(
+      screen.getByLabelText("Value for Title"),
+      "engineer",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Apply filters" }),
+    );
+
+    expect(mockUseJobs).toHaveBeenLastCalledWith({
+      page: 1,
+      pageSize: 50,
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      filter: { field: "title", operator: "contains", value: "engineer" },
     });
   });
 
