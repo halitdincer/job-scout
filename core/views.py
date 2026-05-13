@@ -1,5 +1,6 @@
 import json
 import math
+import threading
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -337,20 +338,13 @@ def _list_runs(request):
     return JsonResponse(list(runs), safe=False)
 
 
-def _trigger_run(request):
-    api_key = settings.INGEST_API_KEY
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer ") or auth_header[7:] != api_key:
-        return JsonResponse({"error": "Unauthorized"}, status=401)
+def _execute_run(run_id):
+    """Run ingestion for the given Run row and persist its terminal state.
 
-    Run.objects.filter(status="running").update(
-        status="failed",
-        error_message="Marked as failed: stale running state",
-        finished_at=timezone.now(),
-    )
-
-    run = Run.objects.create(status="running", started_at=timezone.now())
-
+    Runs in a background thread (see ``_spawn_run``) so the request handler
+    can return before Cloudflare's 100s edge timeout — otherwise long scrapes
+    return 524 to GitHub Actions even when the work succeeds."""
+    run = Run.objects.get(id=run_id)
     try:
         sources = Source.objects.filter(is_active=True)
         result = ingest_sources(sources)
@@ -359,20 +353,7 @@ def _trigger_run(request):
         run.finished_at = timezone.now()
         run.error_message = str(exc)
         run.save()
-        return JsonResponse(
-            {
-                "id": run.id,
-                "status": run.status,
-                "started_at": run.started_at.isoformat(),
-                "finished_at": run.finished_at.isoformat(),
-                "sources_processed": run.sources_processed,
-                "listings_created": run.listings_created,
-                "listings_updated": run.listings_updated,
-                "listings_expired": run.listings_expired,
-                "error_message": run.error_message,
-            },
-            status=201,
-        )
+        return
 
     run.finished_at = timezone.now()
     run.sources_processed = result["sources_processed"]
@@ -390,19 +371,40 @@ def _trigger_run(request):
 
     run.save()
 
+
+def _spawn_run(run_id):
+    thread = threading.Thread(target=_execute_run, args=(run_id,), daemon=True)
+    thread.start()
+
+
+def _trigger_run(request):
+    api_key = settings.INGEST_API_KEY
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer ") or auth_header[7:] != api_key:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    Run.objects.filter(status="running").update(
+        status="failed",
+        error_message="Marked as failed: stale running state",
+        finished_at=timezone.now(),
+    )
+
+    run = Run.objects.create(status="running", started_at=timezone.now())
+    _spawn_run(run.id)
+
     return JsonResponse(
         {
             "id": run.id,
             "status": run.status,
             "started_at": run.started_at.isoformat(),
-            "finished_at": run.finished_at.isoformat(),
-            "sources_processed": run.sources_processed,
-            "listings_created": run.listings_created,
-            "listings_updated": run.listings_updated,
-            "listings_expired": run.listings_expired,
-            "error_message": run.error_message,
+            "finished_at": None,
+            "sources_processed": 0,
+            "listings_created": 0,
+            "listings_updated": 0,
+            "listings_expired": 0,
+            "error_message": None,
         },
-        status=201,
+        status=202,
     )
 
 

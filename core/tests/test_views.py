@@ -9,6 +9,14 @@ from django.utils import timezone
 from core.models import JobListing, LocationTag, Run, SavedView, SeenListing, Source
 
 
+def _run_inline(run_id):
+    """Test helper: execute the background worker synchronously so DB state is
+    deterministic when tests inspect the Run row after POST /api/runs/."""
+    from core.views import _execute_run
+
+    _execute_run(run_id)
+
+
 @pytest.mark.django_db
 def test_health_returns_200_with_status_ok():
     client = Client()
@@ -468,7 +476,8 @@ class TestRunsAPI:
 
     @override_settings(INGEST_API_KEY="test-secret-key")
     @patch("core.views.ingest_sources")
-    def test_post_triggers_ingestion(self, mock_ingest):
+    @patch("core.views._spawn_run", side_effect=_run_inline)
+    def test_post_triggers_ingestion(self, mock_spawn, mock_ingest):
         Source.objects.create(name="Airbnb", platform="greenhouse", board_id="airbnb-run")
         mock_ingest.return_value = {
             "sources_processed": 1,
@@ -483,15 +492,19 @@ class TestRunsAPI:
             content_type="application/json",
             HTTP_AUTHORIZATION="Bearer test-secret-key",
         )
-        assert response.status_code == 201
+        assert response.status_code == 202
         data = response.json()
-        assert data["status"] == "completed"
-        assert data["listings_created"] == 5
+        assert data["status"] == "running"
+        run = Run.objects.get(id=data["id"])
+        assert run.status == "completed"
+        assert run.listings_created == 5
         mock_ingest.assert_called_once()
+        mock_spawn.assert_called_once_with(data["id"])
 
     @override_settings(INGEST_API_KEY="test-secret-key")
     @patch("core.views.ingest_sources")
-    def test_post_failed_run(self, mock_ingest):
+    @patch("core.views._spawn_run", side_effect=_run_inline)
+    def test_post_failed_run(self, mock_spawn, mock_ingest):
         mock_ingest.return_value = {
             "sources_processed": 0,
             "listings_created": 0,
@@ -505,10 +518,12 @@ class TestRunsAPI:
             content_type="application/json",
             HTTP_AUTHORIZATION="Bearer test-secret-key",
         )
-        assert response.status_code == 201
+        assert response.status_code == 202
         data = response.json()
-        assert data["status"] == "failed"
-        assert "Source1" in data["error_message"]
+        assert data["status"] == "running"
+        run = Run.objects.get(id=data["id"])
+        assert run.status == "failed"
+        assert "Source1" in run.error_message
 
     @override_settings(INGEST_API_KEY="test-secret-key")
     def test_post_missing_api_key(self):
@@ -528,7 +543,8 @@ class TestRunsAPI:
 
     @override_settings(INGEST_API_KEY="test-secret-key")
     @patch("core.views.ingest_sources")
-    def test_post_unhandled_exception_records_failed_run(self, mock_ingest):
+    @patch("core.views._spawn_run", side_effect=_run_inline)
+    def test_post_unhandled_exception_records_failed_run(self, mock_spawn, mock_ingest):
         mock_ingest.side_effect = Exception("database exploded")
         client = Client()
         response = client.post(
@@ -536,16 +552,17 @@ class TestRunsAPI:
             content_type="application/json",
             HTTP_AUTHORIZATION="Bearer test-secret-key",
         )
-        assert response.status_code == 201
+        assert response.status_code == 202
         data = response.json()
-        assert data["status"] == "failed"
-        assert "database exploded" in data["error_message"]
         run = Run.objects.get(id=data["id"])
         assert run.status == "failed"
+        assert "database exploded" in run.error_message
         assert run.finished_at is not None
+
     @override_settings(INGEST_API_KEY="test-secret-key")
     @patch("core.views.ingest_sources")
-    def test_trigger_run_marks_stale_running_runs_as_failed(self, mock_ingest):
+    @patch("core.views._spawn_run", side_effect=_run_inline)
+    def test_trigger_run_marks_stale_running_runs_as_failed(self, mock_spawn, mock_ingest):
         stale = Run.objects.create(status="running", started_at=timezone.now())
         mock_ingest.return_value = {
             "sources_processed": 1,
@@ -563,6 +580,40 @@ class TestRunsAPI:
         stale.refresh_from_db()
         assert stale.status == "failed"
         assert stale.error_message == "Marked as failed: stale running state"
+
+    @override_settings(INGEST_API_KEY="test-secret-key")
+    @patch("core.views.ingest_sources")
+    @patch("core.views._spawn_run")
+    def test_post_returns_202_without_running_ingestion_inline(
+        self, mock_spawn, mock_ingest
+    ):
+        """POST returns immediately with status=running; ingestion is deferred
+        to the background worker so Cloudflare's 100s edge timeout can't kill
+        an otherwise-successful scrape."""
+        client = Client()
+        response = client.post(
+            "/api/runs/",
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer test-secret-key",
+        )
+        assert response.status_code == 202
+        data = response.json()
+        assert data["status"] == "running"
+        assert data["finished_at"] is None
+        assert data["listings_created"] == 0
+        assert data["error_message"] is None
+        mock_ingest.assert_not_called()
+        mock_spawn.assert_called_once_with(data["id"])
+
+    @patch("core.views.threading.Thread")
+    def test_spawn_run_starts_daemon_thread_targeting_execute_run(self, mock_thread):
+        from core.views import _execute_run, _spawn_run
+
+        _spawn_run(42)
+        mock_thread.assert_called_once_with(
+            target=_execute_run, args=(42,), daemon=True
+        )
+        mock_thread.return_value.start.assert_called_once()
 
 
 @pytest.mark.django_db
