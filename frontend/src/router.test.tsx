@@ -2,6 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import { router } from "./router";
 
+function findRouteByPath(
+  routes: typeof router.routes,
+  path: string,
+): unknown {
+  for (const route of routes) {
+    if (route.path === path) {
+      return route;
+    }
+    if (route.children) {
+      const match = findRouteByPath(route.children, path);
+      if (match) {
+        return match;
+      }
+    }
+  }
+  return undefined;
+}
+
 describe("router", () => {
   it("exposes at least one route", () => {
     expect(router.routes.length).toBeGreaterThan(0);
@@ -13,16 +31,14 @@ describe("router", () => {
   });
 
   it("routes /runs through the app shell", () => {
-    const shell = router.routes.find((r) =>
-      r.children?.some((child) => child.path === "/runs"),
-    );
-    expect(shell).toBeDefined();
+    expect(findRouteByPath(router.routes, "/runs")).toBeDefined();
   });
 
   it("routes /sources through the app shell", () => {
-    const shell = router.routes.find((r) =>
-      r.children?.some((child) => child.path === "/sources"),
-    );
-    expect(shell).toBeDefined();
+    expect(findRouteByPath(router.routes, "/sources")).toBeDefined();
+  });
+
+  it("routes /accounts/login to the login page", () => {
+    expect(findRouteByPath(router.routes, "/accounts/login")).toBeDefined();
   });
 });

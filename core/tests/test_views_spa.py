@@ -15,6 +15,7 @@ def test_spa_index_returns_html_when_bundle_exists(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response["Content-Type"].startswith("text/html")
     assert b'<div id="root">' in response.content
+    assert "csrftoken" in response.cookies
 
 
 def test_spa_index_returns_503_when_bundle_missing(tmp_path, monkeypatch):

@@ -9,10 +9,10 @@ export const E2E_PASSWORD = "e2e-pass-123";
  */
 export async function login(page: Page): Promise<void> {
   await page.goto("/accounts/login/");
-  await page.fill('input[name="username"]', E2E_USER);
-  await page.fill('input[name="password"]', E2E_PASSWORD);
-  await page.click('button[type="submit"], input[type="submit"]');
-  await page.waitForURL("**/");
+  await page.getByLabel("Username").fill(E2E_USER);
+  await page.getByLabel("Password").fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL((url) => url.pathname === "/");
 }
 
 /**
