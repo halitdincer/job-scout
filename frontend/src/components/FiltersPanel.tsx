@@ -60,7 +60,7 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
   };
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {disabled ? (
         <p
           role="alert"
@@ -71,7 +71,10 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
         </p>
       ) : null}
 
-      <div className="space-y-3">
+      <div
+        data-testid="filters-panel-scroll"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
+      >
         {rules.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No filter rules yet. Pick a field below to add one.

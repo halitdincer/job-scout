@@ -195,53 +195,6 @@ export function JobsPage() {
               />
             </SheetContent>
           </Sheet>
-
-          <div id="pagination-bar" className="flex flex-wrap items-center gap-3">
-            <label
-              htmlFor="page-size-select"
-              className="text-sm font-medium text-muted-foreground"
-            >
-              Page size
-            </label>
-            <select
-              id="page-size-select"
-              aria-label="Page size"
-              value={pageSize}
-              onChange={handlePageSizeChange}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-            >
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-            <button
-              id="page-prev"
-              type="button"
-              onClick={() => setPage((current) => current - 1)}
-              disabled={page <= 1}
-              className="h-9 rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span
-              id="page-info"
-              aria-live="polite"
-              className="min-w-24 text-center text-sm text-muted-foreground"
-            >
-              Page {page} of {maxPage}
-            </span>
-            <button
-              id="page-next"
-              type="button"
-              onClick={() => setPage((current) => current + 1)}
-              disabled={page >= maxPage}
-              className="h-9 rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
         </div>
       </div>
 
@@ -263,6 +216,56 @@ export function JobsPage() {
         options={tableOptions}
         onSortChanged={handleSortChanged}
       />
+
+      <div
+        id="pagination-bar"
+        className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-3"
+      >
+        <label
+          htmlFor="page-size-select"
+          className="text-sm font-medium text-muted-foreground"
+        >
+          Page size
+        </label>
+        <select
+          id="page-size-select"
+          aria-label="Page size"
+          value={pageSize}
+          onChange={handlePageSizeChange}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+        >
+          {PAGE_SIZES.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </select>
+        <button
+          id="page-prev"
+          type="button"
+          onClick={() => setPage((current) => current - 1)}
+          disabled={page <= 1}
+          className="h-9 rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span
+          id="page-info"
+          aria-live="polite"
+          className="min-w-24 text-center text-sm text-muted-foreground"
+        >
+          Page {page} of {maxPage}
+        </span>
+        <button
+          id="page-next"
+          type="button"
+          onClick={() => setPage((current) => current + 1)}
+          disabled={page >= maxPage}
+          className="h-9 rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
 
       {saveDialog ? (
         <SaveViewDialog
