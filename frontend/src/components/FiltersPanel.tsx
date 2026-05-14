@@ -3,6 +3,7 @@ import type { ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  DATE_RANGE_PRESETS,
   FIELD_ORDER,
   FILTER_FIELD_DEFS,
   OPERATOR_LABELS,
@@ -17,9 +18,39 @@ type Props = {
 };
 
 const VALUELESS_OPERATORS = new Set(["is_empty", "is_not_empty"]);
+const DATE_INPUT_OPERATORS = new Set(["before", "after"]);
 
 function fieldLabel(field: string) {
   return FILTER_FIELD_DEFS[field]?.label ?? field;
+}
+
+type DaysPresetPickerProps = {
+  id: string;
+  ariaLabel: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+};
+
+function DaysPresetPicker({ id, ariaLabel, value, onChange }: DaysPresetPickerProps) {
+  const isPreset = DATE_RANGE_PRESETS.some((p) => p.value === value);
+  return (
+    <select
+      id={id}
+      aria-label={ariaLabel}
+      value={value}
+      onChange={onChange}
+      className="h-9 flex-1 min-w-40 rounded-md border border-input bg-background px-2 text-sm"
+    >
+      {!isPreset && value !== "" ? (
+        <option value={value}>{`Last ${value} days`}</option>
+      ) : null}
+      {DATE_RANGE_PRESETS.map((preset) => (
+        <option key={preset.value} value={preset.value}>
+          {preset.label}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 export function FiltersPanel({ state, dispatch, onApplied }: Props) {
@@ -42,7 +73,7 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
       });
 
   const handleValueChange = (rule: FilterRule) =>
-    (event: ChangeEvent<HTMLInputElement>) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       dispatch({
         type: "UPDATE_RULE_VALUE",
         ruleId: rule.id,
@@ -85,6 +116,12 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
           const operators = def?.operators ?? [rule.operator];
           const showValue = !VALUELESS_OPERATORS.has(rule.operator);
           const label = fieldLabel(rule.field);
+          const isDateField = def?.type === "date";
+          const isInLastDays = rule.operator === "in_last_days";
+          const renderAsPresetPicker = isDateField && isInLastDays;
+          const renderAsDateInput =
+            isDateField && DATE_INPUT_OPERATORS.has(rule.operator);
+          const safeValue = rule.value ?? "";
           return (
             <div
               key={rule.id}
@@ -112,13 +149,31 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
                   <label className="sr-only" htmlFor={`val-${rule.id}`}>
                     {`Value for ${label}`}
                   </label>
-                  <Input
-                    id={`val-${rule.id}`}
-                    aria-label={`Value for ${label}`}
-                    value={rule.value ?? ""}
-                    onChange={handleValueChange(rule)}
-                    className="h-9 flex-1 min-w-40"
-                  />
+                  {renderAsPresetPicker ? (
+                    <DaysPresetPicker
+                      id={`val-${rule.id}`}
+                      ariaLabel={`Value for ${label}`}
+                      value={safeValue}
+                      onChange={handleValueChange(rule)}
+                    />
+                  ) : renderAsDateInput ? (
+                    <Input
+                      id={`val-${rule.id}`}
+                      aria-label={`Value for ${label}`}
+                      type="date"
+                      value={safeValue}
+                      onChange={handleValueChange(rule)}
+                      className="h-9 flex-1 min-w-40"
+                    />
+                  ) : (
+                    <Input
+                      id={`val-${rule.id}`}
+                      aria-label={`Value for ${label}`}
+                      value={safeValue}
+                      onChange={handleValueChange(rule)}
+                      className="h-9 flex-1 min-w-40"
+                    />
+                  )}
                 </>
               ) : null}
               <Button

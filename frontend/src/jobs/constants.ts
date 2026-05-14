@@ -171,6 +171,8 @@ export const EMPTY_SENTINEL = "__EMPTY__";
 
 export const DATE_RANGE_PRESETS: Array<{ label: string; value: string }> = [
   { label: "Today", value: "0" },
+  { label: "Last 1 day", value: "1" },
+  { label: "Last 3 days", value: "3" },
   { label: "Last 7 days", value: "7" },
   { label: "Last 14 days", value: "14" },
   { label: "Last 30 days", value: "30" },

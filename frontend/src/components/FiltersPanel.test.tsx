@@ -180,4 +180,103 @@ describe("FiltersPanel", () => {
       (screen.getByLabelText("Value for Title") as HTMLInputElement).value,
     ).toBe("");
   });
+
+  it("renders a preset picker for date fields with in_last_days operator", () => {
+    const { dispatch } = setup({
+      rules: [
+        {
+          id: "r1",
+          field: "first_seen_at",
+          operator: "in_last_days",
+          value: "7",
+        },
+      ],
+    });
+    const select = screen.getByLabelText(
+      "Value for First Seen",
+    ) as HTMLSelectElement;
+    expect(select.tagName).toBe("SELECT");
+    expect(select.value).toBe("7");
+    const labels = Array.from(select.options).map((o) => o.textContent);
+    expect(labels).toContain("Last 1 day");
+    expect(labels).toContain("Last 3 days");
+    expect(labels).toContain("Last 7 days");
+    expect(labels).toContain("Last 30 days");
+
+    fireEvent.change(select, { target: { value: "3" } });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "UPDATE_RULE_VALUE",
+      ruleId: "r1",
+      value: "3",
+    });
+  });
+
+  it("preserves a non-preset in_last_days value as a custom option", () => {
+    setup({
+      rules: [
+        {
+          id: "r1",
+          field: "first_seen_at",
+          operator: "in_last_days",
+          value: "42",
+        },
+      ],
+    });
+    const select = screen.getByLabelText(
+      "Value for First Seen",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("42");
+    const custom = Array.from(select.options).find((o) => o.value === "42");
+    expect(custom?.textContent).toBe("Last 42 days");
+  });
+
+  it("renders a native date picker for date fields with before/after operators", () => {
+    const { dispatch } = setup({
+      rules: [
+        {
+          id: "r1",
+          field: "first_seen_at",
+          operator: "before",
+          value: "2026-01-01",
+        },
+      ],
+    });
+    const input = screen.getByLabelText(
+      "Value for First Seen",
+    ) as HTMLInputElement;
+    expect(input.type).toBe("date");
+    expect(input.value).toBe("2026-01-01");
+
+    fireEvent.change(input, { target: { value: "2026-05-13" } });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "UPDATE_RULE_VALUE",
+      ruleId: "r1",
+      value: "2026-05-13",
+    });
+  });
+
+  it("swaps to the preset picker when operator changes from before to in_last_days", () => {
+    const { dispatch } = setup({
+      rules: [
+        {
+          id: "r1",
+          field: "first_seen_at",
+          operator: "before",
+          value: "2026-01-01",
+        },
+      ],
+    });
+    fireEvent.change(screen.getByLabelText("Operator for First Seen"), {
+      target: { value: "in_last_days" },
+    });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "UPDATE_RULE_OPERATOR",
+      ruleId: "r1",
+      operator: "in_last_days",
+    });
+    const select = screen.getByLabelText(
+      "Value for First Seen",
+    ) as HTMLSelectElement;
+    expect(select.tagName).toBe("SELECT");
+  });
 });

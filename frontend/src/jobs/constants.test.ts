@@ -58,6 +58,16 @@ describe("misc constants", () => {
     expect(DATE_RANGE_PRESETS.length).toBeGreaterThan(0);
   });
 
+  it("includes short relative presets for 1 and 3 day windows", () => {
+    const values = DATE_RANGE_PRESETS.map((p) => p.value);
+    expect(values).toContain("1");
+    expect(values).toContain("3");
+    const oneDay = DATE_RANGE_PRESETS.find((p) => p.value === "1");
+    expect(oneDay?.label).toBe("Last 1 day");
+    const threeDays = DATE_RANGE_PRESETS.find((p) => p.value === "3");
+    expect(threeDays?.label).toBe("Last 3 days");
+  });
+
   it("declares default page size + sort", () => {
     expect(PAGE_SIZE_ALLOWLIST).toContain(DEFAULT_PAGE_SIZE);
     expect(DEFAULT_SORT).toEqual([{ field: "first_seen_at", dir: "desc" }]);
