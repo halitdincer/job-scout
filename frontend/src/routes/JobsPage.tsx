@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import type { Options } from "tabulator-tables";
 
 import { useJobs, type SortSpec } from "@/api/jobs";
+import { ColumnsMenu, type ColumnsMenuOption } from "@/components/ColumnsMenu";
 import { DeleteViewDialog } from "@/components/DeleteViewDialog";
 import { FiltersPanel } from "@/components/FiltersPanel";
 import { SaveViewDialog } from "@/components/SaveViewDialog";
@@ -19,9 +20,48 @@ import {
 import { DEFAULT_JOB_SORT, getJobColumns, PAGE_SIZES } from "@/jobs/columns";
 import { mapJobRow } from "@/jobs/formatters";
 import { useJobsState } from "@/jobs/useJobsState";
-import type { SavedView } from "@/types/api";
+import type { SavedView, SavedViewColumn } from "@/types/api";
 
 const DEFAULT_PAGE_SIZE = 50;
+
+const ALL_JOB_COLUMNS = getJobColumns();
+
+const COLUMN_MENU_OPTIONS: ColumnsMenuOption[] = ALL_JOB_COLUMNS.map((col) => ({
+  field: String(col.field),
+  label: String(col.title),
+}));
+
+const DEFAULT_COLUMN_VISIBILITY: Record<string, boolean> = Object.fromEntries(
+  ALL_JOB_COLUMNS.map((col) => [String(col.field), col.visible !== false]),
+);
+
+function applyVisibilityToColumns(
+  visibility: Record<string, boolean>,
+): ReturnType<typeof getJobColumns> {
+  return ALL_JOB_COLUMNS.map((col) => ({
+    ...col,
+    visible: visibility[String(col.field)],
+  }));
+}
+
+function visibilityToSavedColumns(
+  visibility: Record<string, boolean>,
+): SavedViewColumn[] {
+  return COLUMN_MENU_OPTIONS.map((opt) => ({
+    field: opt.field,
+    visible: !!visibility[opt.field],
+  }));
+}
+
+function savedColumnsToVisibility(
+  columns: SavedViewColumn[],
+): Record<string, boolean> {
+  const out = { ...DEFAULT_COLUMN_VISIBILITY };
+  for (const c of columns) {
+    out[c.field] = c.visible !== false;
+  }
+  return out;
+}
 
 function normalizeSort(sort: SortSpec[]) {
   return sort.length > 0 ? sort : DEFAULT_JOB_SORT;
@@ -43,6 +83,9 @@ export function JobsPage() {
   const [deleteDialogView, setDeleteDialogView] = useState<SavedView | null>(
     null,
   );
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >(DEFAULT_COLUMN_VISIBILITY);
   const { state: filterState, dispatch: filterDispatch } = useJobsState();
   const previousExpressionRef = useRef(filterState.expression);
 
@@ -63,7 +106,16 @@ export function JobsPage() {
     () => (jobsQuery.data?.results ?? []).map(mapJobRow),
     [jobsQuery.data?.results],
   );
-  const columns = useMemo(() => getJobColumns(), []);
+  const columns = useMemo(
+    () => applyVisibilityToColumns(columnVisibility),
+    [columnVisibility],
+  );
+  const handleColumnToggle = useCallback(
+    (field: string, nextVisible: boolean) => {
+      setColumnVisibility((prev) => ({ ...prev, [field]: nextVisible }));
+    },
+    [],
+  );
   const tableOptions = useMemo<Partial<Options>>(
     () => ({
       height: "65vh",
@@ -111,6 +163,7 @@ export function JobsPage() {
       setSort(normalizeSort(view.sort as SortSpec[]));
       const nextPageSize = view.config?.page_size ?? DEFAULT_PAGE_SIZE;
       setPageSize(nextPageSize);
+      setColumnVisibility(savedColumnsToVisibility(view.columns));
       setPage(1);
       setCurrentViewId(view.id);
     },
@@ -120,11 +173,11 @@ export function JobsPage() {
   const savedViewPayload = useMemo(
     () => ({
       filter_expression: filterState.expression,
-      columns: [],
+      columns: visibilityToSavedColumns(columnVisibility),
       sort,
       config: { page_size: pageSize },
     }),
-    [filterState.expression, sort, pageSize],
+    [filterState.expression, sort, pageSize, columnVisibility],
   );
 
   const handleSaveAs = useCallback(() => {
@@ -160,6 +213,11 @@ export function JobsPage() {
             onSaveAs={handleSaveAs}
             onSaveChanges={handleSaveChanges}
             onDelete={handleDelete}
+          />
+          <ColumnsMenu
+            options={COLUMN_MENU_OPTIONS}
+            visibility={columnVisibility}
+            onToggle={handleColumnToggle}
           />
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>

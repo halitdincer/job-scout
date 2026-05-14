@@ -413,6 +413,65 @@ describe("JobsPage", () => {
     );
   });
 
+  it("toggles a column from the Columns menu", async () => {
+    mockJobsState();
+    mockSavedViewsList();
+    renderJobs();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    // "External ID" is hidden by default; clicking flips it visible. The
+    // badge displays visible/total and is the simplest observable.
+    const item = await screen.findByRole("menuitemcheckbox", {
+      name: /External ID/,
+    });
+    expect(item).toHaveAttribute("aria-checked", "false");
+    await user.click(item);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("menuitemcheckbox", { name: /External ID/ }),
+      ).toHaveAttribute("aria-checked", "true"),
+    );
+  });
+
+  it("loads a saved view's column visibility into the Columns menu", async () => {
+    mockJobsState();
+    const view = {
+      id: 5,
+      name: "WithCols",
+      filter_expression: null,
+      // Hide Title, show External ID — both inversions of the defaults so the
+      // assertion proves the saved payload was honored.
+      columns: [
+        { field: "title", visible: false },
+        { field: "external_id", visible: true },
+      ],
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      config: { page_size: 50 },
+      created_at: "2025-05-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+    };
+    mockSavedViewsList([view]);
+    renderJobs();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Saved views" }));
+    await waitFor(() =>
+      expect(screen.getByText("WithCols")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("WithCols"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("menuitemcheckbox", { name: /^Title$/ }),
+      ).toHaveAttribute("aria-checked", "false"),
+    );
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: /External ID/ }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
   it("falls back to default page size when a saved view has no page_size", async () => {
     mockJobsState();
     const view = {
