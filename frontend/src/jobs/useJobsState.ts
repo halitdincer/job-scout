@@ -32,7 +32,8 @@ export type JobsAction =
       field: string;
       operator: string;
       value: string;
-    };
+    }
+  | { type: "CLEAR_FIELD_RULES"; field: string };
 
 export const initialJobsState: JobsState = {
   rules: [],
@@ -109,6 +110,15 @@ export function jobsReducer(state: JobsState, action: JobsAction): JobsState {
                 value: action.value,
               },
             ];
+      return {
+        ...state,
+        rules: next,
+        expression: rulesToExpression(next),
+        renderable: true,
+      };
+    }
+    case "CLEAR_FIELD_RULES": {
+      const next = state.rules.filter((r) => r.field !== action.field);
       return {
         ...state,
         rules: next,

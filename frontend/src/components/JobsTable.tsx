@@ -35,6 +35,13 @@ type JobsTableProps = {
   emptyMessage?: string;
   filterRules?: FilterRule[];
   filterDispatch?: (action: JobsAction) => void;
+  /**
+   * Server-supplied distinct values per filter field. When present they take
+   * precedence over values collected from the current page so multi-select
+   * dropdowns show every option, not just what happens to be on the current
+   * page.
+   */
+  facets?: Record<string, string[]>;
 };
 
 function collectUniqueValues(
@@ -91,6 +98,7 @@ export function JobsTable({
   emptyMessage = "No jobs found",
   filterRules,
   filterDispatch,
+  facets,
 }: JobsTableProps) {
   const tanstackSorting = useMemo(() => toTanstackSorting(sorting), [sorting]);
 
@@ -116,9 +124,14 @@ export function JobsTable({
     [data, columns],
   );
   const rulesByField = useMemo(() => {
-    const map = new Map<string, FilterRule>();
+    const map = new Map<string, FilterRule[]>();
     for (const rule of filterRules ?? []) {
-      map.set(rule.field, rule);
+      const existing = map.get(rule.field);
+      if (existing) {
+        existing.push(rule);
+      } else {
+        map.set(rule.field, [rule]);
+      }
     }
     return map;
   }, [filterRules]);
@@ -194,14 +207,16 @@ export function JobsTable({
                   return <TableHead key={col.id} className="py-1" />;
                 }
                 const key = meta?.uniqueValuesKey ?? String(col.id);
+                const uniqueValues =
+                  facets?.[filterField] ?? uniqueValuesByKey[key];
                 return (
                   <TableHead key={col.id} className="py-1">
                     <HeaderFilterCell
                       filterField={filterField}
                       filterWidget={filterWidget}
-                      rule={rulesByField.get(filterField)}
+                      rules={rulesByField.get(filterField) ?? []}
                       dispatch={filterDispatch}
-                      uniqueValues={uniqueValuesByKey[key]}
+                      uniqueValues={uniqueValues}
                     />
                   </TableHead>
                 );

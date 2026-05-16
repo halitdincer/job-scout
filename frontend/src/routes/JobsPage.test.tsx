@@ -12,12 +12,19 @@ vi.mock("@/api/jobs", () => ({
 }));
 
 function mockSavedViewsList(views: unknown[] = []) {
-  return vi.spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify(views), {
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url.startsWith("/api/jobs/facets/")) {
+      return new Response("{}", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify(views), {
       status: 200,
       headers: { "Content-Type": "application/json" },
-    }),
-  );
+    });
+  });
 }
 
 afterEach(() => {
@@ -200,6 +207,12 @@ describe("JobsPage", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy.mockImplementation(async (input, init) => {
       const url = String(input);
+      if (url.startsWith("/api/jobs/facets/")) {
+        return new Response("{}", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       if (url === "/api/views/" && (init?.method ?? "GET") === "GET") {
         return new Response("[]", {
           status: 200,
@@ -258,6 +271,12 @@ describe("JobsPage", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy.mockImplementation(async (input, init) => {
       const url = String(input);
+      if (url.startsWith("/api/jobs/facets/")) {
+        return new Response("{}", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       if (url === "/api/views/" && (init?.method ?? "GET") === "GET") {
         return new Response(JSON.stringify([view]), {
           status: 200,

@@ -19,6 +19,7 @@ import {
   DATE_RANGE_PRESETS,
   EMPTY_SENTINEL,
   FILTER_FIELD_DEFS,
+  OPERATOR_LABELS,
 } from "@/jobs/constants";
 import type { FilterRule } from "@/jobs/filterExpression";
 import type { JobsAction } from "@/jobs/useJobsState";
@@ -254,10 +255,156 @@ export function DateHeaderFilter({
   );
 }
 
+const CANONICAL_OPERATOR: Record<FilterWidgetKind, string> = {
+  text: "contains",
+  multi: "in",
+  date: "in_last_days",
+};
+
+const VALUELESS_OPERATORS = new Set(["is_empty", "is_not_empty"]);
+const DATE_INPUT_OPERATORS = new Set(["before", "after"]);
+
+type MultiRulePopoverProps = {
+  field: string;
+  label: string;
+  rules: FilterRule[];
+  dispatch: (action: JobsAction) => void;
+};
+
+function MultiRulePopover({
+  field,
+  label,
+  rules,
+  dispatch,
+}: MultiRulePopoverProps) {
+  const [open, setOpen] = useState(false);
+  const def = FILTER_FIELD_DEFS[field];
+  const operators = def?.operators ?? [];
+  const isDateField = def?.type === "date";
+
+  const updateOperator = (ruleId: string, operator: string) => {
+    dispatch({ type: "UPDATE_RULE_OPERATOR", ruleId, operator });
+    dispatch({ type: "COMMIT_FILTER" });
+  };
+
+  const updateValue = (ruleId: string, value: string) => {
+    dispatch({ type: "UPDATE_RULE_VALUE", ruleId, value });
+    dispatch({ type: "COMMIT_FILTER" });
+  };
+
+  const removeRule = (ruleId: string) => {
+    dispatch({ type: "REMOVE_RULE", ruleId });
+    dispatch({ type: "COMMIT_FILTER" });
+  };
+
+  const addRule = () => {
+    dispatch({ type: "ADD_RULE", field });
+  };
+
+  const clearAll = () => {
+    dispatch({ type: "CLEAR_FIELD_RULES", field });
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={`Filter ${label}`}
+          className="h-8 w-full justify-between border-primary text-xs font-normal text-primary"
+        >
+          <span className="truncate">{`${rules.length} applied`}</span>
+          <FilterIcon className="ml-2 h-3 w-3 shrink-0" aria-hidden="true" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-2">
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {rules.map((rule) => {
+            const valueless = VALUELESS_OPERATORS.has(rule.operator);
+            const dateInput =
+              isDateField && DATE_INPUT_OPERATORS.has(rule.operator);
+            const datePreset =
+              isDateField && rule.operator === "in_last_days";
+            return (
+              <div
+                key={rule.id}
+                className="flex items-center gap-2 rounded-md border border-input p-1"
+              >
+                <select
+                  aria-label={`Operator for rule ${rule.id}`}
+                  value={rule.operator}
+                  onChange={(event) =>
+                    updateOperator(rule.id, event.target.value)
+                  }
+                  className="h-8 rounded-md border border-input bg-background px-1 text-xs"
+                >
+                  {operators.map((op) => (
+                    <option key={op} value={op}>
+                      {OPERATOR_LABELS[op]}
+                    </option>
+                  ))}
+                </select>
+                {valueless ? null : datePreset ? (
+                  <select
+                    aria-label={`Value for rule ${rule.id}`}
+                    value={rule.value ?? ""}
+                    onChange={(event) =>
+                      updateValue(rule.id, event.target.value)
+                    }
+                    className="h-8 flex-1 rounded-md border border-input bg-background px-1 text-xs"
+                  >
+                    <option value="">—</option>
+                    {DATE_RANGE_PRESETS.map((preset) => (
+                      <option key={preset.value} value={preset.value}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    aria-label={`Value for rule ${rule.id}`}
+                    type={dateInput ? "date" : "text"}
+                    value={rule.value ?? ""}
+                    onChange={(event) =>
+                      updateValue(rule.id, event.target.value)
+                    }
+                    className="h-8 flex-1 text-xs"
+                  />
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Remove rule ${rule.id}`}
+                  onClick={() => removeRule(rule.id)}
+                  className="h-8 px-2"
+                >
+                  ×
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex justify-between gap-2 border-t pt-2">
+          <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
+            Clear all
+          </Button>
+          <Button type="button" size="sm" onClick={addRule}>
+            Add rule
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 type HeaderFilterCellProps = {
   filterField: string;
   filterWidget: FilterWidgetKind;
-  rule: FilterRule | undefined;
+  rules: FilterRule[];
   dispatch: (action: JobsAction) => void;
   uniqueValues?: string[];
 };
@@ -265,12 +412,28 @@ type HeaderFilterCellProps = {
 export function HeaderFilterCell({
   filterField,
   filterWidget,
-  rule,
+  rules,
   dispatch,
   uniqueValues = [],
 }: HeaderFilterCellProps) {
   const label = FILTER_FIELD_DEFS[filterField]?.label ?? filterField;
+  const canonical = CANONICAL_OPERATOR[filterWidget];
+  const useSimpleWidget =
+    rules.length === 0 ||
+    (rules.length === 1 && rules[0].operator === canonical);
 
+  if (!useSimpleWidget) {
+    return (
+      <MultiRulePopover
+        field={filterField}
+        label={label}
+        rules={rules}
+        dispatch={dispatch}
+      />
+    );
+  }
+
+  const rule = rules[0];
   if (filterWidget === "text") {
     return (
       <TextHeaderFilter

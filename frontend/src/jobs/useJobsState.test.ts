@@ -283,6 +283,64 @@ describe("useJobsState", () => {
     expect(result.current.state.expression).toBeNull();
   });
 
+  it("CLEAR_FIELD_RULES drops every rule for the given field and re-commits", () => {
+    const { result } = renderHook(() => useJobsState());
+    act(() => result.current.dispatch({ type: "ADD_RULE", field: "title" }));
+    act(() =>
+      result.current.dispatch({
+        type: "UPDATE_RULE_VALUE",
+        ruleId: "r1",
+        value: "eng",
+      }),
+    );
+    act(() => result.current.dispatch({ type: "ADD_RULE", field: "title" }));
+    act(() =>
+      result.current.dispatch({
+        type: "UPDATE_RULE_OPERATOR",
+        ruleId: "r2",
+        operator: "not_contains",
+      }),
+    );
+    act(() =>
+      result.current.dispatch({
+        type: "UPDATE_RULE_VALUE",
+        ruleId: "r2",
+        value: "intern",
+      }),
+    );
+    act(() => result.current.dispatch({ type: "ADD_RULE", field: "status" }));
+    act(() =>
+      result.current.dispatch({
+        type: "UPDATE_RULE_VALUE",
+        ruleId: "r3",
+        value: "active",
+      }),
+    );
+    act(() => result.current.dispatch({ type: "COMMIT_FILTER" }));
+    expect(result.current.state.rules).toHaveLength(3);
+
+    act(() =>
+      result.current.dispatch({ type: "CLEAR_FIELD_RULES", field: "title" }),
+    );
+    expect(result.current.state.rules).toEqual([
+      { id: "r3", field: "status", operator: "eq", value: "active" },
+    ]);
+    expect(result.current.state.expression).toEqual({
+      field: "status",
+      operator: "eq",
+      value: "active",
+    });
+  });
+
+  it("CLEAR_FIELD_RULES on a field with no rules re-commits to null when nothing remains", () => {
+    const { result } = renderHook(() => useJobsState());
+    act(() =>
+      result.current.dispatch({ type: "CLEAR_FIELD_RULES", field: "title" }),
+    );
+    expect(result.current.state.rules).toEqual([]);
+    expect(result.current.state.expression).toBeNull();
+  });
+
   it("unknown actions return the state unchanged", () => {
     const { result } = renderHook(() => useJobsState());
     const before = result.current.state;

@@ -1012,3 +1012,139 @@ class TestCSRFRunsExempt:
         response = client.post("/api/runs/")
         assert response.status_code == 401
 
+
+@pytest.mark.django_db
+class TestJobsFacetsAPI:
+    """`GET /api/jobs/facets/` returns distinct values per requested field
+    across the entire JobListing table, regardless of pagination."""
+
+    def _populate(self):
+        acme = Source.objects.create(
+            name="Acme", platform="greenhouse", board_id="acme"
+        )
+        globex = Source.objects.create(
+            name="Globex", platform="lever", board_id="globex"
+        )
+        ca = LocationTag.objects.create(
+            name="Toronto", country_code="CA", region_code="CA-ON", city="Toronto"
+        )
+        us = LocationTag.objects.create(
+            name="SF", country_code="US", region_code="US-CA", city="San Francisco"
+        )
+        listing1 = JobListing.objects.create(
+            source=acme,
+            external_id="a1",
+            title="Engineer",
+            url="https://example.com/a1",
+            status="active",
+            employment_type="full_time",
+            workplace_type="remote",
+        )
+        listing2 = JobListing.objects.create(
+            source=globex,
+            external_id="g1",
+            title="Designer",
+            url="https://example.com/g1",
+            status="expired",
+            employment_type="part_time",
+            workplace_type="on_site",
+        )
+        listing3 = JobListing.objects.create(
+            source=acme,
+            external_id="a2",
+            title="Manager",
+            url="https://example.com/a2",
+            status="active",
+            employment_type="full_time",
+            workplace_type="hybrid",
+        )
+        listing1.locations.add(ca)
+        listing2.locations.add(us)
+        listing3.locations.add(ca, us)
+
+    def test_facets_returns_distinct_source_names(self):
+        self._populate()
+        client = Client()
+        response = client.get("/api/jobs/facets/?fields=source_name")
+        assert response.status_code == 200
+        data = response.json()
+        assert data == {"source_name": ["Acme", "Globex"]}
+
+    def test_facets_returns_distinct_country_region_city(self):
+        self._populate()
+        client = Client()
+        response = client.get(
+            "/api/jobs/facets/?fields=country,region,city"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["country"] == ["CA", "US"]
+        assert data["region"] == ["CA-ON", "US-CA"]
+        assert data["city"] == ["San Francisco", "Toronto"]
+
+    def test_facets_returns_distinct_enum_columns(self):
+        self._populate()
+        client = Client()
+        response = client.get(
+            "/api/jobs/facets/?fields=status,employment_type,workplace_type"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == ["active", "expired"]
+        assert data["employment_type"] == ["full_time", "part_time"]
+        assert data["workplace_type"] == ["hybrid", "on_site", "remote"]
+
+    def test_facets_omits_empty_or_null_values(self):
+        source = Source.objects.create(
+            name="Empty", platform="greenhouse", board_id="empty"
+        )
+        JobListing.objects.create(
+            source=source,
+            external_id="e1",
+            title="No fields",
+            url="https://example.com/e1",
+            employment_type="",
+            workplace_type="",
+        )
+        client = Client()
+        response = client.get(
+            "/api/jobs/facets/?fields=employment_type,workplace_type,country"
+        )
+        data = response.json()
+        assert data == {
+            "employment_type": [],
+            "workplace_type": [],
+            "country": [],
+        }
+
+    def test_facets_rejects_unknown_field(self):
+        client = Client()
+        response = client.get("/api/jobs/facets/?fields=bogus")
+        assert response.status_code == 400
+        assert "bogus" in response.json()["error"]
+
+    def test_facets_requires_fields_parameter(self):
+        client = Client()
+        response = client.get("/api/jobs/facets/")
+        assert response.status_code == 400
+        assert "fields" in response.json()["error"]
+
+    def test_facets_ignores_empty_field_tokens(self):
+        self._populate()
+        client = Client()
+        response = client.get(
+            "/api/jobs/facets/?fields=,source_name,,"
+        )
+        assert response.status_code == 200
+        assert response.json() == {"source_name": ["Acme", "Globex"]}
+
+    def test_facets_returns_each_requested_field_even_when_duplicated(self):
+        self._populate()
+        client = Client()
+        response = client.get(
+            "/api/jobs/facets/?fields=source_name,source_name"
+        )
+        assert response.status_code == 200
+        # Duplicates collapse to a single key in the response dict; values are stable.
+        assert response.json() == {"source_name": ["Acme", "Globex"]}
+

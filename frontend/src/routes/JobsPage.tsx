@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
+import { useJobFacets } from "@/api/facets";
 import { useJobs, type SortSpec } from "@/api/jobs";
 import { ColumnsMenu, type ColumnsMenuOption } from "@/components/ColumnsMenu";
 import { DeleteViewDialog } from "@/components/DeleteViewDialog";
@@ -95,6 +96,7 @@ export function JobsPage() {
     sort,
     filter: filterState.expression,
   });
+  const facetsQuery = useJobFacets();
   const rows = useMemo(
     () => (jobsQuery.data?.results ?? []).map(mapJobRow),
     [jobsQuery.data?.results],
@@ -256,6 +258,7 @@ export function JobsPage() {
         onSortingChange={handleSortChanged}
         filterRules={filterState.rules}
         filterDispatch={filterDispatch}
+        facets={facetsQuery.data}
       />
 
       <div

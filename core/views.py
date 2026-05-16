@@ -262,6 +262,63 @@ def list_jobs(request):
     )
 
 
+_FACET_FIELD_QUERYSETS = {
+    "source_name": lambda: Source.objects.filter(
+        listings__isnull=False
+    ).values_list("name", flat=True).distinct(),
+    "status": lambda: JobListing.objects.exclude(status="").values_list(
+        "status", flat=True
+    ).distinct(),
+    "employment_type": lambda: JobListing.objects.exclude(
+        employment_type=""
+    ).values_list("employment_type", flat=True).distinct(),
+    "workplace_type": lambda: JobListing.objects.exclude(
+        workplace_type=""
+    ).values_list("workplace_type", flat=True).distinct(),
+    "country": lambda: LocationTag.objects.filter(
+        joblisting__isnull=False
+    ).exclude(country_code="").values_list(
+        "country_code", flat=True
+    ).distinct(),
+    "region": lambda: LocationTag.objects.filter(
+        joblisting__isnull=False
+    ).exclude(region_code="").values_list(
+        "region_code", flat=True
+    ).distinct(),
+    "city": lambda: LocationTag.objects.filter(
+        joblisting__isnull=False
+    ).exclude(city="").values_list("city", flat=True).distinct(),
+}
+
+
+@require_GET
+def jobs_facets(request):
+    raw = request.GET.get("fields")
+    if not raw:
+        return JsonResponse(
+            {"error": "Missing required parameter 'fields'."},
+            status=400,
+        )
+    requested = [token.strip() for token in raw.split(",") if token.strip()]
+    unknown = [field for field in requested if field not in _FACET_FIELD_QUERYSETS]
+    if unknown:
+        return JsonResponse(
+            {
+                "error": (
+                    f"Unknown facet field(s): {', '.join(unknown)}. "
+                    f"Valid fields: {', '.join(sorted(_FACET_FIELD_QUERYSETS))}."
+                )
+            },
+            status=400,
+        )
+    facets = {}
+    for field in requested:
+        if field in facets:
+            continue
+        facets[field] = sorted(_FACET_FIELD_QUERYSETS[field]())
+    return JsonResponse(facets)
+
+
 @login_required
 @require_POST
 def mark_listing_seen(request, listing_id):

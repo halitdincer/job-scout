@@ -348,6 +348,81 @@ describe("JobsTable", () => {
       expect(filterCells.length).toBe(visibleColumns.length);
     });
 
+    it("prefers facet values over per-page derived values for multi-selects", async () => {
+      const user = userEvent.setup();
+      render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[mapJobRow(buildJob({ id: 1, country: ["CA"] }))]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+          filterRules={[]}
+          filterDispatch={vi.fn()}
+          facets={{ country: ["CA", "GB", "US"] }}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Filter Country" }));
+      expect(screen.getByLabelText("CA")).toBeInTheDocument();
+      expect(screen.getByLabelText("GB")).toBeInTheDocument();
+      expect(screen.getByLabelText("US")).toBeInTheDocument();
+    });
+
+    it("falls back to per-page derived values when no facet is supplied for a field", async () => {
+      const user = userEvent.setup();
+      render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[mapJobRow(buildJob({ id: 1, country: ["CA"] }))]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+          filterRules={[]}
+          filterDispatch={vi.fn()}
+          facets={{ source_name: ["Other"] }}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Filter Country" }));
+      expect(screen.getByLabelText("CA")).toBeInTheDocument();
+    });
+
+    it("groups multiple filter rules for the same field into one header filter", async () => {
+      const user = userEvent.setup();
+      render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[mapJobRow(buildJob())]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+          filterRules={[
+            {
+              id: "r1",
+              field: "title",
+              operator: "contains",
+              value: "engineer",
+            },
+            {
+              id: "r2",
+              field: "title",
+              operator: "not_contains",
+              value: "intern",
+            },
+          ]}
+          filterDispatch={vi.fn()}
+        />,
+      );
+      const trigger = screen.getByRole("button", { name: "Filter Title" });
+      expect(trigger).toHaveTextContent("2 applied");
+      await user.click(trigger);
+      expect(screen.getByLabelText("Operator for rule r1")).toHaveValue(
+        "contains",
+      );
+      expect(screen.getByLabelText("Operator for rule r2")).toHaveValue(
+        "not_contains",
+      );
+    });
+
     it("skips the filter row when filterRules and filterDispatch are not supplied", () => {
       const { container } = render(
         <JobsTable
