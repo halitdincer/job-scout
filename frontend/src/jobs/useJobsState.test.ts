@@ -16,6 +16,23 @@ describe("useJobsState", () => {
     expect(result.current.state.renderable).toBe(true);
   });
 
+  it("hydrates initial rules from an expression", () => {
+    const expr = {
+      op: "and" as const,
+      children: [
+        { field: "title", operator: "contains", value: "engineer" },
+        { field: "title", operator: "not_contains", value: "intern" },
+      ],
+    };
+    const { result } = renderHook(() => useJobsState(expr));
+    expect(result.current.state.expression).toBe(expr);
+    expect(result.current.state.rules).toEqual([
+      { id: "r1", field: "title", operator: "contains", value: "engineer" },
+      { id: "r2", field: "title", operator: "not_contains", value: "intern" },
+    ]);
+    expect(result.current.state.renderable).toBe(true);
+  });
+
   it("ADD_RULE appends a rule with the field's default operator", () => {
     const { result } = renderHook(() => useJobsState());
     act(() => result.current.dispatch({ type: "ADD_RULE", field: "title" }));

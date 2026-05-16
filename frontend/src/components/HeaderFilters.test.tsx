@@ -424,7 +424,8 @@ describe("HeaderFilterCell", () => {
     expect(screen.getByLabelText("Filter Title")).toBeInTheDocument();
   });
 
-  it("renders the text widget for a single canonical contains rule", () => {
+  it("renders a summary popover for a single active text rule", async () => {
+    const user = userEvent.setup();
     render(
       <HeaderFilterCell
         filterField="title"
@@ -435,7 +436,13 @@ describe("HeaderFilterCell", () => {
         dispatch={vi.fn()}
       />,
     );
-    expect(screen.getByLabelText("Filter Title")).toHaveValue("eng");
+    const trigger = screen.getByRole("button", { name: "Filter Title" });
+    expect(trigger).toHaveTextContent("1 filter");
+    await user.click(trigger);
+    expect(screen.getByLabelText("Operator for rule r1")).toHaveValue(
+      "contains",
+    );
+    expect(screen.getByLabelText("Value for rule r1")).toHaveValue("eng");
   });
 
   it("renders the multi-select widget when there are no rules", () => {
@@ -451,6 +458,21 @@ describe("HeaderFilterCell", () => {
     expect(
       screen.getByRole("button", { name: "Filter Country" }),
     ).toBeInTheDocument();
+  });
+
+  it("renders the multi-select widget for a single canonical rule", () => {
+    render(
+      <HeaderFilterCell
+        filterField="country"
+        filterWidget="multi"
+        rules={[makeRule({ field: "country", operator: "in", value: "CA" })]}
+        dispatch={vi.fn()}
+        uniqueValues={["CA"]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Filter Country" })).toHaveTextContent(
+      "1 selected",
+    );
   });
 
   it("renders the date widget when there are no rules", () => {
@@ -509,7 +531,7 @@ describe("HeaderFilterCell", () => {
       />,
     );
     const trigger = screen.getByRole("button", { name: "Filter Title" });
-    expect(trigger).toHaveTextContent("1 applied");
+    expect(trigger).toHaveTextContent("1 filter");
     await user.click(trigger);
     expect(screen.getByLabelText("Operator for rule r1")).toHaveValue(
       "not_contains",
@@ -540,7 +562,7 @@ describe("HeaderFilterCell", () => {
       />,
     );
     const trigger = screen.getByRole("button", { name: "Filter Title" });
-    expect(trigger).toHaveTextContent("2 applied");
+    expect(trigger).toHaveTextContent("2 filters");
     await user.click(trigger);
     expect(screen.getByLabelText("Operator for rule r1")).toBeInTheDocument();
     expect(screen.getByLabelText("Operator for rule r2")).toBeInTheDocument();

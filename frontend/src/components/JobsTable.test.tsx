@@ -273,17 +273,22 @@ describe("JobsTable", () => {
           filterDispatch={dispatch}
         />,
       );
-      const input = screen.getByLabelText("Filter Title") as HTMLInputElement;
-      expect(input).toHaveValue("engineer");
-      await user.clear(input);
-      await user.type(input, "manager");
-      input.blur();
-      expect(dispatch).toHaveBeenLastCalledWith({
-        type: "SET_FIELD_FILTER",
-        field: "title",
-        operator: "contains",
-        value: "manager",
+      const trigger = screen.getByRole("button", { name: "Filter Title" });
+      expect(trigger).toHaveTextContent("1 filter");
+      await user.click(trigger);
+      expect(screen.getByLabelText("Value for rule r1")).toHaveValue(
+        "engineer",
+      );
+      await user.selectOptions(
+        screen.getByLabelText("Operator for rule r1"),
+        "not_contains",
+      );
+      expect(dispatch).toHaveBeenNthCalledWith(1, {
+        type: "UPDATE_RULE_OPERATOR",
+        ruleId: "r1",
+        operator: "not_contains",
       });
+      expect(dispatch).toHaveBeenNthCalledWith(2, { type: "COMMIT_FILTER" });
     });
 
     it("populates multi-select unique values from data", async () => {
@@ -423,7 +428,7 @@ describe("JobsTable", () => {
         />,
       );
       const trigger = screen.getByRole("button", { name: "Filter Title" });
-      expect(trigger).toHaveTextContent("2 applied");
+      expect(trigger).toHaveTextContent("2 filters");
       await user.click(trigger);
       expect(screen.getByLabelText("Operator for rule r1")).toHaveValue(
         "contains",

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -10,6 +10,27 @@ import { JobsPage } from "./JobsPage";
 vi.mock("@/api/jobs", () => ({
   useJobs: vi.fn(),
 }));
+
+let localStorageState: Record<string, string> = {};
+
+beforeEach(() => {
+  localStorageState = {};
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => localStorageState[key] ?? null,
+      setItem: (key: string, value: string) => {
+        localStorageState[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete localStorageState[key];
+      },
+      clear: () => {
+        localStorageState = {};
+      },
+    },
+  });
+});
 
 function mockSavedViewsList(views: unknown[] = []) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
@@ -29,6 +50,7 @@ function mockSavedViewsList(views: unknown[] = []) {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  window.localStorage.clear();
 });
 
 function renderJobs() {
@@ -43,8 +65,10 @@ function renderJobs() {
 vi.mock("@/components/JobsTable", () => ({
   JobsTable: ({
     onSortingChange,
+    filterRules = [],
   }: {
     onSortingChange?: (sort: unknown[]) => void;
+    filterRules?: unknown[];
   }) => (
     <>
       <button
@@ -56,6 +80,7 @@ vi.mock("@/components/JobsTable", () => ({
       <button type="button" onClick={() => onSortingChange?.([])}>
         clear sort
       </button>
+      <div data-testid="header-filter-rule-count">{filterRules.length}</div>
     </>
   ),
 }));
@@ -88,6 +113,35 @@ describe("JobsPage", () => {
     expect(screen.getByRole("heading", { name: "Jobs" })).toBeInTheDocument();
     expect(screen.getByText("grid")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 6")).toBeInTheDocument();
+  });
+
+  it("hydrates stored filters on first load and passes their rules to the table", async () => {
+    const expression = {
+      op: "and" as const,
+      children: [
+        { field: "title", operator: "contains", value: "engineer" },
+        { field: "title", operator: "not_contains", value: "intern" },
+      ],
+    };
+    window.localStorage.setItem(
+      "job-scout.jobs.filter_expression",
+      JSON.stringify(expression),
+    );
+    mockJobsState();
+    mockSavedViewsList();
+    renderJobs();
+
+    await waitFor(() =>
+      expect(mockUseJobs).toHaveBeenLastCalledWith({
+        page: 1,
+        pageSize: 50,
+        sort: [{ field: "first_seen_at", dir: "desc" }],
+        filter: expression,
+      }),
+    );
+    expect(screen.getByTestId("header-filter-rule-count")).toHaveTextContent(
+      "2",
+    );
   });
 
   it("changes page size and moves pages", async () => {

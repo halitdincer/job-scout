@@ -19,10 +19,12 @@ import {
 } from "@/components/ui/sheet";
 import { DEFAULT_JOB_SORT, getJobColumns, PAGE_SIZES } from "@/jobs/columns";
 import { mapJobRow } from "@/jobs/formatters";
+import type { FilterExpression } from "@/jobs/filterExpression";
 import { useJobsState } from "@/jobs/useJobsState";
 import type { SavedView, SavedViewColumn } from "@/types/api";
 
 const DEFAULT_PAGE_SIZE = 50;
+const FILTER_STORAGE_KEY = "job-scout.jobs.filter_expression";
 
 const ALL_JOB_COLUMNS = getJobColumns();
 
@@ -65,6 +67,11 @@ function serializeSort(sort: SortSpec[]) {
   return JSON.stringify(sort);
 }
 
+function readStoredFilterExpression(): FilterExpression | null {
+  const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+  return raw ? (JSON.parse(raw) as FilterExpression) : null;
+}
+
 export function JobsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -80,8 +87,22 @@ export function JobsPage() {
   const [columnVisibility, setColumnVisibility] = useState<
     Record<string, boolean>
   >(DEFAULT_COLUMN_VISIBILITY);
-  const { state: filterState, dispatch: filterDispatch } = useJobsState();
+  const [initialFilterExpression] = useState(readStoredFilterExpression);
+  const { state: filterState, dispatch: filterDispatch } = useJobsState(
+    initialFilterExpression,
+  );
   const previousExpressionRef = useRef(filterState.expression);
+
+  useEffect(() => {
+    if (filterState.expression) {
+      window.localStorage.setItem(
+        FILTER_STORAGE_KEY,
+        JSON.stringify(filterState.expression),
+      );
+    } else {
+      window.localStorage.removeItem(FILTER_STORAGE_KEY);
+    }
+  }, [filterState.expression]);
 
   useEffect(() => {
     if (previousExpressionRef.current !== filterState.expression) {

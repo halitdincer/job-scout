@@ -281,6 +281,7 @@ function MultiRulePopover({
   const def = FILTER_FIELD_DEFS[field];
   const operators = def?.operators ?? [];
   const isDateField = def?.type === "date";
+  const summary = `${rules.length} filter${rules.length === 1 ? "" : "s"}`;
 
   const updateOperator = (ruleId: string, operator: string) => {
     dispatch({ type: "UPDATE_RULE_OPERATOR", ruleId, operator });
@@ -316,7 +317,7 @@ function MultiRulePopover({
           aria-label={`Filter ${label}`}
           className="h-8 w-full justify-between border-primary text-xs font-normal text-primary"
         >
-          <span className="truncate">{`${rules.length} applied`}</span>
+          <span className="truncate">{summary}</span>
           <FilterIcon className="ml-2 h-3 w-3 shrink-0" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
@@ -420,7 +421,9 @@ export function HeaderFilterCell({
   const canonical = CANONICAL_OPERATOR[filterWidget];
   const useSimpleWidget =
     rules.length === 0 ||
-    (rules.length === 1 && rules[0].operator === canonical);
+    (filterWidget !== "text" &&
+      rules.length === 1 &&
+      rules[0].operator === canonical);
 
   if (!useSimpleWidget) {
     return (

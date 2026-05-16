@@ -41,6 +41,18 @@ export const initialJobsState: JobsState = {
   renderable: true,
 };
 
+function stateFromExpression(expression: FilterExpression | null | undefined) {
+  if (expression === null || expression === undefined) {
+    return initialJobsState;
+  }
+  const projected = expressionToRules(expression);
+  return {
+    rules: projected.rules,
+    expression: projected.expression,
+    renderable: projected.renderable,
+  };
+}
+
 export function jobsReducer(state: JobsState, action: JobsAction): JobsState {
   switch (action.type) {
     case "ADD_RULE": {
@@ -131,7 +143,11 @@ export function jobsReducer(state: JobsState, action: JobsAction): JobsState {
   }
 }
 
-export function useJobsState() {
-  const [state, dispatch] = useReducer(jobsReducer, initialJobsState);
+export function useJobsState(initialExpression?: FilterExpression | null) {
+  const [state, dispatch] = useReducer(
+    jobsReducer,
+    initialExpression,
+    stateFromExpression,
+  );
   return { state, dispatch };
 }
