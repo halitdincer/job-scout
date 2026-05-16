@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime, joinValues, mapJobRow } from "./formatters";
+import {
+  formatDateTime,
+  formatRelativeDateTime,
+  joinValues,
+  mapJobRow,
+} from "./formatters";
 
 describe("job formatters", () => {
   it("formats dates in a stable UTC shape", () => {
     expect(formatDateTime("2025-01-02T03:04:00Z")).toBe("Jan 02, 2025 03:04");
     expect(formatDateTime(null)).toBe("");
+  });
+
+  it("formats relative dates with compact units", () => {
+    const now = new Date("2025-01-23T03:04:00Z");
+    expect(formatRelativeDateTime("2025-01-22T03:04:00Z", now)).toBe(
+      "1d ago",
+    );
+    expect(formatRelativeDateTime("2025-01-02T03:04:00Z", now)).toBe(
+      "3w ago",
+    );
+    expect(formatRelativeDateTime("2025-01-23T03:03:30Z", now)).toBe("now");
+    expect(formatRelativeDateTime("2025-01-25T03:04:00Z", now)).toBe("in 2d");
+    expect(formatRelativeDateTime(null, now)).toBe("");
   });
 
   it("joins array values", () => {

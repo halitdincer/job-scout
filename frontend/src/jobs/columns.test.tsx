@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getJobColumns } from "./columns";
 import type { JobGridRow } from "./formatters";
@@ -40,6 +40,10 @@ function makeRow(overrides: Partial<JobGridRow> = {}): JobGridRow {
   };
 }
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("getJobColumns", () => {
   it("includes the title column sorted by default + visibility metadata", () => {
     const columns = getJobColumns();
@@ -75,13 +79,22 @@ describe("getJobColumns", () => {
   });
 
   it("renders date and array cell formatters", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-01-23T03:04:00Z"));
+
     const dateCol = findColumn("published_at");
     const dateRender = dateCol.cell as (ctx: {
       getValue: () => unknown;
-    }) => string;
-    expect(dateRender({ getValue: () => "2025-01-02T03:04:00Z" })).toBe(
+    }) => JSX.Element | string;
+    const renderedDate = render(
+      <>{dateRender({ getValue: () => "2025-01-02T03:04:00Z" })}</>,
+    );
+    expect(renderedDate.getByText("3w ago")).toHaveAttribute(
+      "title",
       "Jan 02, 2025 03:04",
     );
+    renderedDate.unmount();
+    expect(dateRender({ getValue: () => null })).toBe("");
 
     const countryCol = findColumn("country");
     const valuesRender = countryCol.cell as (ctx: {

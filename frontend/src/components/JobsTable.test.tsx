@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { JobsTable } from "./JobsTable";
 import { getJobColumns } from "@/jobs/columns";
@@ -11,6 +11,10 @@ const COLUMNS = getJobColumns();
 const FULL_VISIBILITY = Object.fromEntries(
   COLUMNS.map((c) => [String(c.id), c.meta?.defaultVisible !== false]),
 );
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function buildJob(overrides: Partial<JobListing> = {}): JobListing {
   return {
@@ -49,6 +53,9 @@ function buildJob(overrides: Partial<JobListing> = {}): JobListing {
 
 describe("JobsTable", () => {
   it("renders rows with formatted cells and the title link", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-01-23T03:04:00Z"));
+
     const data = [mapJobRow(buildJob({ title: "Visible Job", seen: false }))];
     render(
       <JobsTable
@@ -63,7 +70,10 @@ describe("JobsTable", () => {
     const link = screen.getByRole("link", { name: "Visible Job" });
     expect(link).toHaveAttribute("href", "https://example.com/jobs/1");
     expect(link.className).toBe("job-link");
-    expect(screen.getByText("Jan 02, 2025 03:04")).toBeInTheDocument();
+    expect(screen.getByText("3w ago")).toHaveAttribute(
+      "title",
+      "Jan 02, 2025 03:04",
+    );
     expect(screen.getAllByText("CA").length).toBeGreaterThan(0);
   });
 

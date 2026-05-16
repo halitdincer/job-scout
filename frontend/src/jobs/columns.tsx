@@ -2,7 +2,12 @@ import type { ColumnDef } from "@tanstack/react-table";
 
 import type { SortSpec } from "@/api/jobs";
 
-import { formatDateTime, joinValues, type JobGridRow } from "./formatters";
+import {
+  formatDateTime,
+  formatRelativeDateTime,
+  joinValues,
+  type JobGridRow,
+} from "./formatters";
 
 export const DEFAULT_JOB_SORT: SortSpec[] = [
   { field: "first_seen_at", dir: "desc" },
@@ -31,7 +36,10 @@ export type JobColumnDef = ColumnDef<JobGridRow> & {
 type CellContext<TValue> = { getValue: () => TValue };
 
 function dateCellRenderer({ getValue }: CellContext<unknown>) {
-  return formatDateTime(getValue() as string | null | undefined);
+  const value = getValue() as string | null | undefined;
+  const label = formatRelativeDateTime(value);
+  if (!label) return "";
+  return <span title={formatDateTime(value)}>{label}</span>;
 }
 
 function valuesCellRenderer({ getValue }: CellContext<unknown>) {
