@@ -254,6 +254,8 @@ export function JobsPage() {
         columnVisibility={columnVisibility}
         sorting={sort}
         onSortingChange={handleSortChanged}
+        filterRules={filterState.rules}
+        filterDispatch={filterDispatch}
       />
 
       <div

@@ -6,10 +6,14 @@ import {
   useReactTable,
   type SortingState,
 } from "@tanstack/react-table";
+import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 
 import type { SortSpec } from "@/api/jobs";
+import { HeaderFilterCell } from "@/components/HeaderFilters";
 import type { JobColumnDef, JobColumnMeta } from "@/jobs/columns";
+import type { FilterRule } from "@/jobs/filterExpression";
 import type { JobGridRow } from "@/jobs/formatters";
+import type { JobsAction } from "@/jobs/useJobsState";
 import {
   Table,
   TableBody,
@@ -29,7 +33,41 @@ type JobsTableProps = {
   sorting: SortSpec[];
   onSortingChange: (next: SortSpec[]) => void;
   emptyMessage?: string;
+  filterRules?: FilterRule[];
+  filterDispatch?: (action: JobsAction) => void;
 };
+
+function collectUniqueValues(
+  data: JobGridRow[],
+  columns: JobColumnDef[],
+): Record<string, string[]> {
+  const sets: Record<string, Set<string>> = {};
+  for (const col of columns) {
+    const meta = col.meta;
+    if (!meta || meta.filterWidget !== "multi" || !meta.filterField) continue;
+    const key = meta.uniqueValuesKey ?? String(col.id);
+    sets[key] = new Set<string>();
+  }
+  for (const row of data) {
+    for (const key of Object.keys(sets)) {
+      const value = (row as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item !== null && item !== undefined && item !== "") {
+            sets[key].add(String(item));
+          }
+        }
+      } else if (value !== null && value !== undefined && value !== "") {
+        sets[key].add(String(value));
+      }
+    }
+  }
+  const out: Record<string, string[]> = {};
+  for (const [key, set] of Object.entries(sets)) {
+    out[key] = Array.from(set).sort();
+  }
+  return out;
+}
 
 function toTanstackSorting(sorting: SortSpec[]): SortingState {
   return sorting.map((spec) => ({ id: spec.field, desc: spec.dir === "desc" }));
@@ -51,6 +89,8 @@ export function JobsTable({
   sorting,
   onSortingChange,
   emptyMessage = "No jobs found",
+  filterRules,
+  filterDispatch,
 }: JobsTableProps) {
   const tanstackSorting = useMemo(() => toTanstackSorting(sorting), [sorting]);
 
@@ -71,6 +111,17 @@ export function JobsTable({
 
   const rows = table.getRowModel().rows;
   const visibleColumnCount = table.getVisibleFlatColumns().length;
+  const uniqueValuesByKey = useMemo(
+    () => collectUniqueValues(data, columns),
+    [data, columns],
+  );
+  const rulesByField = useMemo(() => {
+    const map = new Map<string, FilterRule>();
+    for (const rule of filterRules ?? []) {
+      map.set(rule.field, rule);
+    }
+    return map;
+  }, [filterRules]);
 
   return (
     <div id={id} className={cn("w-full", className)}>
@@ -99,6 +150,7 @@ export function JobsTable({
                           ? "descending"
                           : undefined
                     }
+                    className="sticky top-0 z-10 bg-background"
                   >
                     {canSort ? (
                       <button
@@ -107,13 +159,22 @@ export function JobsTable({
                         className="inline-flex items-center gap-1 font-medium hover:text-foreground"
                       >
                         {headerContent}
-                        <span aria-hidden="true">
-                          {sortDir === "asc"
-                            ? "↑"
-                            : sortDir === "desc"
-                              ? "↓"
-                              : ""}
-                        </span>
+                        {sortDir === "asc" ? (
+                          <ArrowUp
+                            className="h-3 w-3 text-primary"
+                            aria-hidden="true"
+                          />
+                        ) : sortDir === "desc" ? (
+                          <ArrowDown
+                            className="h-3 w-3 text-primary"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <ChevronsUpDown
+                            className="h-3 w-3 opacity-50"
+                            aria-hidden="true"
+                          />
+                        )}
                       </button>
                     ) : (
                       headerContent
@@ -123,6 +184,30 @@ export function JobsTable({
               })}
             </TableRow>
           ))}
+          {filterRules !== undefined && filterDispatch !== undefined ? (
+            <TableRow>
+              {table.getVisibleLeafColumns().map((col) => {
+                const meta = col.columnDef.meta as JobColumnMeta | undefined;
+                const filterField = meta?.filterField;
+                const filterWidget = meta?.filterWidget;
+                if (!filterField || !filterWidget) {
+                  return <TableHead key={col.id} className="py-1" />;
+                }
+                const key = meta?.uniqueValuesKey ?? String(col.id);
+                return (
+                  <TableHead key={col.id} className="py-1">
+                    <HeaderFilterCell
+                      filterField={filterField}
+                      filterWidget={filterWidget}
+                      rule={rulesByField.get(filterField)}
+                      dispatch={filterDispatch}
+                      uniqueValues={uniqueValuesByKey[key]}
+                    />
+                  </TableHead>
+                );
+              })}
+            </TableRow>
+          ) : null}
         </TableHeader>
         <TableBody>
           {rows.length === 0 ? (

@@ -170,6 +170,119 @@ describe("useJobsState", () => {
     });
   });
 
+  it("SET_FIELD_FILTER adds a rule for the field and commits the expression", () => {
+    const { result } = renderHook(() => useJobsState());
+    act(() =>
+      result.current.dispatch({
+        type: "SET_FIELD_FILTER",
+        field: "title",
+        operator: "contains",
+        value: "engineer",
+      }),
+    );
+    expect(result.current.state.rules).toEqual([
+      { id: "r1", field: "title", operator: "contains", value: "engineer" },
+    ]);
+    expect(result.current.state.expression).toEqual({
+      field: "title",
+      operator: "contains",
+      value: "engineer",
+    });
+  });
+
+  it("SET_FIELD_FILTER with an empty value clears rules for that field and commits", () => {
+    const { result } = renderHook(() => useJobsState());
+    act(() =>
+      result.current.dispatch({
+        type: "SET_FIELD_FILTER",
+        field: "title",
+        operator: "contains",
+        value: "engineer",
+      }),
+    );
+    act(() =>
+      result.current.dispatch({
+        type: "SET_FIELD_FILTER",
+        field: "title",
+        operator: "contains",
+        value: "",
+      }),
+    );
+    expect(result.current.state.rules).toEqual([]);
+    expect(result.current.state.expression).toBeNull();
+  });
+
+  it("SET_FIELD_FILTER replaces any existing rules for the same field", () => {
+    const { result } = renderHook(() => useJobsState());
+    act(() => result.current.dispatch({ type: "ADD_RULE", field: "title" }));
+    act(() =>
+      result.current.dispatch({
+        type: "UPDATE_RULE_VALUE",
+        ruleId: "r1",
+        value: "old",
+      }),
+    );
+    act(() =>
+      result.current.dispatch({
+        type: "SET_FIELD_FILTER",
+        field: "title",
+        operator: "eq",
+        value: "new",
+      }),
+    );
+    expect(result.current.state.rules).toEqual([
+      { id: "r2", field: "title", operator: "eq", value: "new" },
+    ]);
+    expect(result.current.state.expression).toEqual({
+      field: "title",
+      operator: "eq",
+      value: "new",
+    });
+  });
+
+  it("SET_FIELD_FILTER preserves rules for other fields", () => {
+    const { result } = renderHook(() => useJobsState());
+    act(() => result.current.dispatch({ type: "ADD_RULE", field: "status" }));
+    act(() =>
+      result.current.dispatch({
+        type: "UPDATE_RULE_VALUE",
+        ruleId: "r1",
+        value: "active",
+      }),
+    );
+    act(() =>
+      result.current.dispatch({
+        type: "SET_FIELD_FILTER",
+        field: "title",
+        operator: "contains",
+        value: "eng",
+      }),
+    );
+    expect(result.current.state.rules).toHaveLength(2);
+    const titleRule = result.current.state.rules.find(
+      (r) => r.field === "title",
+    );
+    const statusRule = result.current.state.rules.find(
+      (r) => r.field === "status",
+    );
+    expect(titleRule?.value).toBe("eng");
+    expect(statusRule?.value).toBe("active");
+  });
+
+  it("SET_FIELD_FILTER ignores unknown fields", () => {
+    const { result } = renderHook(() => useJobsState());
+    act(() =>
+      result.current.dispatch({
+        type: "SET_FIELD_FILTER",
+        field: "bogus",
+        operator: "eq",
+        value: "x",
+      }),
+    );
+    expect(result.current.state.rules).toEqual([]);
+    expect(result.current.state.expression).toBeNull();
+  });
+
   it("unknown actions return the state unchanged", () => {
     const { result } = renderHook(() => useJobsState());
     const before = result.current.state;

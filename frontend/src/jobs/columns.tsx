@@ -10,9 +10,18 @@ export const DEFAULT_JOB_SORT: SortSpec[] = [
 
 export const PAGE_SIZES = [25, 50, 100, 250] as const;
 
+export type FilterWidgetKind = "text" | "multi" | "date";
+
 export type JobColumnMeta = {
   minWidth?: string;
   defaultVisible?: boolean;
+  filterField?: string;
+  filterWidget?: FilterWidgetKind;
+  /**
+   * For multi-select header filters: the row key whose values populate the
+   * dropdown. Defaults to the column id when omitted.
+   */
+  uniqueValuesKey?: string;
 };
 
 export type JobColumnDef = ColumnDef<JobGridRow> & {
@@ -49,14 +58,24 @@ export function getJobColumns(): JobColumnDef[] {
           </a>
         );
       },
-      meta: { minWidth: "260px", defaultVisible: true },
+      meta: {
+        minWidth: "260px",
+        defaultVisible: true,
+        filterField: "title",
+        filterWidget: "text",
+      },
     },
     {
       id: "source_name",
       accessorKey: "source_name",
       header: "Source",
       enableSorting: true,
-      meta: { minWidth: "150px", defaultVisible: true },
+      meta: {
+        minWidth: "150px",
+        defaultVisible: true,
+        filterField: "source_name",
+        filterWidget: "multi",
+      },
     },
     {
       id: "department",
@@ -77,14 +96,24 @@ export function getJobColumns(): JobColumnDef[] {
       accessorKey: "employment_type_label",
       header: "Employment",
       enableSorting: false,
-      meta: { minWidth: "120px", defaultVisible: true },
+      meta: {
+        minWidth: "120px",
+        defaultVisible: true,
+        filterField: "employment_type",
+        filterWidget: "multi",
+      },
     },
     {
       id: "workplace_type_label",
       accessorKey: "workplace_type_label",
       header: "Workplace",
       enableSorting: false,
-      meta: { minWidth: "120px", defaultVisible: true },
+      meta: {
+        minWidth: "120px",
+        defaultVisible: true,
+        filterField: "workplace_type",
+        filterWidget: "multi",
+      },
     },
     {
       id: "locations_display",
@@ -99,7 +128,12 @@ export function getJobColumns(): JobColumnDef[] {
       header: "Country",
       enableSorting: true,
       cell: valuesCellRenderer,
-      meta: { minWidth: "110px", defaultVisible: true },
+      meta: {
+        minWidth: "110px",
+        defaultVisible: true,
+        filterField: "country",
+        filterWidget: "multi",
+      },
     },
     {
       id: "region",
@@ -107,7 +141,12 @@ export function getJobColumns(): JobColumnDef[] {
       header: "Region",
       enableSorting: true,
       cell: valuesCellRenderer,
-      meta: { minWidth: "110px", defaultVisible: true },
+      meta: {
+        minWidth: "110px",
+        defaultVisible: true,
+        filterField: "region",
+        filterWidget: "multi",
+      },
     },
     {
       id: "city",
@@ -115,7 +154,12 @@ export function getJobColumns(): JobColumnDef[] {
       header: "City",
       enableSorting: true,
       cell: valuesCellRenderer,
-      meta: { minWidth: "130px", defaultVisible: true },
+      meta: {
+        minWidth: "130px",
+        defaultVisible: true,
+        filterField: "city",
+        filterWidget: "multi",
+      },
     },
     {
       id: "published_at",
@@ -123,7 +167,12 @@ export function getJobColumns(): JobColumnDef[] {
       header: "Published",
       enableSorting: true,
       cell: dateCellRenderer,
-      meta: { minWidth: "150px", defaultVisible: true },
+      meta: {
+        minWidth: "150px",
+        defaultVisible: true,
+        filterField: "published_at",
+        filterWidget: "date",
+      },
     },
     {
       id: "first_seen_at",
@@ -131,7 +180,12 @@ export function getJobColumns(): JobColumnDef[] {
       header: "First Seen",
       enableSorting: true,
       cell: dateCellRenderer,
-      meta: { minWidth: "150px", defaultVisible: true },
+      meta: {
+        minWidth: "150px",
+        defaultVisible: true,
+        filterField: "first_seen_at",
+        filterWidget: "date",
+      },
     },
     {
       id: "last_seen_at",
@@ -139,7 +193,12 @@ export function getJobColumns(): JobColumnDef[] {
       header: "Last Seen",
       enableSorting: true,
       cell: dateCellRenderer,
-      meta: { minWidth: "150px", defaultVisible: true },
+      meta: {
+        minWidth: "150px",
+        defaultVisible: true,
+        filterField: "last_seen_at",
+        filterWidget: "date",
+      },
     },
     {
       id: "external_id",
@@ -153,7 +212,11 @@ export function getJobColumns(): JobColumnDef[] {
       accessorKey: "status",
       header: "Status",
       enableSorting: false,
-      meta: { defaultVisible: false },
+      meta: {
+        defaultVisible: false,
+        filterField: "status",
+        filterWidget: "multi",
+      },
     },
     {
       id: "updated_at_source",
@@ -161,7 +224,11 @@ export function getJobColumns(): JobColumnDef[] {
       header: "Updated At Source",
       enableSorting: false,
       cell: dateCellRenderer,
-      meta: { defaultVisible: false },
+      meta: {
+        defaultVisible: false,
+        filterField: "updated_at_source",
+        filterWidget: "date",
+      },
     },
     {
       id: "expired_at",
@@ -169,7 +236,11 @@ export function getJobColumns(): JobColumnDef[] {
       header: "Expired",
       enableSorting: false,
       cell: dateCellRenderer,
-      meta: { defaultVisible: false },
+      meta: {
+        defaultVisible: false,
+        filterField: "expired_at",
+        filterWidget: "date",
+      },
     },
     {
       id: "seen",

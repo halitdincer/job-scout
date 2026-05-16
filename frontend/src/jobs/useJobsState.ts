@@ -26,7 +26,13 @@ export type JobsAction =
   | { type: "UPDATE_RULE_VALUE"; ruleId: string; value: string }
   | { type: "CLEAR_RULES" }
   | { type: "COMMIT_FILTER" }
-  | { type: "SET_FILTER_FROM_EXPRESSION"; expression: FilterExpression | null };
+  | { type: "SET_FILTER_FROM_EXPRESSION"; expression: FilterExpression | null }
+  | {
+      type: "SET_FIELD_FILTER";
+      field: string;
+      operator: string;
+      value: string;
+    };
 
 export const initialJobsState: JobsState = {
   rules: [],
@@ -85,6 +91,29 @@ export function jobsReducer(state: JobsState, action: JobsAction): JobsState {
         rules: projected.rules,
         expression: projected.expression,
         renderable: projected.renderable,
+      };
+    }
+    case "SET_FIELD_FILTER": {
+      const def = FILTER_FIELD_DEFS[action.field];
+      if (!def) return state;
+      const other = state.rules.filter((r) => r.field !== action.field);
+      const next =
+        action.value === ""
+          ? other
+          : [
+              ...other,
+              {
+                id: genRuleId(),
+                field: action.field,
+                operator: action.operator,
+                value: action.value,
+              },
+            ];
+      return {
+        ...state,
+        rules: next,
+        expression: rulesToExpression(next),
+        renderable: true,
       };
     }
     default:

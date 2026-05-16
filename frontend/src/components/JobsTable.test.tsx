@@ -220,4 +220,146 @@ describe("JobsTable", () => {
     });
     expect(within(employmentHeader).queryByRole("button")).toBeNull();
   });
+
+  describe("header filter row", () => {
+    it("renders header filter widgets when filter props are supplied", () => {
+      const dispatch = vi.fn();
+      render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[mapJobRow(buildJob())]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+          filterRules={[]}
+          filterDispatch={dispatch}
+        />,
+      );
+      expect(screen.getByLabelText("Filter Title")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Filter Country" }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Filter First Seen")).toBeInTheDocument();
+    });
+
+    it("hydrates header filter values from filterRules and routes dispatch", async () => {
+      const user = userEvent.setup();
+      const dispatch = vi.fn();
+      render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[mapJobRow(buildJob())]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+          filterRules={[
+            {
+              id: "r1",
+              field: "title",
+              operator: "contains",
+              value: "engineer",
+            },
+          ]}
+          filterDispatch={dispatch}
+        />,
+      );
+      const input = screen.getByLabelText("Filter Title") as HTMLInputElement;
+      expect(input).toHaveValue("engineer");
+      await user.clear(input);
+      await user.type(input, "manager");
+      input.blur();
+      expect(dispatch).toHaveBeenLastCalledWith({
+        type: "SET_FIELD_FILTER",
+        field: "title",
+        operator: "contains",
+        value: "manager",
+      });
+    });
+
+    it("populates multi-select unique values from data", async () => {
+      const user = userEvent.setup();
+      render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[
+            mapJobRow(buildJob({ id: 1, country: ["CA"] })),
+            mapJobRow(
+              buildJob({
+                id: 2,
+                country: ["US", null as unknown as string, ""],
+              }),
+            ),
+            mapJobRow(buildJob({ id: 3, country: ["CA"] })),
+          ]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+          filterRules={[]}
+          filterDispatch={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Filter Country" }));
+      expect(screen.getByLabelText("CA")).toBeInTheDocument();
+      expect(screen.getByLabelText("US")).toBeInTheDocument();
+    });
+
+    it("collects unique source_name values from scalar columns", async () => {
+      const user = userEvent.setup();
+      render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[
+            mapJobRow(buildJob({ id: 1, source_name: "Acme" })),
+            mapJobRow(buildJob({ id: 2, source_name: "Globex" })),
+          ]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+          filterRules={[]}
+          filterDispatch={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Filter Company" }));
+      expect(screen.getByLabelText("Acme")).toBeInTheDocument();
+      expect(screen.getByLabelText("Globex")).toBeInTheDocument();
+    });
+
+    it("renders empty filter cells for columns without a filter widget", () => {
+      const dispatch = vi.fn();
+      const { container } = render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[mapJobRow(buildJob())]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+          filterRules={[]}
+          filterDispatch={dispatch}
+        />,
+      );
+      // Department has no filter widget — its header-filter cell exists but is empty.
+      const headerRows = container.querySelectorAll("thead tr");
+      expect(headerRows.length).toBe(2);
+      // Visible columns should equal the number of filter cells in the second row.
+      const filterCells = headerRows[1].querySelectorAll("th");
+      const visibleColumns = container.querySelectorAll(
+        "thead tr:first-child th",
+      );
+      expect(filterCells.length).toBe(visibleColumns.length);
+    });
+
+    it("skips the filter row when filterRules and filterDispatch are not supplied", () => {
+      const { container } = render(
+        <JobsTable
+          columns={COLUMNS}
+          data={[mapJobRow(buildJob())]}
+          columnVisibility={FULL_VISIBILITY}
+          sorting={[]}
+          onSortingChange={vi.fn()}
+        />,
+      );
+      const headerRows = container.querySelectorAll("thead tr");
+      expect(headerRows.length).toBe(1);
+    });
+  });
 });
