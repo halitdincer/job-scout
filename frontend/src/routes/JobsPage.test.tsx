@@ -33,16 +33,20 @@ function renderJobs() {
   );
 }
 
-vi.mock("@/components/Tabulator", () => ({
-  Tabulator: ({ onSortChanged }: { onSortChanged?: (sort: unknown[]) => void }) => (
+vi.mock("@/components/JobsTable", () => ({
+  JobsTable: ({
+    onSortingChange,
+  }: {
+    onSortingChange?: (sort: unknown[]) => void;
+  }) => (
     <>
       <button
         type="button"
-        onClick={() => onSortChanged?.([{ field: "title", dir: "asc" }])}
+        onClick={() => onSortingChange?.([{ field: "title", dir: "asc" }])}
       >
         grid
       </button>
-      <button type="button" onClick={() => onSortChanged?.([])}>
+      <button type="button" onClick={() => onSortingChange?.([])}>
         clear sort
       </button>
     </>

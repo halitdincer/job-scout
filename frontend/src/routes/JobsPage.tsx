@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import type { Options } from "tabulator-tables";
 
 import { useJobs, type SortSpec } from "@/api/jobs";
 import { ColumnsMenu, type ColumnsMenuOption } from "@/components/ColumnsMenu";
 import { DeleteViewDialog } from "@/components/DeleteViewDialog";
 import { FiltersPanel } from "@/components/FiltersPanel";
+import { JobsTable } from "@/components/JobsTable";
 import { SaveViewDialog } from "@/components/SaveViewDialog";
 import { SavedViewsMenu } from "@/components/SavedViewsMenu";
-import { Tabulator } from "@/components/Tabulator";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -27,22 +26,16 @@ const DEFAULT_PAGE_SIZE = 50;
 const ALL_JOB_COLUMNS = getJobColumns();
 
 const COLUMN_MENU_OPTIONS: ColumnsMenuOption[] = ALL_JOB_COLUMNS.map((col) => ({
-  field: String(col.field),
-  label: String(col.title),
+  field: String(col.id),
+  label: String(col.header),
 }));
 
 const DEFAULT_COLUMN_VISIBILITY: Record<string, boolean> = Object.fromEntries(
-  ALL_JOB_COLUMNS.map((col) => [String(col.field), col.visible !== false]),
+  ALL_JOB_COLUMNS.map((col) => [
+    String(col.id),
+    col.meta?.defaultVisible !== false,
+  ]),
 );
-
-function applyVisibilityToColumns(
-  visibility: Record<string, boolean>,
-): ReturnType<typeof getJobColumns> {
-  return ALL_JOB_COLUMNS.map((col) => ({
-    ...col,
-    visible: visibility[String(col.field)],
-  }));
-}
 
 function visibilityToSavedColumns(
   visibility: Record<string, boolean>,
@@ -106,23 +99,10 @@ export function JobsPage() {
     () => (jobsQuery.data?.results ?? []).map(mapJobRow),
     [jobsQuery.data?.results],
   );
-  const columns = useMemo(
-    () => applyVisibilityToColumns(columnVisibility),
-    [columnVisibility],
-  );
   const handleColumnToggle = useCallback(
     (field: string, nextVisible: boolean) => {
       setColumnVisibility((prev) => ({ ...prev, [field]: nextVisible }));
     },
-    [],
-  );
-  const tableOptions = useMemo<Partial<Options>>(
-    () => ({
-      height: "65vh",
-      index: "id",
-      columnDefaults: { headerSort: false },
-      placeholder: "No jobs found",
-    }),
     [],
   );
   const totalPages = jobsQuery.data?.total_pages ?? 0;
@@ -266,13 +246,14 @@ export function JobsPage() {
         </p>
       ) : null}
 
-      <Tabulator
+      <JobsTable
         id="jobs-grid"
         className="min-h-[65vh] w-full overflow-hidden rounded-md border border-border"
-        columns={columns}
+        columns={ALL_JOB_COLUMNS}
         data={rows}
-        options={tableOptions}
-        onSortChanged={handleSortChanged}
+        columnVisibility={columnVisibility}
+        sorting={sort}
+        onSortingChange={handleSortChanged}
       />
 
       <div

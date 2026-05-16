@@ -1,38 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { CellComponent } from "tabulator-tables";
 
-import {
-  dateFormatter,
-  formatDateTime,
-  formatLink,
-  joinValues,
-  mapJobRow,
-  titleFormatter,
-  valuesFormatter,
-} from "./formatters";
-
-function cell(value: unknown, data: Record<string, unknown> = {}): CellComponent {
-  return {
-    getValue: () => value,
-    getRow: () => ({
-      getData: () => data,
-    }),
-  } as unknown as CellComponent;
-}
+import { formatDateTime, joinValues, mapJobRow } from "./formatters";
 
 describe("job formatters", () => {
   it("formats dates in a stable UTC shape", () => {
     expect(formatDateTime("2025-01-02T03:04:00Z")).toBe("Jan 02, 2025 03:04");
     expect(formatDateTime(null)).toBe("");
-  });
-
-  it("escapes link text", () => {
-    expect(formatLink("<b>Role</b>", "https://example.com")).toContain(
-      "&lt;b&gt;Role&lt;/b&gt;",
-    );
-    expect(formatLink("Role", "https://example.com", true)).toContain(
-      "seen-link",
-    );
   });
 
   it("joins array values", () => {
@@ -48,7 +21,15 @@ describe("job formatters", () => {
       external_id: "ext-1",
       title: "Listing",
       department: null,
-      locations: [{ name: "Toronto", country_code: "CA", region_code: "ON", city: "Toronto", geo_key: "ON-Toronto" }],
+      locations: [
+        {
+          name: "Toronto",
+          country_code: "CA",
+          region_code: "ON",
+          city: "Toronto",
+          geo_key: "ON-Toronto",
+        },
+      ],
       url: "https://example.com",
       status: "active",
       team: null,
@@ -82,18 +63,5 @@ describe("job formatters", () => {
     expect(unmapped.locations_display).toBe("");
     expect(unmapped.employment_type_label).toBe("");
     expect(unmapped.workplace_type_label).toBe("");
-  });
-
-  it("formats Tabulator cell values", () => {
-    expect(
-      titleFormatter(cell("Listing", { url: "https://example.com", seen: false })),
-    ).toContain("Listing");
-    expect(
-      titleFormatter(cell(null, { url: "https://example.com", seen: false })),
-    ).toContain("></a>");
-    expect(dateFormatter(cell("2025-01-02T03:04:00Z"))).toBe(
-      "Jan 02, 2025 03:04",
-    );
-    expect(valuesFormatter(cell(["CA", "US"]))).toBe("CA, US");
   });
 });
