@@ -69,6 +69,8 @@ describe("JobsTable", () => {
 
     const link = screen.getByRole("link", { name: "Visible Job" });
     expect(link).toHaveAttribute("href", "https://example.com/jobs/1");
+    expect(link).not.toHaveAttribute("target");
+    expect(link).not.toHaveAttribute("rel");
     expect(link.className).toBe("job-link");
     expect(link.closest("td")).toHaveAttribute("data-label", "Title");
     const publishedAt = screen.getByText("3w ago");

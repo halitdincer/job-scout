@@ -3,7 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 
 import { createQueryWrapper } from "@/test/queryWrapper";
 
-import { useJobs } from "./jobs";
+import { markJobSeen, useJobs } from "./jobs";
 
 function mockOk(body: unknown) {
   return vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -16,6 +16,8 @@ function mockOk(body: unknown) {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  document.cookie =
+    "csrftoken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 });
 
 describe("useJobs", () => {
@@ -111,5 +113,20 @@ describe("useJobs", () => {
     );
 
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it("marks a job as seen with a keepalive POST", async () => {
+    document.cookie = "csrftoken=seen-token; path=/";
+    const spy = mockOk({ listing_id: 42, seen: true, created: true });
+
+    const result = await markJobSeen(42);
+
+    expect(result).toEqual({ listing_id: 42, seen: true, created: true });
+    expect(spy.mock.calls[0][0]).toBe("/api/jobs/42/seen/");
+    const init = spy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(init.keepalive).toBe(true);
+    expect(init.credentials).toBe("same-origin");
+    expect(new Headers(init.headers).get("X-CSRFToken")).toBe("seen-token");
   });
 });

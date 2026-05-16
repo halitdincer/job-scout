@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 
-import type { SortSpec } from "@/api/jobs";
+import { markJobSeen, type SortSpec } from "@/api/jobs";
 
 import {
   formatDateTime,
@@ -54,13 +54,19 @@ export function getJobColumns(): JobColumnDef[] {
       header: "Title",
       enableSorting: true,
       cell: ({ row }) => {
-        const { title, url, seen } = row.original;
+        const { id, title, url, seen } = row.original;
         return (
           <a
             className={seen ? "job-link seen-link" : "job-link"}
             href={url}
-            target="_blank"
-            rel="noopener noreferrer"
+            onClick={(event) => {
+              const link = event.currentTarget;
+              const previousClassName = link.className;
+              link.classList.add("seen-link");
+              void markJobSeen(id).catch(() => {
+                link.className = previousClassName;
+              });
+            }}
           >
             {title}
           </a>

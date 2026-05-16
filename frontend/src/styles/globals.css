@@ -37,6 +37,14 @@
 }
 
 @layer components {
+  .job-link {
+    @apply font-semibold leading-snug text-foreground underline-offset-4 hover:text-primary hover:underline;
+  }
+
+  .job-link.seen-link {
+    @apply text-muted-foreground;
+  }
+
   @media (max-width: 1023px), (hover: none) and (pointer: coarse) {
     .responsive-data-table {
       @apply border-0;
@@ -137,7 +145,7 @@
     }
 
     .responsive-data-table .job-link {
-      @apply block break-words text-base font-medium leading-snug;
+      @apply block break-words text-base font-semibold leading-snug;
     }
   }
 }

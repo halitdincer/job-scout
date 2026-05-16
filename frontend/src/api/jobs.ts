@@ -27,6 +27,12 @@ export type JobsEnvelope = {
   sort: SortSpec[];
 };
 
+export type MarkJobSeenResponse = {
+  listing_id: number;
+  seen: true;
+  created: boolean;
+};
+
 export const JOBS_QUERY_KEY = ["jobs"] as const;
 
 export function buildJobsUrl({ page, pageSize, sort, filter }: JobsParams) {
@@ -46,5 +52,12 @@ export function useJobs(params: JobsParams) {
   return useQuery<JobsEnvelope>({
     queryKey: [...JOBS_QUERY_KEY, params],
     queryFn: () => apiFetch<JobsEnvelope>(buildJobsUrl(params)),
+  });
+}
+
+export function markJobSeen(listingId: number) {
+  return apiFetch<MarkJobSeenResponse>(`/api/jobs/${listingId}/seen/`, {
+    method: "POST",
+    keepalive: true,
   });
 }
