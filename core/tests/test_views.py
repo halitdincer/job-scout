@@ -311,6 +311,42 @@ class TestJobsAPI:
         data = response.json()["results"]
         assert [row["title"] for row in data] == ["US Job"]
 
+    def test_filter_expression_supports_raw_location_name_contains(self):
+        source = Source.objects.create(
+            name="Geo Co", platform="greenhouse", board_id="geoco-raw"
+        )
+        remote_listing = JobListing.objects.create(
+            source=source,
+            external_id="1",
+            title="Remote Job",
+            url="https://example.com/1",
+            status="active",
+        )
+        toronto_listing = JobListing.objects.create(
+            source=source,
+            external_id="2",
+            title="Toronto Job",
+            url="https://example.com/2",
+            status="active",
+        )
+        remote_listing.locations.add(LocationTag.objects.create(name="Remote"))
+        toronto_listing.locations.add(
+            LocationTag.objects.create(name="Toronto, Ontario, Canada")
+        )
+
+        expression = {
+            "field": "location",
+            "operator": "contains",
+            "value": "toronto",
+        }
+
+        client = Client()
+        response = client.get("/api/jobs/", {"filter": json.dumps(expression)})
+
+        assert response.status_code == 200
+        data = response.json()["results"]
+        assert [row["title"] for row in data] == ["Toronto Job"]
+
     def test_filter_expression_can_combine_with_legacy_quick_filters(self):
         source = Source.objects.create(
             name="Blend Co", platform="greenhouse", board_id="blendco"
@@ -1147,4 +1183,3 @@ class TestJobsFacetsAPI:
         assert response.status_code == 200
         # Duplicates collapse to a single key in the response dict; values are stable.
         assert response.json() == {"source_name": ["Acme", "Globex"]}
-

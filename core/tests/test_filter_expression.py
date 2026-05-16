@@ -153,6 +153,16 @@ def test_validate_filter_expression_allows_source_name_in_operator():
     validate_filter_expression(expression)
 
 
+def test_validate_filter_expression_allows_raw_location_text_operator():
+    expression = {
+        "field": "location",
+        "operator": "contains",
+        "value": "Toronto",
+    }
+
+    validate_filter_expression(expression)
+
+
 def test_build_filter_q_supports_source_name_not_in_operator():
     expression = {
         "field": "source_name",

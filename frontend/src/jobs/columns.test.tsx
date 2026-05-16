@@ -52,6 +52,18 @@ describe("getJobColumns", () => {
     expect(findColumn("employment_type_label").enableSorting).toBe(false);
     expect(findColumn("external_id").meta?.defaultVisible).toBe(false);
     expect(findColumn("title").meta?.defaultVisible).toBe(true);
+    expect(findColumn("department").meta).toMatchObject({
+      filterField: "department",
+      filterWidget: "text",
+    });
+    expect(findColumn("team").meta).toMatchObject({
+      filterField: "team",
+      filterWidget: "text",
+    });
+    expect(findColumn("locations_display").meta).toMatchObject({
+      filterField: "location",
+      filterWidget: "text",
+    });
   });
 
   it("renders the title cell as an anchor with seen styling", () => {

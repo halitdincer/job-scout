@@ -85,6 +85,21 @@ export const FILTER_FIELD_DEFS: Record<string, FilterFieldDef> = {
     operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"],
     headerField: null,
   },
+  location: {
+    label: "Locations",
+    type: "text",
+    operators: [
+      "contains",
+      "not_contains",
+      "eq",
+      "neq",
+      "in",
+      "not_in",
+      "is_empty",
+      "is_not_empty",
+    ],
+    headerField: "locations_display",
+  },
   employment_type: {
     label: "Type",
     type: "enum",

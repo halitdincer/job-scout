@@ -90,14 +90,24 @@ export function getJobColumns(): JobColumnDef[] {
       accessorKey: "department",
       header: "Department",
       enableSorting: true,
-      meta: { minWidth: "150px", defaultVisible: true },
+      meta: {
+        minWidth: "150px",
+        defaultVisible: true,
+        filterField: "department",
+        filterWidget: "text",
+      },
     },
     {
       id: "team",
       accessorKey: "team",
       header: "Team",
       enableSorting: true,
-      meta: { minWidth: "140px", defaultVisible: true },
+      meta: {
+        minWidth: "140px",
+        defaultVisible: true,
+        filterField: "team",
+        filterWidget: "text",
+      },
     },
     {
       id: "employment_type_label",
@@ -128,7 +138,12 @@ export function getJobColumns(): JobColumnDef[] {
       accessorKey: "locations_display",
       header: "Locations",
       enableSorting: false,
-      meta: { minWidth: "180px", defaultVisible: true },
+      meta: {
+        minWidth: "180px",
+        defaultVisible: true,
+        filterField: "location",
+        filterWidget: "text",
+      },
     },
     {
       id: "country",

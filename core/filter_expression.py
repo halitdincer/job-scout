@@ -22,6 +22,11 @@ FIELD_DEFINITIONS = {
         "type": "text",
         "operators": {"contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"},
     },
+    "location": {
+        "path": "locations__name",
+        "type": "array_text",
+        "operators": {"contains", "not_contains", "eq", "neq", "in", "not_in", "is_empty", "is_not_empty"},
+    },
     "source_name": {
         "path": "source__name",
         "type": "text",

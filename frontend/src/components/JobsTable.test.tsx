@@ -246,6 +246,9 @@ describe("JobsTable", () => {
         />,
       );
       expect(screen.getByLabelText("Filter Title")).toBeInTheDocument();
+      expect(screen.getByLabelText("Filter Department")).toBeInTheDocument();
+      expect(screen.getByLabelText("Filter Team")).toBeInTheDocument();
+      expect(screen.getByLabelText("Filter Locations")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Filter Country" }),
       ).toBeInTheDocument();
@@ -345,14 +348,14 @@ describe("JobsTable", () => {
         <JobsTable
           columns={COLUMNS}
           data={[mapJobRow(buildJob())]}
-          columnVisibility={FULL_VISIBILITY}
+          columnVisibility={{ ...FULL_VISIBILITY, external_id: true }}
           sorting={[]}
           onSortingChange={vi.fn()}
           filterRules={[]}
           filterDispatch={dispatch}
         />,
       );
-      // Department has no filter widget — its header-filter cell exists but is empty.
+      // External ID has no filter widget — its header-filter cell exists but is empty.
       const headerRows = container.querySelectorAll("thead tr");
       expect(headerRows.length).toBe(2);
       // Visible columns should equal the number of filter cells in the second row.
