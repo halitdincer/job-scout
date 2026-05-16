@@ -73,10 +73,10 @@ export function RunsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Started</TableHead>
                 <TableHead>Finished</TableHead>
-                <TableHead className="text-right">Sources</TableHead>
-                <TableHead className="text-right">Created</TableHead>
-                <TableHead className="text-right">Updated</TableHead>
-                <TableHead className="text-right">Expired</TableHead>
+                <TableHead className="md:text-right">Sources</TableHead>
+                <TableHead className="md:text-right">Created</TableHead>
+                <TableHead className="md:text-right">Updated</TableHead>
+                <TableHead className="md:text-right">Expired</TableHead>
                 <TableHead>Error</TableHead>
               </TableRow>
             </TableHeader>
@@ -95,19 +95,22 @@ export function RunsPage() {
                   <TableCell data-label="Finished">
                     {formatTimestamp(run.finished_at)}
                   </TableCell>
-                  <TableCell data-label="Sources" className="text-right">
+                  <TableCell data-label="Sources" className="md:text-right">
                     {run.sources_processed}
                   </TableCell>
-                  <TableCell data-label="Created" className="text-right">
+                  <TableCell data-label="Created" className="md:text-right">
                     {run.listings_created}
                   </TableCell>
-                  <TableCell data-label="Updated" className="text-right">
+                  <TableCell data-label="Updated" className="md:text-right">
                     {run.listings_updated}
                   </TableCell>
-                  <TableCell data-label="Expired" className="text-right">
+                  <TableCell data-label="Expired" className="md:text-right">
                     {run.listings_expired}
                   </TableCell>
-                  <TableCell data-label="Error" className="max-w-sm truncate">
+                  <TableCell
+                    data-label="Error"
+                    className="break-words md:max-w-sm md:truncate"
+                  >
                     {run.error_message ?? "—"}
                   </TableCell>
                 </TableRow>

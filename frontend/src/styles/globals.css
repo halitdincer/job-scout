@@ -98,8 +98,13 @@
 
     .responsive-data-table td {
       min-width: 0 !important;
+      overflow-wrap: anywhere;
       grid-template-columns: minmax(6.5rem, 36%) minmax(0, 1fr);
       @apply grid gap-3 border-b border-border px-3 py-2 text-left align-top text-sm;
+    }
+
+    .responsive-data-table td > * {
+      @apply min-w-0;
     }
 
     .responsive-data-table td::before {

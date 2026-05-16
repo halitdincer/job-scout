@@ -53,7 +53,10 @@ export function SourceTable({ sources }: { sources: Source[] }) {
               <TableCell data-label="Platform">
                 {PLATFORM_LABELS[source.platform] ?? source.platform}
               </TableCell>
-              <TableCell data-label="Board ID" className="font-mono text-xs">
+              <TableCell
+                data-label="Board ID"
+                className="break-all font-mono text-xs md:break-normal"
+              >
                 {source.board_id}
               </TableCell>
               <TableCell data-label="Status">

@@ -60,15 +60,18 @@ export function LoginPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
-      <section className="w-full max-w-sm space-y-6 rounded-md border border-border p-6 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-6 text-foreground">
+      <section className="w-full max-w-sm space-y-6 rounded-md border border-border p-4 shadow-sm sm:p-6">
         <div className="space-y-1">
           <p className="text-sm font-medium text-muted-foreground">Job Scout</p>
           <h1 className="text-2xl font-semibold tracking-normal">Sign in</h1>
         </div>
 
         {submitError ? (
-          <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <p
+            role="alert"
+            className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
             {submitError}
           </p>
         ) : null}

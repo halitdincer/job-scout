@@ -44,7 +44,7 @@ export function DeleteViewDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete view</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="break-words">
             Permanently delete the saved view “{view.name}”? This cannot be
             undone.
           </DialogDescription>

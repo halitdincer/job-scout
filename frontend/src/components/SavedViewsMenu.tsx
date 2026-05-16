@@ -49,8 +49,9 @@ export function SavedViewsMenu({
             <DropdownMenuItem
               key={view.id}
               onSelect={() => onLoadView(view)}
+              title={view.name}
             >
-              {view.name}
+              <span className="min-w-0 truncate">{view.name}</span>
             </DropdownMenuItem>
           ))
         )}
@@ -58,14 +59,22 @@ export function SavedViewsMenu({
         <DropdownMenuItem onSelect={onSaveAs}>Save as new view…</DropdownMenuItem>
         {currentView ? (
           <>
-            <DropdownMenuItem onSelect={() => onSaveChanges(currentView)}>
-              Save changes to “{currentView.name}”
+            <DropdownMenuItem
+              onSelect={() => onSaveChanges(currentView)}
+              title={`Save changes to ${currentView.name}`}
+            >
+              <span className="min-w-0 truncate">
+                Save changes to “{currentView.name}”
+              </span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => onDelete(currentView)}
               className="text-destructive focus:text-destructive"
+              title={`Delete view ${currentView.name}`}
             >
-              Delete view “{currentView.name}”
+              <span className="min-w-0 truncate">
+                Delete view “{currentView.name}”
+              </span>
             </DropdownMenuItem>
           </>
         ) : null}
