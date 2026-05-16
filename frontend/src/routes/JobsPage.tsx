@@ -201,7 +201,7 @@ export function JobsPage() {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-normal">Jobs</h1>
           <p className="text-sm text-muted-foreground">
@@ -209,7 +209,7 @@ export function JobsPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-none sm:flex sm:flex-wrap sm:items-center sm:gap-3">
           <SavedViewsMenu
             currentViewId={currentViewId}
             onLoadView={handleLoadView}
@@ -271,7 +271,7 @@ export function JobsPage() {
 
       <JobsTable
         id="jobs-grid"
-        className="min-h-[65vh] w-full overflow-hidden rounded-md border border-border"
+        className="responsive-data-table w-full overflow-visible rounded-md md:min-h-[65vh] md:overflow-hidden md:border md:border-border"
         columns={ALL_JOB_COLUMNS}
         data={rows}
         columnVisibility={columnVisibility}
@@ -284,40 +284,42 @@ export function JobsPage() {
 
       <div
         id="pagination-bar"
-        className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-3"
+        className="grid grid-cols-2 items-center gap-3 border-t border-border pt-3 sm:flex sm:flex-wrap sm:justify-end"
       >
-        <label
-          htmlFor="page-size-select"
-          className="text-sm font-medium text-muted-foreground"
-        >
-          Page size
-        </label>
-        <select
-          id="page-size-select"
-          aria-label="Page size"
-          value={pageSize}
-          onChange={handlePageSizeChange}
-          className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-        >
-          {PAGE_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
+        <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:justify-start">
+          <label
+            htmlFor="page-size-select"
+            className="text-sm font-medium text-muted-foreground"
+          >
+            Page size
+          </label>
+          <select
+            id="page-size-select"
+            aria-label="Page size"
+            value={pageSize}
+            onChange={handlePageSizeChange}
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            {PAGE_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           id="page-prev"
           type="button"
           onClick={() => setPage((current) => current - 1)}
           disabled={page <= 1}
-          className="h-9 rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-9 w-full rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
           Previous
         </button>
         <span
           id="page-info"
           aria-live="polite"
-          className="min-w-24 text-center text-sm text-muted-foreground"
+          className="order-last col-span-2 min-w-24 text-center text-sm text-muted-foreground sm:order-none sm:col-span-1"
         >
           Page {page} of {maxPage}
         </span>
@@ -326,7 +328,7 @@ export function JobsPage() {
           type="button"
           onClick={() => setPage((current) => current + 1)}
           disabled={page >= maxPage}
-          className="h-9 rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-9 w-full rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
           Next
         </button>

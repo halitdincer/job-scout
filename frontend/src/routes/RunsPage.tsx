@@ -65,7 +65,7 @@ export function RunsPage() {
       ) : null}
 
       {!isLoading && !isError && runs.length > 0 ? (
-        <div className="rounded-md border border-border">
+        <div className="responsive-data-table rounded-md md:border md:border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -83,25 +83,31 @@ export function RunsPage() {
             <TableBody>
               {runs.map((run) => (
                 <TableRow key={run.id}>
-                  <TableCell className="font-medium">#{run.id}</TableCell>
-                  <TableCell>
+                  <TableCell data-label="ID" className="font-medium">
+                    #{run.id}
+                  </TableCell>
+                  <TableCell data-label="Status">
                     <StatusBadge status={run.status} />
                   </TableCell>
-                  <TableCell>{formatTimestamp(run.started_at)}</TableCell>
-                  <TableCell>{formatTimestamp(run.finished_at)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell data-label="Started">
+                    {formatTimestamp(run.started_at)}
+                  </TableCell>
+                  <TableCell data-label="Finished">
+                    {formatTimestamp(run.finished_at)}
+                  </TableCell>
+                  <TableCell data-label="Sources" className="text-right">
                     {run.sources_processed}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell data-label="Created" className="text-right">
                     {run.listings_created}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell data-label="Updated" className="text-right">
                     {run.listings_updated}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell data-label="Expired" className="text-right">
                     {run.listings_expired}
                   </TableCell>
-                  <TableCell className="max-w-sm truncate">
+                  <TableCell data-label="Error" className="max-w-sm truncate">
                     {run.error_message ?? "—"}
                   </TableCell>
                 </TableRow>

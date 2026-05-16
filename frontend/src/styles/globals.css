@@ -35,3 +35,104 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  @media (max-width: 767px) {
+    .responsive-data-table {
+      @apply border-0;
+    }
+
+    .responsive-data-table > div {
+      @apply overflow-visible;
+    }
+
+    .responsive-data-table table,
+    .responsive-data-table th,
+    .responsive-data-table tbody,
+    .responsive-data-table tr,
+    .responsive-data-table td {
+      @apply block w-full;
+    }
+
+    .responsive-data-table table {
+      min-width: 0 !important;
+    }
+
+    .responsive-data-table thead {
+      @apply block;
+    }
+
+    .responsive-data-table thead tr {
+      @apply hidden;
+    }
+
+    .responsive-data-table thead tr + tr {
+      @apply mb-3 grid w-full grid-cols-1 gap-2 rounded-md border border-border bg-background p-3 shadow-sm;
+    }
+
+    .responsive-data-table thead tr + tr th {
+      min-width: 0 !important;
+      @apply block h-auto bg-background p-0;
+    }
+
+    .responsive-data-table thead tr + tr th:empty {
+      @apply hidden;
+    }
+
+    .responsive-data-table thead tr + tr th:not(:empty)::before {
+      content: attr(data-filter-label);
+      @apply mb-1 block text-xs font-medium text-muted-foreground;
+    }
+
+    .responsive-data-table tbody {
+      @apply space-y-3;
+    }
+
+    .responsive-data-table tr {
+      @apply overflow-hidden rounded-md border border-border bg-background shadow-sm;
+    }
+
+    .responsive-data-table tr:hover {
+      @apply bg-background;
+    }
+
+    .responsive-data-table td {
+      min-width: 0 !important;
+      grid-template-columns: minmax(6.5rem, 36%) minmax(0, 1fr);
+      @apply grid gap-3 border-b border-border px-3 py-2 text-left align-top text-sm;
+    }
+
+    .responsive-data-table td::before {
+      content: attr(data-label);
+      @apply text-xs font-medium text-muted-foreground;
+    }
+
+    .responsive-data-table td:last-child {
+      @apply border-b-0;
+    }
+
+    .responsive-data-table td[data-empty="true"] {
+      @apply hidden;
+    }
+
+    .responsive-data-table td[data-label="Title"] {
+      @apply block px-3 py-3;
+    }
+
+    .responsive-data-table td[data-label="Title"]::before {
+      @apply mb-1 block;
+    }
+
+    .responsive-data-table td[data-mobile-empty="true"] {
+      @apply block rounded-md border border-dashed border-border p-6 text-center;
+    }
+
+    .responsive-data-table td[data-mobile-empty="true"]::before {
+      content: none;
+    }
+
+    .responsive-data-table .job-link {
+      @apply block break-words text-base font-medium leading-snug;
+    }
+  }
+}

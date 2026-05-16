@@ -87,6 +87,17 @@ function toSortSpecs(state: SortingState): SortSpec[] {
   }));
 }
 
+function columnLabel(column: { id?: unknown; header?: unknown }) {
+  return typeof column.header === "string" ? column.header : String(column.id);
+}
+
+function isEmptyCellValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.every((item) => item === null || item === undefined || item === "");
+  }
+  return value === null || value === undefined || value === "";
+}
+
 export function JobsTable({
   id,
   className,
@@ -201,6 +212,7 @@ export function JobsTable({
             <TableRow>
               {table.getVisibleLeafColumns().map((col) => {
                 const meta = col.columnDef.meta as JobColumnMeta | undefined;
+                const headerLabel = columnLabel(col.columnDef);
                 const filterField = meta?.filterField;
                 const filterWidget = meta?.filterWidget;
                 if (!filterField || !filterWidget) {
@@ -210,7 +222,11 @@ export function JobsTable({
                 const uniqueValues =
                   facets?.[filterField] ?? uniqueValuesByKey[key];
                 return (
-                  <TableHead key={col.id} className="py-1">
+                  <TableHead
+                    key={col.id}
+                    className="py-1"
+                    data-filter-label={headerLabel}
+                  >
                     <HeaderFilterCell
                       filterField={filterField}
                       filterWidget={filterWidget}
@@ -230,6 +246,7 @@ export function JobsTable({
               <TableCell
                 colSpan={Math.max(visibleColumnCount, 1)}
                 className="h-24 text-center text-muted-foreground"
+                data-mobile-empty="true"
               >
                 {emptyMessage}
               </TableCell>
@@ -244,6 +261,8 @@ export function JobsTable({
                   return (
                     <TableCell
                       key={cell.id}
+                      data-label={columnLabel(cell.column.columnDef)}
+                      data-empty={isEmptyCellValue(cell.getValue()) ? "true" : undefined}
                       style={
                         meta?.minWidth ? { minWidth: meta.minWidth } : undefined
                       }

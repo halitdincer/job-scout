@@ -172,7 +172,7 @@ export function MultiSelectHeaderFilter({
           <FilterIcon className="ml-2 h-3 w-3 shrink-0" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2">
+      <PopoverContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-2">
         <div className="max-h-60 space-y-1 overflow-y-auto">
           <label className="flex items-center gap-2 text-sm font-medium">
             <input
@@ -321,7 +321,7 @@ function MultiRulePopover({
           <FilterIcon className="ml-2 h-3 w-3 shrink-0" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-2">
+      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-2">
         <div className="max-h-72 space-y-2 overflow-y-auto">
           {rules.map((rule) => {
             const valueless = VALUELESS_OPERATORS.has(rule.operator);
@@ -332,7 +332,7 @@ function MultiRulePopover({
             return (
               <div
                 key={rule.id}
-                className="flex items-center gap-2 rounded-md border border-input p-1"
+                className="flex flex-col gap-2 rounded-md border border-input p-2 sm:flex-row sm:items-center sm:p-1"
               >
                 <select
                   aria-label={`Operator for rule ${rule.id}`}
@@ -340,7 +340,7 @@ function MultiRulePopover({
                   onChange={(event) =>
                     updateOperator(rule.id, event.target.value)
                   }
-                  className="h-8 rounded-md border border-input bg-background px-1 text-xs"
+                  className="h-8 w-full rounded-md border border-input bg-background px-1 text-xs sm:w-auto"
                 >
                   {operators.map((op) => (
                     <option key={op} value={op}>
@@ -355,7 +355,7 @@ function MultiRulePopover({
                     onChange={(event) =>
                       updateValue(rule.id, event.target.value)
                     }
-                    className="h-8 flex-1 rounded-md border border-input bg-background px-1 text-xs"
+                    className="h-8 w-full rounded-md border border-input bg-background px-1 text-xs sm:flex-1"
                   >
                     <option value="">—</option>
                     {DATE_RANGE_PRESETS.map((preset) => (
@@ -372,7 +372,7 @@ function MultiRulePopover({
                     onChange={(event) =>
                       updateValue(rule.id, event.target.value)
                     }
-                    className="h-8 flex-1 text-xs"
+                    className="h-8 w-full text-xs sm:flex-1"
                   />
                 )}
                 <Button
@@ -381,7 +381,7 @@ function MultiRulePopover({
                   size="sm"
                   aria-label={`Remove rule ${rule.id}`}
                   onClick={() => removeRule(rule.id)}
-                  className="h-8 px-2"
+                  className="h-8 self-end px-2 sm:self-auto"
                 >
                   ×
                 </Button>

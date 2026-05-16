@@ -34,7 +34,7 @@ function SourceStatusBadge({ active }: { active: boolean }) {
 
 export function SourceTable({ sources }: { sources: Source[] }) {
   return (
-    <div className="rounded-md border border-border">
+    <div className="responsive-data-table rounded-md md:border md:border-border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -47,14 +47,16 @@ export function SourceTable({ sources }: { sources: Source[] }) {
         <TableBody>
           {sources.map((source) => (
             <TableRow key={source.id}>
-              <TableCell className="font-medium">{source.name}</TableCell>
-              <TableCell>
+              <TableCell data-label="Name" className="font-medium">
+                {source.name}
+              </TableCell>
+              <TableCell data-label="Platform">
                 {PLATFORM_LABELS[source.platform] ?? source.platform}
               </TableCell>
-              <TableCell className="font-mono text-xs">
+              <TableCell data-label="Board ID" className="font-mono text-xs">
                 {source.board_id}
               </TableCell>
-              <TableCell>
+              <TableCell data-label="Status">
                 <SourceStatusBadge active={source.is_active} />
               </TableCell>
             </TableRow>

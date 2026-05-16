@@ -40,7 +40,7 @@ export function SavedViewsMenu({
           Saved views
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-2rem)]">
         <DropdownMenuLabel>Saved views</DropdownMenuLabel>
         {views.length === 0 ? (
           <DropdownMenuItem disabled>No saved views yet</DropdownMenuItem>

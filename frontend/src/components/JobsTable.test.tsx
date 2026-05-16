@@ -70,10 +70,13 @@ describe("JobsTable", () => {
     const link = screen.getByRole("link", { name: "Visible Job" });
     expect(link).toHaveAttribute("href", "https://example.com/jobs/1");
     expect(link.className).toBe("job-link");
-    expect(screen.getByText("3w ago")).toHaveAttribute(
+    expect(link.closest("td")).toHaveAttribute("data-label", "Title");
+    const publishedAt = screen.getByText("3w ago");
+    expect(publishedAt).toHaveAttribute(
       "title",
       "Jan 02, 2025 03:04",
     );
+    expect(publishedAt.closest("td")).toHaveAttribute("data-label", "Published");
     expect(screen.getAllByText("CA").length).toBeGreaterThan(0);
   });
 
@@ -215,6 +218,44 @@ describe("JobsTable", () => {
     expect(cell.getAttribute("style") ?? "").not.toContain("min-width");
   });
 
+  it("marks empty cells for the mobile card layout", () => {
+    const { container } = render(
+      <JobsTable
+        columns={COLUMNS}
+        data={[mapJobRow(buildJob({ team: null }))]}
+        columnVisibility={FULL_VISIBILITY}
+        sorting={[]}
+        onSortingChange={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('td[data-label="Team"]')).toHaveAttribute(
+      "data-empty",
+      "true",
+    );
+  });
+
+  it("falls back to the column id for non-text mobile labels", () => {
+    const columns = [
+      {
+        id: "custom_title",
+        accessorKey: "title",
+        header: () => "Custom",
+      },
+    ] as unknown as typeof COLUMNS;
+    const { container } = render(
+      <JobsTable
+        columns={columns}
+        data={[mapJobRow(buildJob())]}
+        columnVisibility={{ custom_title: true }}
+        sorting={[]}
+        onSortingChange={vi.fn()}
+      />,
+    );
+    expect(
+      container.querySelector('td[data-label="custom_title"]'),
+    ).toBeInTheDocument();
+  });
+
   it("does not render a sort button on non-sortable headers", () => {
     render(
       <JobsTable
@@ -245,7 +286,12 @@ describe("JobsTable", () => {
           filterDispatch={dispatch}
         />,
       );
-      expect(screen.getByLabelText("Filter Title")).toBeInTheDocument();
+      const titleFilter = screen.getByLabelText("Filter Title");
+      expect(titleFilter).toBeInTheDocument();
+      expect(titleFilter.closest("th")).toHaveAttribute(
+        "data-filter-label",
+        "Title",
+      );
       expect(screen.getByLabelText("Filter Department")).toBeInTheDocument();
       expect(screen.getByLabelText("Filter Team")).toBeInTheDocument();
       expect(screen.getByLabelText("Filter Locations")).toBeInTheDocument();
