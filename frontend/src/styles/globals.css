@@ -37,7 +37,7 @@
 }
 
 @layer components {
-  @media (max-width: 767px) {
+  @media (max-width: 1023px), (hover: none) and (pointer: coarse) {
     .responsive-data-table {
       @apply border-0;
     }

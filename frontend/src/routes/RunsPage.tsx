@@ -65,7 +65,7 @@ export function RunsPage() {
       ) : null}
 
       {!isLoading && !isError && runs.length > 0 ? (
-        <div className="responsive-data-table rounded-md md:border md:border-border">
+        <div className="responsive-data-table rounded-md lg:border lg:border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -73,10 +73,10 @@ export function RunsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Started</TableHead>
                 <TableHead>Finished</TableHead>
-                <TableHead className="md:text-right">Sources</TableHead>
-                <TableHead className="md:text-right">Created</TableHead>
-                <TableHead className="md:text-right">Updated</TableHead>
-                <TableHead className="md:text-right">Expired</TableHead>
+                <TableHead className="lg:text-right">Sources</TableHead>
+                <TableHead className="lg:text-right">Created</TableHead>
+                <TableHead className="lg:text-right">Updated</TableHead>
+                <TableHead className="lg:text-right">Expired</TableHead>
                 <TableHead>Error</TableHead>
               </TableRow>
             </TableHeader>
@@ -95,21 +95,21 @@ export function RunsPage() {
                   <TableCell data-label="Finished">
                     {formatTimestamp(run.finished_at)}
                   </TableCell>
-                  <TableCell data-label="Sources" className="md:text-right">
+                  <TableCell data-label="Sources" className="lg:text-right">
                     {run.sources_processed}
                   </TableCell>
-                  <TableCell data-label="Created" className="md:text-right">
+                  <TableCell data-label="Created" className="lg:text-right">
                     {run.listings_created}
                   </TableCell>
-                  <TableCell data-label="Updated" className="md:text-right">
+                  <TableCell data-label="Updated" className="lg:text-right">
                     {run.listings_updated}
                   </TableCell>
-                  <TableCell data-label="Expired" className="md:text-right">
+                  <TableCell data-label="Expired" className="lg:text-right">
                     {run.listings_expired}
                   </TableCell>
                   <TableCell
                     data-label="Error"
-                    className="break-words md:max-w-sm md:truncate"
+                    className="break-words lg:max-w-sm lg:truncate"
                   >
                     {run.error_message ?? "—"}
                   </TableCell>

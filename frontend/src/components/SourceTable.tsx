@@ -34,7 +34,7 @@ function SourceStatusBadge({ active }: { active: boolean }) {
 
 export function SourceTable({ sources }: { sources: Source[] }) {
   return (
-    <div className="responsive-data-table rounded-md md:border md:border-border">
+    <div className="responsive-data-table rounded-md lg:border lg:border-border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -55,7 +55,7 @@ export function SourceTable({ sources }: { sources: Source[] }) {
               </TableCell>
               <TableCell
                 data-label="Board ID"
-                className="break-all font-mono text-xs md:break-normal"
+                className="break-all font-mono text-xs lg:break-normal"
               >
                 {source.board_id}
               </TableCell>

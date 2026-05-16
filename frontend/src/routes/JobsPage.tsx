@@ -201,7 +201,7 @@ export function JobsPage() {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-normal">Jobs</h1>
           <p className="text-sm text-muted-foreground">
@@ -209,7 +209,7 @@ export function JobsPage() {
           </p>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-none sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+        <div className="grid w-full grid-cols-1 gap-2 lg:w-auto lg:grid-cols-none lg:flex lg:flex-wrap lg:items-center lg:gap-3">
           <SavedViewsMenu
             currentViewId={currentViewId}
             onLoadView={handleLoadView}
@@ -241,7 +241,7 @@ export function JobsPage() {
                 ) : null}
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
+            <SheetContent side="right" className="flex w-full flex-col lg:max-w-md">
               <SheetHeader>
                 <SheetTitle>Filters</SheetTitle>
                 <SheetDescription>
@@ -271,7 +271,7 @@ export function JobsPage() {
 
       <JobsTable
         id="jobs-grid"
-        className="responsive-data-table w-full overflow-visible rounded-md md:min-h-[65vh] md:overflow-hidden md:border md:border-border"
+        className="responsive-data-table w-full overflow-visible rounded-md lg:min-h-[65vh] lg:overflow-hidden lg:border lg:border-border"
         columns={ALL_JOB_COLUMNS}
         data={rows}
         columnVisibility={columnVisibility}
@@ -284,9 +284,9 @@ export function JobsPage() {
 
       <div
         id="pagination-bar"
-        className="grid grid-cols-2 items-center gap-3 border-t border-border pt-3 sm:flex sm:flex-wrap sm:justify-end"
+        className="grid grid-cols-2 items-center gap-3 border-t border-border pt-3 lg:flex lg:flex-wrap lg:justify-end"
       >
-        <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:justify-start">
+        <div className="col-span-2 flex items-center justify-between gap-3 lg:col-span-1 lg:justify-start">
           <label
             htmlFor="page-size-select"
             className="text-sm font-medium text-muted-foreground"
@@ -312,14 +312,14 @@ export function JobsPage() {
           type="button"
           onClick={() => setPage((current) => current - 1)}
           disabled={page <= 1}
-          className="h-9 w-full rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          className="h-9 w-full rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 lg:w-auto"
         >
           Previous
         </button>
         <span
           id="page-info"
           aria-live="polite"
-          className="order-last col-span-2 min-w-24 text-center text-sm text-muted-foreground sm:order-none sm:col-span-1"
+          className="order-last col-span-2 min-w-24 text-center text-sm text-muted-foreground lg:order-none lg:col-span-1"
         >
           Page {page} of {maxPage}
         </span>
@@ -328,7 +328,7 @@ export function JobsPage() {
           type="button"
           onClick={() => setPage((current) => current + 1)}
           disabled={page >= maxPage}
-          className="h-9 w-full rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          className="h-9 w-full rounded-md border border-input px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 lg:w-auto"
         >
           Next
         </button>

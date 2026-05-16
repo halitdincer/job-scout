@@ -39,7 +39,7 @@ function DaysPresetPicker({ id, ariaLabel, value, onChange }: DaysPresetPickerPr
       aria-label={ariaLabel}
       value={value}
       onChange={onChange}
-      className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm sm:min-w-40 sm:flex-1"
+      className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm lg:min-w-40 lg:flex-1"
     >
       {!isPreset && value !== "" ? (
         <option value={value}>{`Last ${value} days`}</option>
@@ -125,9 +125,9 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
           return (
             <div
               key={rule.id}
-              className="flex flex-col items-stretch gap-2 rounded-md border border-input p-2 sm:flex-row sm:flex-wrap sm:items-center"
+              className="flex flex-col items-stretch gap-2 rounded-md border border-input p-2 lg:flex-row lg:flex-wrap lg:items-center"
             >
-              <span className="text-sm font-medium sm:min-w-28">{label}</span>
+              <span className="text-sm font-medium lg:min-w-28">{label}</span>
               <label className="sr-only" htmlFor={`op-${rule.id}`}>
                 {`Operator for ${label}`}
               </label>
@@ -136,7 +136,7 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
                 aria-label={`Operator for ${label}`}
                 value={rule.operator}
                 onChange={handleOperatorChange(rule)}
-                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm sm:w-auto"
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm lg:w-auto"
               >
                 {operators.map((op) => (
                   <option key={op} value={op}>
@@ -163,7 +163,7 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
                       type="date"
                       value={safeValue}
                       onChange={handleValueChange(rule)}
-                      className="h-9 min-w-0 sm:min-w-40 sm:flex-1"
+                      className="h-9 min-w-0 lg:min-w-40 lg:flex-1"
                     />
                   ) : (
                     <Input
@@ -171,7 +171,7 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
                       aria-label={`Value for ${label}`}
                       value={safeValue}
                       onChange={handleValueChange(rule)}
-                      className="h-9 min-w-0 sm:min-w-40 sm:flex-1"
+                      className="h-9 min-w-0 lg:min-w-40 lg:flex-1"
                     />
                   )}
                 </>
@@ -182,7 +182,7 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
                 size="sm"
                 aria-label={`Remove ${label} rule`}
                 onClick={handleRemove(rule)}
-                className="w-full sm:w-auto"
+                className="w-full lg:w-auto"
               >
                 Remove
               </Button>
@@ -217,13 +217,13 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
         </select>
       </div>
 
-      <div className="mt-auto grid grid-cols-1 gap-2 pt-4 sm:flex sm:items-center sm:justify-end">
+      <div className="mt-auto grid grid-cols-1 gap-2 pt-4 lg:flex lg:items-center lg:justify-end">
         <Button
           type="button"
           variant="outline"
           onClick={handleClear}
           disabled={rules.length === 0 && state.expression === null}
-          className="w-full sm:w-auto"
+          className="w-full lg:w-auto"
         >
           Clear filters
         </Button>
@@ -231,7 +231,7 @@ export function FiltersPanel({ state, dispatch, onApplied }: Props) {
           type="button"
           onClick={handleApply}
           disabled={disabled || rules.length === 0}
-          className="w-full sm:w-auto"
+          className="w-full lg:w-auto"
         >
           Apply filters
         </Button>
