@@ -537,6 +537,223 @@ class TestWorkdayAdapter:
         with pytest.raises(requests.HTTPError):
             adapter.fetch_listings("tmx:wd3:TMX_Careers")
 
+    @patch("core.adapters.requests.get")
+    @patch("core.adapters.requests.post")
+    def test_summary_label_triggers_detail_fetch(self, mock_post, mock_get):
+        mock_post.return_value = _mock_response({
+            "total": 1,
+            "jobPostings": [
+                {
+                    "title": "Software Engineer",
+                    "externalPath": "/job/Princeton/Software-Engineer_JR-001",
+                    "timeType": "Full time",
+                    "locationsText": "2 Locations",
+                    "bulletFields": ["JR-001"],
+                }
+            ],
+        })
+        mock_get.return_value = _mock_response({
+            "jobPostingInfo": {
+                "location": "Princeton, NJ",
+                "additionalLocations": ["New York, NY"],
+            }
+        })
+        adapter = WorkdayAdapter()
+        listings = adapter.fetch_listings("spgi:wd5:ExperiencedProfessional")
+        assert listings[0]["locations"] == ["Princeton, NJ", "New York, NY"]
+        mock_get.assert_called_once_with(
+            "https://spgi.wd5.myworkdayjobs.com"
+            "/wday/cxs/spgi/ExperiencedProfessional"
+            "/job/Princeton/Software-Engineer_JR-001",
+            timeout=15,
+        )
+
+    @patch("core.adapters.requests.get")
+    @patch("core.adapters.requests.post")
+    def test_singular_one_location_label_triggers_detail_fetch(
+        self, mock_post, mock_get
+    ):
+        mock_post.return_value = _mock_response({
+            "total": 1,
+            "jobPostings": [
+                {
+                    "title": "Analyst",
+                    "externalPath": "/job/Toronto/Analyst_JR-002",
+                    "locationsText": "1 Location",
+                    "bulletFields": ["JR-002"],
+                }
+            ],
+        })
+        mock_get.return_value = _mock_response({
+            "jobPostingInfo": {
+                "location": "Toronto, ON",
+                "additionalLocations": [],
+            }
+        })
+        adapter = WorkdayAdapter()
+        listings = adapter.fetch_listings("tmx:wd3:TMX_Careers")
+        assert listings[0]["locations"] == ["Toronto, ON"]
+        assert mock_get.call_count == 1
+
+    @patch("core.adapters.requests.get")
+    @patch("core.adapters.requests.post")
+    def test_normal_locations_text_does_not_trigger_detail_fetch(
+        self, mock_post, mock_get
+    ):
+        mock_post.return_value = _mock_response({
+            "total": 1,
+            "jobPostings": [
+                {
+                    "title": "Engineer",
+                    "externalPath": "/job/Toronto/Engineer_JR-003",
+                    "locationsText": "Toronto",
+                    "bulletFields": ["JR-003"],
+                }
+            ],
+        })
+        adapter = WorkdayAdapter()
+        listings = adapter.fetch_listings("tmx:wd3:TMX_Careers")
+        assert listings[0]["locations"] == ["Toronto"]
+        mock_get.assert_not_called()
+
+    @patch("core.adapters.requests.get")
+    @patch("core.adapters.requests.post")
+    def test_detail_fetch_failure_does_not_raise_and_returns_empty(
+        self, mock_post, mock_get
+    ):
+        mock_post.return_value = _mock_response({
+            "total": 1,
+            "jobPostings": [
+                {
+                    "title": "Manager",
+                    "externalPath": "/job/Toronto/Manager_JR-004",
+                    "locationsText": "5 Locations",
+                    "bulletFields": ["JR-004"],
+                }
+            ],
+        })
+        mock_get.side_effect = requests.RequestException("network down")
+        adapter = WorkdayAdapter()
+        listings = adapter.fetch_listings("cibc:wd3:campus")
+        # The bad summary label is never stored as a fake location.
+        assert listings[0]["locations"] == []
+        # Retried until DETAIL_MAX_ATTEMPTS (1 initial + 2 retries = 3).
+        assert mock_get.call_count == 3
+
+    @patch("core.adapters.requests.get")
+    @patch("core.adapters.requests.post")
+    def test_detail_fetch_retries_then_succeeds(self, mock_post, mock_get):
+        mock_post.return_value = _mock_response({
+            "total": 1,
+            "jobPostings": [
+                {
+                    "title": "Engineer",
+                    "externalPath": "/job/x/Engineer_J1",
+                    "locationsText": "2 Locations",
+                    "bulletFields": ["J1"],
+                }
+            ],
+        })
+        mock_get.side_effect = [
+            requests.RequestException("transient"),
+            _mock_response({
+                "jobPostingInfo": {
+                    "location": "Toronto, ON",
+                    "additionalLocations": [],
+                }
+            }),
+        ]
+        adapter = WorkdayAdapter()
+        listings = adapter.fetch_listings("tmx:wd3:TMX_Careers")
+        assert listings[0]["locations"] == ["Toronto, ON"]
+        assert mock_get.call_count == 2
+
+    @patch("core.adapters.requests.get")
+    @patch("core.adapters.requests.post")
+    def test_dedupes_primary_and_additional_preserving_order(
+        self, mock_post, mock_get
+    ):
+        mock_post.return_value = _mock_response({
+            "total": 1,
+            "jobPostings": [
+                {
+                    "title": "Lead",
+                    "externalPath": "/job/x/Lead_JR-005",
+                    "locationsText": "4 Locations",
+                    "bulletFields": ["JR-005"],
+                }
+            ],
+        })
+        mock_get.return_value = _mock_response({
+            "jobPostingInfo": {
+                "location": "Toronto, ON",
+                "additionalLocations": [
+                    "Toronto, ON",
+                    "  ",
+                    "New York, NY",
+                    "New York, NY",
+                    None,
+                    {},
+                ],
+            }
+        })
+        adapter = WorkdayAdapter()
+        listings = adapter.fetch_listings("tmx:wd3:TMX_Careers")
+        assert listings[0]["locations"] == ["Toronto, ON", "New York, NY"]
+
+    @patch("core.adapters.requests.get")
+    @patch("core.adapters.requests.post")
+    def test_summary_labels_across_pages_resolved(self, mock_post, mock_get):
+        page1_jobs = [
+            {
+                "title": f"Job {i}",
+                "externalPath": f"/job/x/Job-{i}_J{i}",
+                "locationsText": "2 Locations" if i == 0 else "Toronto",
+                "bulletFields": [f"J{i}"],
+            }
+            for i in range(20)
+        ]
+        page2_jobs = [
+            {
+                "title": "Job 20",
+                "externalPath": "/job/x/Job-20_J20",
+                "locationsText": "3 Locations",
+                "bulletFields": ["J20"],
+            },
+        ]
+        mock_post.side_effect = [
+            _mock_response({"total": 21, "jobPostings": page1_jobs}),
+            _mock_response({"total": 21, "jobPostings": page2_jobs}),
+        ]
+
+        def detail_for(url, timeout):
+            assert timeout == 15
+            if url.endswith("/job/x/Job-0_J0"):
+                return _mock_response({
+                    "jobPostingInfo": {
+                        "location": "Princeton, NJ",
+                        "additionalLocations": ["New York, NY"],
+                    }
+                })
+            if url.endswith("/job/x/Job-20_J20"):
+                return _mock_response({
+                    "jobPostingInfo": {
+                        "location": "Toronto, ON",
+                        "additionalLocations": ["Vancouver, BC"],
+                    }
+                })
+            raise AssertionError(f"Unexpected detail URL: {url}")
+
+        mock_get.side_effect = detail_for
+        adapter = WorkdayAdapter()
+        listings = adapter.fetch_listings("tmx:wd3:TMX_Careers")
+        assert len(listings) == 21
+        assert listings[0]["locations"] == ["Princeton, NJ", "New York, NY"]
+        assert listings[1]["locations"] == ["Toronto"]
+        assert listings[20]["locations"] == ["Toronto, ON", "Vancouver, BC"]
+        assert mock_post.call_count == 2
+        assert mock_get.call_count == 2
+
 
 class TestBambooHRAdapter:
     @patch("core.adapters.requests.get")

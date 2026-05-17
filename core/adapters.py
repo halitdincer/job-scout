@@ -1,3 +1,5 @@
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 import requests
@@ -168,8 +170,14 @@ class AshbyAdapter:
         return listings
 
 
+_WORKDAY_SUMMARY_LOCATIONS_RE = re.compile(r"^\s*\d+\s+Locations?\s*$")
+
+
 class WorkdayAdapter:
     PAGE_SIZE = 20
+    DETAIL_MAX_WORKERS = 5
+    DETAIL_TIMEOUT = 15
+    DETAIL_MAX_ATTEMPTS = 3
 
     @staticmethod
     def _parse_board_id(board_id):
@@ -180,18 +188,51 @@ class WorkdayAdapter:
             )
         return parts
 
+    @staticmethod
+    def _is_summary_label(text):
+        return bool(text) and bool(
+            _WORKDAY_SUMMARY_LOCATIONS_RE.match(text)
+        )
+
+    @staticmethod
+    def _dedupe_locations(primary, additional):
+        seen = set()
+        locations = []
+        for item in [primary, *(additional or [])]:
+            if not isinstance(item, str):
+                continue
+            value = item.strip()
+            if value and value not in seen:
+                seen.add(value)
+                locations.append(value)
+        return locations
+
+    @classmethod
+    def _fetch_detail_locations(cls, detail_base, external_path):
+        url = f"{detail_base}{external_path}"
+        for _ in range(cls.DETAIL_MAX_ATTEMPTS):
+            try:
+                response = requests.get(url, timeout=cls.DETAIL_TIMEOUT)
+                response.raise_for_status()
+                info = (response.json() or {}).get("jobPostingInfo") or {}
+                return cls._dedupe_locations(
+                    info.get("location"), info.get("additionalLocations")
+                )
+            except (requests.RequestException, ValueError):
+                continue
+        return []
+
     def fetch_listings(self, board_id):
         tenant, cluster, site = self._parse_board_id(board_id)
-        url = (
-            f"https://{tenant}.{cluster}.myworkdayjobs.com"
-            f"/wday/cxs/{tenant}/{site}/jobs"
-        )
         host = f"https://{tenant}.{cluster}.myworkdayjobs.com"
+        list_url = f"{host}/wday/cxs/{tenant}/{site}/jobs"
+        detail_base = f"{host}/wday/cxs/{tenant}/{site}"
         listings = []
+        pending_detail = []
         offset = 0
         while True:
             response = requests.post(
-                url,
+                list_url,
                 json={
                     "appliedFacets": {},
                     "limit": self.PAGE_SIZE,
@@ -213,11 +254,18 @@ class WorkdayAdapter:
                 else:
                     external_id = external_path.rsplit("/", 1)[-1]
                 locations_text = posting.get("locationsText")
+                if self._is_summary_label(locations_text):
+                    pending_detail.append((len(listings), external_path))
+                    locations = []
+                elif locations_text:
+                    locations = [locations_text]
+                else:
+                    locations = []
                 listings.append({
                     "external_id": external_id,
                     "title": posting.get("title"),
                     "department": None,
-                    "locations": [locations_text] if locations_text else [],
+                    "locations": locations,
                     "url": f"{host}{external_path}",
                     "team": None,
                     "employment_type": normalize_employment_type(
@@ -233,6 +281,21 @@ class WorkdayAdapter:
             total = data.get("total") or 0
             if offset >= total:
                 break
+
+        if pending_detail:
+            with ThreadPoolExecutor(
+                max_workers=self.DETAIL_MAX_WORKERS
+            ) as executor:
+                future_to_idx = {
+                    executor.submit(
+                        self._fetch_detail_locations, detail_base, path
+                    ): idx
+                    for idx, path in pending_detail
+                }
+                for future in as_completed(future_to_idx):
+                    listings[future_to_idx[future]]["locations"] = (
+                        future.result()
+                    )
         return listings
 
 
