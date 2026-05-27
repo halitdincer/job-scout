@@ -11,16 +11,10 @@ function setCookie(value: string) {
 
 function response({
   status = 200,
-  redirected = false,
-  url = "http://localhost/accounts/login/",
 }: {
   status?: number;
-  redirected?: boolean;
-  url?: string;
 }) {
-  const result = new Response("", { status });
-  Object.defineProperty(result, "redirected", { value: redirected });
-  Object.defineProperty(result, "url", { value: url });
+  const result = new Response(status === 204 ? null : "", { status });
   return result;
 }
 
@@ -34,10 +28,8 @@ afterEach(() => {
 });
 
 describe("login", () => {
-  it("posts form-encoded credentials with CSRF and next", async () => {
-    const spy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(response({ redirected: true, url: "http://localhost/sources/" }));
+  it("posts JSON credentials with CSRF and returns next", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(response({}));
 
     const redirectTo = await login({
       username: "e2e",
@@ -46,37 +38,33 @@ describe("login", () => {
     });
 
     expect(redirectTo).toBe("/sources/");
-    expect(spy.mock.calls[0][0]).toBe("/accounts/login/?next=%2Fsources%2F");
+    expect(spy.mock.calls[0][0]).toBe("/api/v1/auth/login");
     const init = spy.mock.calls[0][1]!;
     const headers = new Headers(init.headers);
-    expect(headers.get("Content-Type")).toBe(
-      "application/x-www-form-urlencoded",
-    );
+    expect(headers.get("Content-Type")).toBe("application/json");
     expect(headers.get("X-CSRFToken")).toBe("login-token");
     expect(init.credentials).toBe("same-origin");
-    const body = init.body as URLSearchParams;
-    expect(body.get("username")).toBe("e2e");
-    expect(body.get("password")).toBe("e2e-pass-123");
-    expect(body.get("next")).toBe("/sources/");
+    expect(JSON.parse(init.body as string)).toEqual({
+      username: "e2e",
+      password: "e2e-pass-123",
+    });
   });
 
-  it("defaults to / and omits CSRF when the cookie is missing", async () => {
+  it("warms the CSRF cookie when it is missing", async () => {
     setCookie("");
-    const spy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(response({ redirected: true, url: "http://localhost/" }));
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(response({}));
 
     const redirectTo = await login({ username: "e2e", password: "secret" });
 
     expect(redirectTo).toBe("/");
-    expect(spy.mock.calls[0][0]).toBe("/accounts/login/");
-    const init = spy.mock.calls[0][1]!;
+    expect(spy.mock.calls[0][0]).toBe("/api/v1/health");
+    expect(spy.mock.calls[1][0]).toBe("/api/v1/auth/login");
+    const init = spy.mock.calls[1][1]!;
     expect(new Headers(init.headers).has("X-CSRFToken")).toBe(false);
-    expect((init.body as URLSearchParams).has("next")).toBe(false);
   });
 
-  it("reports invalid credentials when LoginView returns the form", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(response({}));
+  it("reports invalid credentials", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ status: 401 }));
 
     await expect(
       login({ username: "e2e", password: "wrong", next: "/" }),
@@ -101,11 +89,20 @@ describe("login", () => {
 });
 
 describe("logout", () => {
-  it("redirects to Django's logout endpoint", () => {
+  it("posts to the session logout endpoint and redirects to login", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ status: 204 }));
     const redirect = vi.fn();
 
-    logout(redirect);
+    await logout(redirect);
 
-    expect(redirect).toHaveBeenCalledWith("/accounts/logout/");
+    expect(spy.mock.calls[0][0]).toBe("/api/v1/auth/logout");
+    expect(spy.mock.calls[0][1]).toMatchObject({
+      method: "POST",
+      credentials: "same-origin",
+    });
+    expect(new Headers(spy.mock.calls[0][1]?.headers).get("X-CSRFToken")).toBe(
+      "login-token",
+    );
+    expect(redirect).toHaveBeenCalledWith("/accounts/login/");
   });
 });

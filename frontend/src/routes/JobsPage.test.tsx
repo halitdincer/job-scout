@@ -35,7 +35,7 @@ beforeEach(() => {
 function mockSavedViewsList(views: unknown[] = []) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input);
-    if (url.startsWith("/api/jobs/facets/")) {
+    if (url.startsWith("/api/v1/jobs/facets")) {
       return new Response("{}", {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -261,28 +261,28 @@ describe("JobsPage", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy.mockImplementation(async (input, init) => {
       const url = String(input);
-      if (url.startsWith("/api/jobs/facets/")) {
+      if (url.startsWith("/api/v1/jobs/facets")) {
         return new Response("{}", {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (url === "/api/views/" && (init?.method ?? "GET") === "GET") {
+      if (url === "/api/v1/views" && (init?.method ?? "GET") === "GET") {
         return new Response("[]", {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (url === "/api/views/" && init?.method === "POST") {
+      if (url === "/api/v1/views" && init?.method === "POST") {
         const saved = {
           id: 42,
           name: "FromDialog",
-          filter_expression: null,
+          filterExpression: null,
           columns: [],
           sort: [{ field: "first_seen_at", dir: "desc" }],
           config: { page_size: 50 },
-          created_at: "2025-05-01T00:00:00Z",
-          updated_at: "2025-05-01T00:00:00Z",
+          createdAt: "2025-05-01T00:00:00Z",
+          updatedAt: "2025-05-01T00:00:00Z",
         };
         return new Response(JSON.stringify(saved), {
           status: 201,
@@ -325,19 +325,19 @@ describe("JobsPage", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy.mockImplementation(async (input, init) => {
       const url = String(input);
-      if (url.startsWith("/api/jobs/facets/")) {
+      if (url.startsWith("/api/v1/jobs/facets")) {
         return new Response("{}", {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (url === "/api/views/" && (init?.method ?? "GET") === "GET") {
+      if (url === "/api/v1/views" && (init?.method ?? "GET") === "GET") {
         return new Response(JSON.stringify([view]), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (url === "/api/views/99/" && init?.method === "DELETE") {
+      if (url === "/api/v1/views/99" && init?.method === "DELETE") {
         return new Response(null, { status: 204 });
       }
       throw new Error(`unexpected fetch: ${url}`);
@@ -485,7 +485,7 @@ describe("JobsPage", () => {
         page: 1,
         pageSize: 100,
         sort: [{ field: "title", dir: "asc" }],
-        filter: { field: "title", op: "contains", value: "engineer" },
+        filter: { field: "title", operator: "contains", value: "engineer" },
       }),
     );
   });

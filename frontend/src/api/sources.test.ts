@@ -19,14 +19,14 @@ afterEach(() => {
 });
 
 describe("useSources", () => {
-  it("fetches /api/sources/ and returns the parsed list", async () => {
+  it("fetches /api/v1/sources and maps the generated DTO", async () => {
     const spy = mockOk([
       {
         id: 1,
         name: "E2E Source",
-        platform: "greenhouse",
-        board_id: "e2e-board",
-        is_active: true,
+        platform: "GREENHOUSE",
+        boardId: "e2e-board",
+        isActive: true,
       },
     ]);
 
@@ -35,9 +35,13 @@ describe("useSources", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(spy.mock.calls[0][0]).toBe("/api/sources/");
+    expect(spy.mock.calls[0][0]).toBe("/api/v1/sources");
     expect(result.current.data).toHaveLength(1);
-    expect(result.current.data?.[0].name).toBe("E2E Source");
+    expect(result.current.data?.[0]).toMatchObject({
+      name: "E2E Source",
+      board_id: "e2e-board",
+      is_active: true,
+    });
   });
 
   it("surfaces fetch errors via isError", async () => {

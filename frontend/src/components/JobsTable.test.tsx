@@ -23,9 +23,9 @@ function buildJob(overrides: Partial<JobListing> = {}): JobListing {
     source_name: "Acme",
     external_id: "ext-1",
     title: "Senior Engineer",
-    department: "Engineering",
     locations: [
       {
+        id: 1,
         name: "Toronto",
         country_code: "CA",
         region_code: "ON",
@@ -34,10 +34,7 @@ function buildJob(overrides: Partial<JobListing> = {}): JobListing {
       },
     ],
     url: "https://example.com/jobs/1",
-    status: "active",
-    team: "Platform",
-    employment_type: "full_time",
-    workplace_type: "remote",
+    status: "ACTIVE",
     country: ["CA"],
     region: ["ON"],
     city: ["Toronto"],
@@ -224,13 +221,13 @@ describe("JobsTable", () => {
     const { container } = render(
       <JobsTable
         columns={COLUMNS}
-        data={[mapJobRow(buildJob({ team: null }))]}
+        data={[mapJobRow(buildJob({ country: [] }))]}
         columnVisibility={FULL_VISIBILITY}
         sorting={[]}
         onSortingChange={vi.fn()}
       />,
     );
-    expect(container.querySelector('td[data-label="Team"]')).toHaveAttribute(
+    expect(container.querySelector('td[data-label="Country"]')).toHaveAttribute(
       "data-empty",
       "true",
     );
@@ -268,10 +265,10 @@ describe("JobsTable", () => {
         onSortingChange={vi.fn()}
       />,
     );
-    const employmentHeader = screen.getByRole("columnheader", {
-      name: "Employment",
+    const locationsHeader = screen.getByRole("columnheader", {
+      name: "Locations",
     });
-    expect(within(employmentHeader).queryByRole("button")).toBeNull();
+    expect(within(locationsHeader).queryByRole("button")).toBeNull();
   });
 
   describe("header filter row", () => {
@@ -294,8 +291,6 @@ describe("JobsTable", () => {
         "data-filter-label",
         "Title",
       );
-      expect(screen.getByLabelText("Filter Department")).toBeInTheDocument();
-      expect(screen.getByLabelText("Filter Team")).toBeInTheDocument();
       expect(screen.getByLabelText("Filter Locations")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Filter Country" }),

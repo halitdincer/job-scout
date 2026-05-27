@@ -9,14 +9,14 @@ const sources: Source[] = [
   {
     id: 1,
     name: "E2E Source",
-    platform: "greenhouse",
+    platform: "GREENHOUSE",
     board_id: "e2e-board",
     is_active: true,
   },
   {
     id: 2,
     name: "Workday Source",
-    platform: "workday",
+    platform: "WORKDAY",
     board_id: "tenant/site",
     is_active: false,
   },

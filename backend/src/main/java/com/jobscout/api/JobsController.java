@@ -1,0 +1,97 @@
+package com.jobscout.api;
+
+import com.jobscout.api.generated.api.JobsApi;
+import com.jobscout.api.generated.model.FacetBucket;
+import com.jobscout.api.generated.model.JobListingPage;
+import com.jobscout.api.generated.model.MarkSeenResponse;
+import com.jobscout.domain.JobListing;
+import com.jobscout.domain.SeenListing;
+import com.jobscout.domain.User;
+import com.jobscout.filter.FilterExpressionEvaluator;
+import com.jobscout.mapper.JobListingMapper;
+import com.jobscout.repository.JobListingRepository;
+import com.jobscout.repository.SeenListingRepository;
+import com.jobscout.security.CurrentUserService;
+import com.jobscout.service.JobFacetsService;
+import com.jobscout.service.SeenSet;
+import com.jobscout.service.SortParser;
+import java.util.List;
+import java.util.Map;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+@RestController
+@RequestMapping("/api/v1")
+class JobsController implements JobsApi {
+
+    private final JobListingRepository listings;
+    private final SeenListingRepository seenRepo;
+    private final FilterExpressionEvaluator filterEval;
+    private final JobFacetsService facetsService;
+    private final SeenSet seenSet;
+    private final CurrentUserService currentUser;
+
+    JobsController(JobListingRepository listings,
+                   SeenListingRepository seenRepo,
+                   FilterExpressionEvaluator filterEval,
+                   JobFacetsService facetsService,
+                   SeenSet seenSet,
+                   CurrentUserService currentUser) {
+        this.listings = listings;
+        this.seenRepo = seenRepo;
+        this.filterEval = filterEval;
+        this.facetsService = facetsService;
+        this.seenSet = seenSet;
+        this.currentUser = currentUser;
+    }
+
+    @Override
+    public ResponseEntity<JobListingPage> listJobs(
+        Integer page, Integer pageSize, List<String> sort, String filter
+    ) {
+        Sort sortObj = SortParser.parse(sort);
+        Specification<JobListing> spec = filterEval.toSpecification(filter);
+
+        Page<JobListing> result = listings.findAll(
+            spec,
+            PageRequest.of(page == null ? 0 : page,
+                           pageSize == null ? 50 : pageSize,
+                           sortObj));
+
+        User user = currentUser.current();
+        var seenIds = seenSet.forUserAndListings(
+            user,
+            result.getContent().stream().map(JobListing::getId).toList());
+
+        return ResponseEntity.ok(JobListingMapper.toPage(result, seenIds));
+    }
+
+    @Override
+    public ResponseEntity<Map<String, List<FacetBucket>>> getJobFacets(
+        List<String> fields, String filter
+    ) {
+        Specification<JobListing> spec = filterEval.toSpecification(filter);
+        return ResponseEntity.ok(facetsService.compute(fields, spec));
+    }
+
+    @Override
+    public ResponseEntity<MarkSeenResponse> markJobSeen(Long id) {
+        JobListing listing = listings.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_FOUND, "Job not found"));
+        User user = currentUser.current();
+        if (!seenRepo.existsByUserAndListing(user, listing)) {
+            SeenListing seen = new SeenListing();
+            seen.setUser(user);
+            seen.setListing(listing);
+            seenRepo.save(seen);
+        }
+        return ResponseEntity.ok(new MarkSeenResponse(listing.getId(), true));
+    }
+}

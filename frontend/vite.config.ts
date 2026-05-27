@@ -2,8 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
-// Vite serves built assets via Django's WhiteNoise at /static/spa/.
-// In dev, the proxy forwards API + auth + admin paths to Django on :8000.
+// Built assets are copied into Spring Boot's classpath:/static root.
+// In dev, Vite serves the SPA and proxies API calls to Spring on :8080.
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -11,7 +11,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
-  base: "/static/spa/",
+  base: "/",
   build: {
     outDir: "dist",
     emptyOutDir: true,
@@ -21,10 +21,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://127.0.0.1:8000",
-      "/accounts": "http://127.0.0.1:8000",
-      "/admin": "http://127.0.0.1:8000",
-      "/static": "http://127.0.0.1:8000",
+      "/api": "http://127.0.0.1:8080",
     },
   },
 });

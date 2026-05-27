@@ -38,9 +38,9 @@ describe("job formatters", () => {
       source_name: "Source",
       external_id: "ext-1",
       title: "Listing",
-      department: null,
       locations: [
         {
+          id: 1,
           name: "Toronto",
           country_code: "CA",
           region_code: "ON",
@@ -49,10 +49,7 @@ describe("job formatters", () => {
         },
       ],
       url: "https://example.com",
-      status: "active",
-      team: null,
-      employment_type: "full_time",
-      workplace_type: "remote",
+      status: "ACTIVE",
       country: ["CA"],
       region: ["ON"],
       city: ["Toronto"],
@@ -64,22 +61,12 @@ describe("job formatters", () => {
       seen: false,
     });
 
-    expect(row.department).toBe("");
-    expect(row.team).toBe("");
     expect(row.locations_display).toBe("Toronto");
-    expect(row.employment_type_label).toBe("Full-time");
-    expect(row.workplace_type_label).toBe("Remote");
 
     const unmapped = mapJobRow({
       ...row,
-      department: null,
-      team: null,
       locations: [],
-      employment_type: null,
-      workplace_type: null,
     });
     expect(unmapped.locations_display).toBe("");
-    expect(unmapped.employment_type_label).toBe("");
-    expect(unmapped.workplace_type_label).toBe("");
   });
 });

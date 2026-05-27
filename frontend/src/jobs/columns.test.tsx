@@ -17,16 +17,10 @@ function makeRow(overrides: Partial<JobGridRow> = {}): JobGridRow {
     source_name: "Source",
     external_id: "x-1",
     title: "Software Engineer",
-    department: "Eng",
-    team: "Platform",
     locations_display: "Toronto",
-    employment_type_label: "Full-time",
-    workplace_type_label: "Remote",
     locations: [],
     url: "https://example.com/job",
-    status: "active",
-    employment_type: "full_time",
-    workplace_type: "remote",
+    status: "ACTIVE",
     country: ["CA"],
     region: ["ON"],
     city: ["Toronto"],
@@ -58,17 +52,13 @@ describe("getJobColumns", () => {
     const columns = getJobColumns();
     expect(columns.map((c) => c.id)).toContain("title");
     expect(findColumn("title").enableSorting).toBe(true);
-    expect(findColumn("employment_type_label").enableSorting).toBe(false);
+    expect(findColumn("locations_display").enableSorting).toBe(false);
     expect(findColumn("external_id").meta?.defaultVisible).toBe(false);
     expect(findColumn("title").meta?.defaultVisible).toBe(true);
-    expect(findColumn("department").meta).toMatchObject({
-      filterField: "department",
-      filterWidget: "text",
-    });
-    expect(findColumn("team").meta).toMatchObject({
-      filterField: "team",
-      filterWidget: "text",
-    });
+    expect(columns.map((c) => c.id)).not.toContain("department");
+    expect(columns.map((c) => c.id)).not.toContain("team");
+    expect(columns.map((c) => c.id)).not.toContain("employment_type_label");
+    expect(columns.map((c) => c.id)).not.toContain("workplace_type_label");
     expect(findColumn("locations_display").meta).toMatchObject({
       filterField: "location",
       filterWidget: "text",
@@ -102,7 +92,7 @@ describe("getJobColumns", () => {
     preventTestNavigation(unseenLink);
     fireEvent.click(unseenLink);
     expect(unseenLink.className).toContain("seen-link");
-    expect(fetchSpy.mock.calls[0][0]).toBe("/api/jobs/1/seen/");
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/jobs/1/seen");
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("POST");
     expect(init.keepalive).toBe(true);

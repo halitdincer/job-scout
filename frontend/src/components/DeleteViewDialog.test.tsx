@@ -62,7 +62,7 @@ describe("DeleteViewDialog", () => {
 
     await waitFor(() => expect(onDeleted).toHaveBeenCalled());
     const [url, init] = spy.mock.calls[0];
-    expect(url).toBe("/api/views/12/");
+    expect(url).toBe("/api/v1/views/12");
     expect(init?.method).toBe("DELETE");
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

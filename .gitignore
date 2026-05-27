@@ -31,6 +31,9 @@ media/
 node_modules/
 coverage/
 
+# Java / Maven
+backend/target/
+
 # Playwright
 /e2e.sqlite3
 /playwright-report/

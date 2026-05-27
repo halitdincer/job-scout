@@ -1,7 +1,7 @@
 /**
- * Read Django's csrftoken cookie. Returns null if absent so callers can
- * skip injecting the header on requests that don't need it (e.g. GETs,
- * cross-origin pings).
+ * Read Spring Security's CSRF cookie. The backend keeps Django-compatible
+ * cookie/header names so existing unsafe request helpers can keep using
+ * X-CSRFToken.
  */
 export function getCsrfToken(): string | null {
   const cookie = document.cookie;

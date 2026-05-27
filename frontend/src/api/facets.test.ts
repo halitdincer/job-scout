@@ -12,7 +12,7 @@ afterEach(() => {
 describe("buildFacetsUrl", () => {
   it("joins fields into a comma-separated query param", () => {
     expect(buildFacetsUrl(["source_name", "country"])).toBe(
-      "/api/jobs/facets/?fields=source_name%2Ccountry",
+      "/api/v1/jobs/facets?fields=source_name%2Ccountry",
     );
   });
 });
@@ -24,8 +24,9 @@ describe("useJobFacets", () => {
       .mockResolvedValue(
         new Response(
           JSON.stringify({
-            source_name: ["Acme"],
+            source_name: [{ value: "Acme", count: 2 }],
             country: ["CA"],
+            region: null,
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         ),
@@ -34,12 +35,13 @@ describe("useJobFacets", () => {
     const { result } = renderHook(() => useJobFacets(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining("/api/jobs/facets/?fields="),
+      expect.stringContaining("/api/v1/jobs/facets?fields="),
       expect.any(Object),
     );
     expect(result.current.data).toEqual({
       source_name: ["Acme"],
       country: ["CA"],
+      region: [],
     });
   });
 

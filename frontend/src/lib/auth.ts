@@ -19,50 +19,59 @@ function browserRedirect(url: string) {
 }
 /* v8 ignore stop */
 
-function buildLoginUrl(next?: string) {
-  if (!next) {
-    return "/accounts/login/";
+async function ensureCsrfCookie() {
+  if (getCsrfToken()) {
+    return;
   }
-  const params = new URLSearchParams({ next });
-  return `/accounts/login/?${params.toString()}`;
+  await fetch("/api/v1/health", {
+    method: "GET",
+    credentials: "same-origin",
+  });
 }
 
 export async function login({ username, password, next }: LoginInput) {
-  const body = new URLSearchParams({ username, password });
-  if (next) {
-    body.set("next", next);
-  }
+  await ensureCsrfCookie();
 
   const headers = new Headers({
-    "Content-Type": "application/x-www-form-urlencoded",
+    "Content-Type": "application/json",
   });
   const token = getCsrfToken();
   if (token) {
     headers.set("X-CSRFToken", token);
   }
 
-  const response = await fetch(buildLoginUrl(next), {
+  const response = await fetch("/api/v1/auth/login", {
     method: "POST",
     headers,
-    body,
+    body: JSON.stringify({ username, password }),
     credentials: "same-origin",
   });
 
   if (response.status === 403) {
     throw new LoginError("Your sign-in session expired. Reload and try again.");
   }
+  if (response.status === 401) {
+    throw new LoginError("Please enter a correct username and password.");
+  }
   if (!response.ok) {
     throw new LoginError(`Sign in failed with HTTP ${response.status}.`);
   }
-  if (response.redirected) {
-    return next ?? "/";
-  }
 
-  throw new LoginError("Please enter a correct username and password.");
+  return next ?? "/";
 }
 
-export function logout(
+export async function logout(
   redirect: (url: string) => void = browserRedirect,
 ) {
-  redirect("/accounts/logout/");
+  const headers = new Headers();
+  const token = getCsrfToken();
+  if (token) {
+    headers.set("X-CSRFToken", token);
+  }
+  await fetch("/api/v1/auth/logout", {
+    method: "POST",
+    headers,
+    credentials: "same-origin",
+  });
+  redirect("/accounts/login/");
 }

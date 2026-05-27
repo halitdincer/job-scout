@@ -13,7 +13,7 @@ export class ApiError extends Error {
 }
 
 /**
- * fetch wrapper for the Django API:
+ * fetch wrapper for the app API:
  *  - always sends cookies (same-origin)
  *  - injects X-CSRFToken on unsafe methods when the cookie is present
  *  - defaults Content-Type to application/json when a body is provided

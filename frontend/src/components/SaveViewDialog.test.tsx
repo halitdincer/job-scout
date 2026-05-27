@@ -75,11 +75,14 @@ describe("SaveViewDialog", () => {
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     const [url, init] = spy.mock.calls[0];
-    expect(url).toBe("/api/views/");
+    expect(url).toBe("/api/v1/views");
     expect(init?.method).toBe("POST");
     expect(JSON.parse(init?.body as string)).toEqual({
-      ...PAYLOAD,
       name: "New view",
+      filterExpression: null,
+      columns: [],
+      sort: [{ field: "first_seen_at", dir: "desc" }],
+      config: { page_size: 50 },
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
@@ -97,7 +100,7 @@ describe("SaveViewDialog", () => {
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     const [url, init] = spy.mock.calls[0];
-    expect(url).toBe("/api/views/9/");
+    expect(url).toBe("/api/v1/views/9");
     expect(init?.method).toBe("PUT");
     expect(JSON.parse(init?.body as string).name).toBe("Renamed");
   });

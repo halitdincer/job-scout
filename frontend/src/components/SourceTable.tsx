@@ -10,13 +10,13 @@ import {
 } from "@/components/ui/table";
 
 const PLATFORM_LABELS: Record<string, string> = {
-  ashby: "Ashby",
-  bamboohr: "BambooHR",
-  greenhouse: "Greenhouse",
-  jibe: "Jibe",
-  lever: "Lever",
-  phenom: "Phenom People",
-  workday: "Workday",
+  ASHBY: "Ashby",
+  BAMBOOHR: "BambooHR",
+  GREENHOUSE: "Greenhouse",
+  JIBE: "Jibe",
+  LEVER: "Lever",
+  PHENOM: "Phenom People",
+  WORKDAY: "Workday",
 };
 
 function SourceStatusBadge({ active }: { active: boolean }) {

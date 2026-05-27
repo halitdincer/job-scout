@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: job-scout
+  main:
+    banner-mode: off
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/jobscout}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      # Flyway owns the schema; Hibernate only verifies the entity mapping matches.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: 8080
+
+springdoc:
+  # Spec-first: Swagger UI is served, but it renders the handwritten YAML
+  # (copied to /openapi.yaml by the Maven resources plugin) rather than a
+  # spec scanned from controllers. We keep api-docs.enabled=true because
+  # disabling it tears down the Swagger UI routes as well.
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    url: /openapi.yaml
+    config-url: /v3/api-docs/swagger-config
+
+logging:
+  level:
+    com.jobscout: DEBUG
+
+jobscout:
+  ingest-api-key: ${INGEST_API_KEY:}

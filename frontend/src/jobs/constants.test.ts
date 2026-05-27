@@ -28,21 +28,26 @@ describe("filter field definitions", () => {
 
   it("derives column-to-filter map from headerField entries", () => {
     expect(COLUMN_TO_FILTER.title).toBe("title");
-    expect(COLUMN_TO_FILTER.employment_type_label).toBe("employment_type");
-    expect(COLUMN_TO_FILTER.workplace_type_label).toBe("workplace_type");
     expect(COLUMN_TO_FILTER.locations_display).toBe("location");
     expect(COLUMN_TO_FILTER).not.toHaveProperty("department");
     expect(COLUMN_TO_FILTER).not.toHaveProperty("team");
+    expect(COLUMN_TO_FILTER).not.toHaveProperty("employment_type_label");
+    expect(COLUMN_TO_FILTER).not.toHaveProperty("workplace_type_label");
   });
 
   it("supports text filtering for non-faceted string fields", () => {
-    expect(FILTER_FIELD_DEFS.department.operators).toContain("not_contains");
-    expect(FILTER_FIELD_DEFS.team.operators).toContain("not_contains");
     expect(FILTER_FIELD_DEFS.location).toMatchObject({
       label: "Locations",
       type: "text",
       headerField: "locations_display",
     });
+  });
+
+  it("does not expose hidden columns as filterable fields", () => {
+    expect(FILTER_FIELD_DEFS).not.toHaveProperty("department");
+    expect(FILTER_FIELD_DEFS).not.toHaveProperty("team");
+    expect(FILTER_FIELD_DEFS).not.toHaveProperty("employment_type");
+    expect(FILTER_FIELD_DEFS).not.toHaveProperty("workplace_type");
   });
 });
 

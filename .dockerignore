@@ -20,6 +20,7 @@ docker-compose.yml
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+backend/target/
 node_modules/
 playwright-report/
 test-results/

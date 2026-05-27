@@ -73,18 +73,6 @@ export const FILTER_FIELD_DEFS: Record<string, FilterFieldDef> = {
     operators: ["eq", "neq", "in", "not_in"],
     headerField: "status",
   },
-  department: {
-    label: "Department",
-    type: "text",
-    operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"],
-    headerField: null,
-  },
-  team: {
-    label: "Team",
-    type: "text",
-    operators: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"],
-    headerField: null,
-  },
   location: {
     label: "Locations",
     type: "text",
@@ -99,18 +87,6 @@ export const FILTER_FIELD_DEFS: Record<string, FilterFieldDef> = {
       "is_not_empty",
     ],
     headerField: "locations_display",
-  },
-  employment_type: {
-    label: "Type",
-    type: "enum",
-    operators: ["eq", "neq", "in", "not_in"],
-    headerField: "employment_type_label",
-  },
-  workplace_type: {
-    label: "Workplace",
-    type: "enum",
-    operators: ["eq", "neq", "in", "not_in"],
-    headerField: "workplace_type_label",
   },
   country: {
     label: "Country",
@@ -203,11 +179,7 @@ export const DEFAULT_SORT: SortSpec[] = [
 
 export const SORTABLE_FIELDS: string[] = [
   "title",
-  "department",
-  "team",
   "status",
-  "employment_type",
-  "workplace_type",
   "source_name",
   "published_at",
   "first_seen_at",

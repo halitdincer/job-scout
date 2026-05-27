@@ -9,27 +9,29 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-# ---- Python build stage ----
-FROM python:3.13-slim AS builder
+# ---- Backend build stage ----
+FROM maven:3.9.9-eclipse-temurin-21 AS backend
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/pom.xml backend/pom.xml
+COPY openapi openapi
+WORKDIR /app/backend
+RUN mvn -B -DskipTests dependency:go-offline
+
+WORKDIR /app
+COPY backend backend
+COPY --from=frontend /app/frontend/dist backend/src/main/resources/static
+WORKDIR /app/backend
+RUN mvn -B -DskipTests package
 
 # ---- Runtime ----
-FROM python:3.13-slim
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin/gunicorn /usr/local/bin/gunicorn
+COPY --from=backend /app/backend/target/job-scout-1.0.0-SNAPSHOT.jar app.jar
 
-COPY . .
-COPY --from=frontend /app/frontend/dist ./frontend/dist
+EXPOSE 8080
 
-RUN python manage.py collectstatic --noinput
-
-EXPOSE 8000
-
-CMD ["gunicorn", "jobscout.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "300"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

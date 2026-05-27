@@ -1,7 +1,7 @@
-/** API contracts mirrored from core/models.py + core/views.py serializers.
+/** UI-facing API contracts.
  *
- * Keep field names in sync with `.values(...)` calls in the Django views;
- * the server is authoritative.
+ * The Spring backend returns generated camelCase DTOs. The frontend API modules
+ * map those responses into these snake_case view models to keep the UI stable.
  */
 
 export type RunStatus = "pending" | "running" | "completed" | "failed";
@@ -20,13 +20,13 @@ export type Run = {
 };
 
 export type SourcePlatform =
-  | "greenhouse"
-  | "lever"
-  | "ashby"
-  | "workday"
-  | "bamboohr"
-  | "phenom"
-  | "jibe";
+  | "GREENHOUSE"
+  | "LEVER"
+  | "ASHBY"
+  | "WORKDAY"
+  | "BAMBOOHR"
+  | "PHENOM"
+  | "JIBE";
 
 export type Source = {
   id: number;
@@ -36,15 +36,7 @@ export type Source = {
   is_active: boolean;
 };
 
-export type JobStatus = "active" | "expired";
-export type EmploymentType =
-  | "full_time"
-  | "part_time"
-  | "contract"
-  | "intern"
-  | "temporary"
-  | "unknown";
-export type WorkplaceType = "on_site" | "remote" | "hybrid" | "unknown";
+export type JobStatus = "ACTIVE" | "EXPIRED";
 
 export type JobListing = {
   id: number;
@@ -52,13 +44,9 @@ export type JobListing = {
   source_name: string;
   external_id: string;
   title: string;
-  department: string | null;
   locations: LocationTag[];
   url: string;
   status: JobStatus;
-  team: string | null;
-  employment_type: EmploymentType | null;
-  workplace_type: WorkplaceType | null;
   country: string[];
   region: string[];
   city: string[];
@@ -71,6 +59,7 @@ export type JobListing = {
 };
 
 export type LocationTag = {
+  id: number;
   name: string;
   country_code: string;
   region_code: string;

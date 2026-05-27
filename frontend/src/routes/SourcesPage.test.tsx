@@ -50,7 +50,7 @@ describe("SourcesPage", () => {
         {
           id: 1,
           name: "E2E Source",
-          platform: "greenhouse",
+          platform: "GREENHOUSE",
           board_id: "e2e-board",
           is_active: true,
         },

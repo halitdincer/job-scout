@@ -1,0 +1,10 @@
+extends:
+  - spectral:oas
+rules:
+  # Defaults from spectral:oas are good; we tighten a few warnings to errors
+  # so they fail CI.
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-tag-defined: error
+  operation-tags: error
+  operation-success-response: error
