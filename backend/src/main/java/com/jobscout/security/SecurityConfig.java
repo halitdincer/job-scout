@@ -25,6 +25,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -43,9 +44,17 @@ public class SecurityConfig {
         csrfRepository.setHeaderName("X-CSRFToken");
         csrfRepository.setCookieCustomizer(cookie -> cookie.path("/").httpOnly(false));
 
+        // The SPA reads the csrftoken cookie verbatim and echoes it in
+        // X-CSRFToken (Django-style double submit). Spring Security 6 defaults
+        // to XorCsrfTokenRequestAttributeHandler, which expects an XOR-encoded
+        // token instead and would 403 every unsafe request from the SPA.
+        CsrfTokenRequestAttributeHandler csrfRequestHandler =
+            new CsrfTokenRequestAttributeHandler();
+
         http
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfRepository)
+                .csrfTokenRequestHandler(csrfRequestHandler)
                 .ignoringRequestMatchers(new AntPathRequestMatcher("/api/v1/runs", "POST")))
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
