@@ -99,7 +99,7 @@ class AuthController implements AuthApi {
 
     private static CurrentUser toDto(User user) {
         return new CurrentUser(
-                user.getId(),
+                user.getId().longValue(),
                 user.getUsername(),
                 user.isStaff(),
                 user.isSuperuser())

@@ -71,7 +71,7 @@ class CurrentUserServiceTest {
 
     private static User user(String username) {
         User user = new User();
-        user.setId(1L);
+        user.setId(1);
         user.setUsername(username);
         user.setPassword("!");
         user.setActive(true);
