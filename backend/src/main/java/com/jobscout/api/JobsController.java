@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -51,7 +52,14 @@ class JobsController implements JobsApi {
         this.currentUser = currentUser;
     }
 
+    // Spring Boot runs with open-in-view=false, so the JPA session closes
+    // when each repository call returns. JobListingMapper walks the
+    // (lazy) source and locations associations on each entity, which
+    // throws LazyInitializationException once the session is gone. Wrap
+    // the read + map in a single read-only transaction so the proxies
+    // stay loadable through serialization.
     @Override
+    @Transactional(readOnly = true)
     public ResponseEntity<JobListingPage> listJobs(
         Integer page, Integer pageSize, List<String> sort, String filter
     ) {
